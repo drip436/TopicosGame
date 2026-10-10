@@ -42,7 +42,7 @@ environment = SubResource("Environment_vgdoj")
 transform = Transform3D(0.6205436, -0.34065968, 0.7063122, -0.014281789, 0.8956517, 0.44452724, -0.784042, -0.28593588, 0.55092573, 2.8249755, 1.311429, 2.743124)
 
 [node name="Plano" type="MeshInstance3D" parent="." unique_id=911039420]
-transform = Transform3D(4.2107463, -0.13078354, -0.090615034, 0.6576155, 0.80657315, 1.2838528, -0.09465885, -0.21425796, 4.8883715, 0.1411326, -1.623354, 0.40370297)
+transform = Transform3D(206.39847, -2.0504816, -205.08972, -2.9338846, 15.281269, -110.70503, -124.36413, -3.7635415, -337.76187, -0.21790934, -2.0106792, -0.987241)
 mesh = SubResource("PlaneMesh_67c32")
 
 [node name="StaticBody3D2" type="StaticBody3D" parent="Plano" unique_id=391730940]
