@@ -4,6 +4,9 @@
 [ext_resource type="Script" uid="uid://bvo8wgr3724pw" path="res://Scenes/ui.gd" id="1_hfhsn"]
 [ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="1_nxvpl"]
 [ext_resource type="Texture2D" uid="uid://diebajfnm80lg" path="res://gameTitle.png" id="2_dewlx"]
+[ext_resource type="AudioStream" uid="uid://mg7urvuvquhy" path="res://Sombra del Bosque.mp3" id="3_xjg7p"]
+[ext_resource type="AudioStream" uid="uid://b7q074yrn6aa1" path="res://Sombra del Bosque_2.mp3" id="4_mg6lk"]
+[ext_resource type="AudioStream" uid="uid://c6t04lineucwp" path="res://Silence Before the Strike.mp3" id="5_qwshj"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nxvpl"]
 content_margin_left = 80.0
@@ -41,6 +44,7 @@ offset_bottom = 2323.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_hfhsn")
+canciones = Array[AudioStream]([ExtResource("5_qwshj"), ExtResource("3_xjg7p"), ExtResource("4_mg6lk")])
 
 [node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="." unique_id=1801197143]
 layout_mode = 1
@@ -110,6 +114,9 @@ grow_horizontal = 2
 rotation = -0.0027014131
 scale = Vector2(0.35161382, 0.3615668)
 texture = ExtResource("2_dewlx")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=261201399]
+volume_db = 24.0
 
 [connection signal="pressed" from="VBoxContainer/ContinueButton" to="." method="_on_continue_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/NewGameButtom" to="." method="_on_new_game_buttom_pressed"]

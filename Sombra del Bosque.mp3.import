@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://mg7urvuvquhy"
+path="res://.godot/imported/Sombra del Bosque.mp3-814297b1f34e19375df739dea4213778.mp3str"
+
+[deps]
+
+source_file="res://Sombra del Bosque.mp3"
+dest_files=["res://.godot/imported/Sombra del Bosque.mp3-814297b1f34e19375df739dea4213778.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

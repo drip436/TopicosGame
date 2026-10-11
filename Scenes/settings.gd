@@ -27,7 +27,7 @@ func _on_volume_h_slider_value_changed(value: float) -> void:
 	AudioServer.set_bus_volume_db(bus_index, linear_to_db(value))
 
 
-func _on_brightness_h_slider_value_changed(value: float) -> void:
+func _on_brightness_h_slider_value_changed(_value: float) -> void:
 	pass
 
 
