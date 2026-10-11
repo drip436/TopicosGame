@@ -1,12 +1,26 @@
 [gd_scene format=3 uid="uid://uk7vvowq8rvj"]
 
 [ext_resource type="Shader" uid="uid://cipss10lf2shi" path="res://Scenes/BuildSelector.gdshader" id="1_54tlk"]
+[ext_resource type="Script" uid="uid://ibd61ohjo5o3" path="res://Scenes/build_selector.gd" id="1_wlbc0"]
 [ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="2_o8uih"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_67c32"]
 shader = ExtResource("1_54tlk")
 shader_parameter/scanline_count = 500.0
 shader_parameter/glitch_intensity = 0.02
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o8uih"]
+content_margin_left = 20.0
+content_margin_top = 20.0
+content_margin_right = 20.0
+content_margin_bottom = 20.0
+bg_color = Color(3.6098065e-08, 0.024724942, 0.042878933, 0.73333335)
+border_width_left = 2
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 1, 0.95000005, 1)
+border_blend = true
 
 [node name="TechTreeUI" type="Control" unique_id=1171593056]
 layout_mode = 3
@@ -15,6 +29,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1_wlbc0")
 
 [node name="BackgroundShader" type="ColorRect" parent="." unique_id=740110466]
 material = SubResource("ShaderMaterial_67c32")
@@ -56,42 +71,77 @@ text = "\"MEMORIA: 5 / 10\""
 
 [node name="ContentLayout" type="HBoxContainer" parent="BackgroundShader/MainLayout" unique_id=1408862002]
 layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 30
 
 [node name="ClassList" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout" unique_id=1665881407]
+custom_minimum_size = Vector2(200, 300)
 layout_mode = 2
+theme_override_constants/separation = 10
 
 [node name="BtnFrontend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=127746374]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Frontend Developer"
 
 [node name="BtnBackend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=314184285]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Backend Developer"
 
 [node name="BtnAIDev" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=1106845092]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "AI Developer"
 
 [node name="BtnDataScientist" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=305712710]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "DataScientist"
 
 [node name="BtnCibersegurity" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=1477408026]
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Cibersegurity Engineeer"
 
 [node name="InfoPanel" type="PanelContainer" parent="BackgroundShader/MainLayout/ContentLayout" unique_id=1961106606]
 layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_o8uih")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel" unique_id=222590279]
 layout_mode = 2
 
 [node name="ClassTitle" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=774915857]
 layout_mode = 2
+theme_override_colors/font_color = Color(0, 0.9000001, 1, 1)
+theme_override_font_sizes/font_size = 28
 
 [node name="ClassDescription" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=1794890239]
+custom_minimum_size = Vector2(300, 450)
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
+autowrap_mode = 3
 
-[node name="ConfirmButton" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=1042823931]
+[node name="HBoxContainer" type="HBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=710846050]
 layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Back to Menu" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer" unique_id=863825386]
+layout_mode = 2
+text = "Back to Menu"
+
+[node name="ConfirmButton" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer" unique_id=1042823931]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9999997, 0.87377965, 0.20684853, 1)
 text = "Confirmar clase"
+
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/ClassList/BtnFrontend" to="." method="_on_btn_frontend_pressed"]
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/ClassList/BtnBackend" to="." method="_on_btn_backend_pressed"]
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/ClassList/BtnAIDev" to="." method="_on_btn_ai_dev_pressed"]
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/ClassList/BtnDataScientist" to="." method="_on_btn_data_scientist_pressed"]
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/ClassList/BtnCibersegurity" to="." method="_on_btn_cibersegurity_pressed"]
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer/Back to Menu" to="." method="_on_back_to_menu_pressed"]
+[connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer/ConfirmButton" to="." method="_on_confirm_button_pressed"]

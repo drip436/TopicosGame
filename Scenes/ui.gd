@@ -16,7 +16,7 @@ func _on_continue_button_pressed() -> void:
 
 
 func _on_new_game_buttom_pressed() -> void:
-	get_tree().change_scene_to_file("res://Scenes/scenes_3d.tscn")
+	get_tree().change_scene_to_file("res://Scenes/BuildSelector.tscn")
 
 
 func _on_settings_buttom_pressed() -> void:
