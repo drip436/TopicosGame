@@ -20,7 +20,7 @@ func _on_new_game_buttom_pressed() -> void:
 
 
 func _on_settings_buttom_pressed() -> void:
-	pass # Funcion de opciones
+	get_tree().change_scene_to_file("res://Scenes/Settings.tscn")
 
 
 func _on_exit_buttom_pressed() -> void:

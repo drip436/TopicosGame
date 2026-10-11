@@ -1,0 +1,97 @@
+[gd_scene format=3 uid="uid://uk7vvowq8rvj"]
+
+[ext_resource type="Shader" uid="uid://cipss10lf2shi" path="res://Scenes/BuildSelector.gdshader" id="1_54tlk"]
+[ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="2_o8uih"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_67c32"]
+shader = ExtResource("1_54tlk")
+shader_parameter/scanline_count = 500.0
+shader_parameter/glitch_intensity = 0.02
+
+[node name="TechTreeUI" type="Control" unique_id=1171593056]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BackgroundShader" type="ColorRect" parent="." unique_id=740110466]
+material = SubResource("ShaderMaterial_67c32")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainLayout" type="VBoxContainer" parent="BackgroundShader" unique_id=405988358]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = -6.0
+offset_right = 3.0
+offset_bottom = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopBar" type="HBoxContainer" parent="BackgroundShader/MainLayout" unique_id=980711358]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="BackgroundShader/MainLayout/TopBar" unique_id=1872391405]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_o8uih")
+theme_override_font_sizes/font_size = 31
+text = "\"BUILD SELECTOR\""
+
+[node name="PointsLabel" type="Label" parent="BackgroundShader/MainLayout/TopBar" unique_id=191782265]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "\"MEMORIA: 5 / 10\""
+
+[node name="ContentLayout" type="HBoxContainer" parent="BackgroundShader/MainLayout" unique_id=1408862002]
+layout_mode = 2
+
+[node name="ClassList" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout" unique_id=1665881407]
+layout_mode = 2
+
+[node name="BtnFrontend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=127746374]
+layout_mode = 2
+text = "Frontend Developer"
+
+[node name="BtnBackend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=314184285]
+layout_mode = 2
+text = "Backend Developer"
+
+[node name="BtnAIDev" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=1106845092]
+layout_mode = 2
+text = "AI Developer"
+
+[node name="BtnDataScientist" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=305712710]
+layout_mode = 2
+text = "DataScientist"
+
+[node name="BtnCibersegurity" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=1477408026]
+layout_mode = 2
+text = "Cibersegurity Engineeer"
+
+[node name="InfoPanel" type="PanelContainer" parent="BackgroundShader/MainLayout/ContentLayout" unique_id=1961106606]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel" unique_id=222590279]
+layout_mode = 2
+
+[node name="ClassTitle" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=774915857]
+layout_mode = 2
+
+[node name="ClassDescription" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=1794890239]
+layout_mode = 2
+
+[node name="ConfirmButton" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=1042823931]
+layout_mode = 2
+text = "Confirmar clase"
