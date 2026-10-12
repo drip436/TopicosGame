@@ -1,0 +1,124 @@
+[gd_scene format=3 uid="uid://887histgx4fs"]
+
+[ext_resource type="VideoStream" uid="uid://bg7svhpgk3vt2" path="res://background.ogv" id="1_dewlx"]
+[ext_resource type="Script" uid="uid://bvo8wgr3724pw" path="res://Scenes/ui.gd" id="1_hfhsn"]
+[ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="1_nxvpl"]
+[ext_resource type="Texture2D" uid="uid://diebajfnm80lg" path="res://gameTitle.png" id="2_dewlx"]
+[ext_resource type="AudioStream" uid="uid://mg7urvuvquhy" path="res://Sombra del Bosque.mp3" id="3_xjg7p"]
+[ext_resource type="AudioStream" uid="uid://b7q074yrn6aa1" path="res://Sombra del Bosque_2.mp3" id="4_mg6lk"]
+[ext_resource type="AudioStream" uid="uid://c6t04lineucwp" path="res://Silence Before the Strike.mp3" id="5_qwshj"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nxvpl"]
+content_margin_left = 80.0
+content_margin_top = 10.0
+content_margin_right = 80.0
+content_margin_bottom = 15.0
+bg_color = Color(0.13816993, 0.1428257, 0.14733289, 0.90300006)
+border_width_left = 2
+border_width_top = 4
+border_width_right = 2
+border_width_bottom = 4
+border_color = Color(0.596441, 0.6014153, 0.6534108, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3iaii"]
+content_margin_left = 60.0
+content_margin_top = 10.0
+content_margin_right = 65.0
+content_margin_bottom = 15.0
+bg_color = Color(0.13816993, 0.1428257, 0.14733289, 0.90300006)
+border_width_left = 2
+border_width_top = 4
+border_width_right = 2
+border_width_bottom = 4
+border_color = Color(0.58431375, 0.5882353, 0.6392157, 1)
+
+[node name="Control" type="Control" unique_id=1796006254]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -35.0
+offset_top = 2326.0
+offset_right = -33.0
+offset_bottom = 2323.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hfhsn")
+canciones = Array[AudioStream]([ExtResource("5_qwshj"), ExtResource("3_xjg7p"), ExtResource("4_mg6lk")])
+
+[node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="." unique_id=1801197143]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = -2323.0
+offset_right = 34.0
+offset_bottom = -2323.0
+grow_horizontal = 2
+grow_vertical = 2
+stream = ExtResource("1_dewlx")
+autoplay = true
+expand = true
+loop = true
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2119529391]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 114.0
+offset_top = -2363.5
+offset_right = 420.0
+offset_bottom = -2095.5
+grow_vertical = 2
+
+[node name="ContinueButton" type="Button" parent="VBoxContainer" unique_id=120232068]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("1_nxvpl")
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("StyleBoxFlat_nxvpl")
+text = "Continue"
+
+[node name="NewGameButtom" type="Button" parent="VBoxContainer" unique_id=2137150671]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("1_nxvpl")
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("StyleBoxFlat_3iaii")
+text = "New Game"
+
+[node name="SettingsButtom" type="Button" parent="VBoxContainer" unique_id=409019044]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("1_nxvpl")
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("StyleBoxFlat_3iaii")
+text = "Settings"
+
+[node name="ExitButtom" type="Button" parent="VBoxContainer" unique_id=1952257905]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("1_nxvpl")
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("StyleBoxFlat_3iaii")
+text = "Exit"
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=233268617]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -559.0
+offset_top = -2307.0
+offset_right = 849.0
+offset_bottom = -1539.0
+grow_horizontal = 2
+rotation = -0.0027014131
+scale = Vector2(0.35161382, 0.3615668)
+texture = ExtResource("2_dewlx")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=261201399]
+volume_db = 24.0
+
+[connection signal="pressed" from="VBoxContainer/ContinueButton" to="." method="_on_continue_button_pressed"]
+[connection signal="pressed" from="VBoxContainer/NewGameButtom" to="." method="_on_new_game_buttom_pressed"]
+[connection signal="pressed" from="VBoxContainer/SettingsButtom" to="." method="_on_settings_buttom_pressed"]
+[connection signal="pressed" from="VBoxContainer/ExitButtom" to="." method="_on_exit_buttom_pressed"]

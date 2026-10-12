@@ -1,0 +1,86 @@
+[gd_scene format=3 uid="uid://sxlxi78gk1b8"]
+
+[ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="1_8uw7q"]
+
+[node name="Control" type="Control" unique_id=1492823608]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 1.0
+offset_top = -1.0
+offset_right = 1.0
+offset_bottom = -1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="." unique_id=1663042651]
+layout_mode = 0
+offset_top = 1.0
+offset_right = 1152.0
+offset_bottom = 649.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=217379294]
+layout_mode = 0
+offset_left = 515.0
+offset_top = 206.0
+offset_right = 933.0
+offset_bottom = 365.0
+
+[node name="Volumen" type="Label" parent="." unique_id=1679835034]
+layout_mode = 0
+offset_left = 301.0
+offset_top = 183.0
+offset_right = 521.0
+offset_bottom = 241.0
+theme_override_fonts/font = ExtResource("1_8uw7q")
+theme_override_font_sizes/font_size = 40
+text = "Volumen"
+
+[node name="VolumenHSlider" type="HSlider" parent="." unique_id=1541903253]
+layout_mode = 0
+offset_left = 519.0
+offset_top = 210.0
+offset_right = 937.0
+offset_bottom = 226.0
+size_flags_vertical = 4
+
+[node name="FullScreen" type="Label" parent="." unique_id=193905831]
+layout_mode = 0
+offset_left = 320.0
+offset_top = 313.0
+offset_right = 540.0
+offset_bottom = 418.0
+theme_override_fonts/font = ExtResource("1_8uw7q")
+theme_override_font_sizes/font_size = 40
+text = "Pantalla 
+completa"
+
+[node name="BrightnessHSlider2" type="HSlider" parent="." unique_id=258719279]
+layout_mode = 0
+offset_left = 520.0
+offset_top = 271.0
+offset_right = 938.0
+offset_bottom = 287.0
+size_flags_vertical = 4
+
+[node name="Brighness" type="Label" parent="." unique_id=673393223]
+layout_mode = 0
+offset_left = 380.0
+offset_top = 247.0
+offset_right = 600.0
+offset_bottom = 305.0
+theme_override_fonts/font = ExtResource("1_8uw7q")
+theme_override_font_sizes/font_size = 40
+text = "Brillo"
+
+[node name="CheckBox" type="CheckBox" parent="." unique_id=304671012]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.021000002
+anchor_bottom = 0.019000001
+offset_left = 590.0
+offset_top = 334.0
+offset_right = 589.808
+offset_bottom = 345.688
+scale = Vector2(3, 3)
