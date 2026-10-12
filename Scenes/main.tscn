@@ -1,0 +1,94 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena_generator.gd" id="1_gen"]
+[ext_resource type="Script" path="res://scripts/weather.gd" id="2_weather"]
+[ext_resource type="Script" path="res://scripts/free_camera.gd" id="3_cam"]
+[ext_resource type="Shader" path="res://shaders/storm_sky.gdshader" id="4_sky"]
+
+[sub_resource type="FastNoiseLite" id="Noise_clouds"]
+frequency = 0.008
+fractal_octaves = 6
+
+[sub_resource type="NoiseTexture2D" id="Tex_clouds"]
+width = 512
+height = 512
+seamless = true
+noise = SubResource("Noise_clouds")
+
+[sub_resource type="ShaderMaterial" id="Mat_sky"]
+shader = ExtResource("4_sky")
+shader_parameter/zenith_color = Color(0.09, 0.1, 0.12, 1)
+shader_parameter/horizon_color = Color(0.27, 0.29, 0.32, 1)
+shader_parameter/ground_color = Color(0.06, 0.06, 0.07, 1)
+shader_parameter/cloud_dark = Color(0.06, 0.065, 0.075, 1)
+shader_parameter/cloud_light = Color(0.3, 0.32, 0.35, 1)
+shader_parameter/cloud_tex = SubResource("Tex_clouds")
+shader_parameter/cloud_speed = 0.004
+shader_parameter/lightning = 0.0
+shader_parameter/lightning_dir = Vector2(0.6, -0.4)
+
+[sub_resource type="Sky" id="Sky_storm"]
+sky_material = SubResource("Mat_sky")
+process_mode = 2
+radiance_size = 3
+
+[sub_resource type="Environment" id="Env_storm"]
+background_mode = 2
+sky = SubResource("Sky_storm")
+ambient_light_source = 3
+ambient_light_color = Color(0.45, 0.5, 0.58, 1)
+ambient_light_sky_contribution = 0.85
+ambient_light_energy = 0.75
+reflected_light_source = 2
+tonemap_mode = 3
+tonemap_exposure = 1.1
+ssr_enabled = true
+ssr_max_steps = 96
+ssr_fade_in = 0.1
+ssr_fade_out = 1.5
+ssao_enabled = true
+glow_enabled = true
+glow_intensity = 0.6
+glow_bloom = 0.06
+fog_enabled = true
+fog_light_color = Color(0.28, 0.31, 0.36, 1)
+fog_light_energy = 0.85
+fog_density = 0.011
+fog_sky_affect = 0.35
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.016
+volumetric_fog_albedo = Color(0.6, 0.65, 0.72, 1)
+volumetric_fog_length = 80.0
+adjustment_enabled = true
+adjustment_contrast = 1.08
+adjustment_saturation = 0.72
+
+[node name="CampusBossArena" type="Node3D"]
+script = ExtResource("1_gen")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_storm")
+
+[node name="StormLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.286788, 0.409576, 0, 0.819152, 0.573576, -0.5, -0.496732, 0.709406, 0, 30, 0)
+light_color = Color(0.62, 0.68, 0.8, 1)
+light_energy = 0.55
+shadow_enabled = true
+directional_shadow_max_distance = 160.0
+
+[node name="Weather" type="Node3D" parent="."]
+script = ExtResource("2_weather")
+environment_path = NodePath("../WorldEnvironment")
+sun_path = NodePath("../StormLight")
+
+[node name="PlayerSpawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)
+
+[node name="BossSpawn" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -10)
+
+[node name="FreeCamera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.994522, 0.104528, 0, -0.104528, 0.994522, 0, 3.5, 35)
+fov = 70.0
+far = 600.0
+script = ExtResource("3_cam")
