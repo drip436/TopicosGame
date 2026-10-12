@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://uk7vvowq8rvj"]
+[gd_scene load_steps=6 format=3 uid="uid://uk7vvowq8rvj"]
 
 [ext_resource type="Shader" uid="uid://cipss10lf2shi" path="res://Scenes/BuildSelector.gdshader" id="1_54tlk"]
 [ext_resource type="Script" uid="uid://ibd61ohjo5o3" path="res://Scenes/build_selector.gd" id="1_wlbc0"]
@@ -14,15 +14,15 @@ content_margin_left = 20.0
 content_margin_top = 20.0
 content_margin_right = 20.0
 content_margin_bottom = 20.0
-bg_color = Color(3.6098065e-08, 0.024724942, 0.042878933, 0.73333335)
+bg_color = Color(3.60981e-08, 0.0247249, 0.0428789, 0.733333)
 border_width_left = 2
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0, 1, 0.95000005, 1)
+border_color = Color(0, 1, 0.95, 1)
 border_blend = true
 
-[node name="TechTreeUI" type="Control" unique_id=1171593056]
+[node name="TechTreeUI" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -31,7 +31,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_wlbc0")
 
-[node name="BackgroundShader" type="ColorRect" parent="." unique_id=740110466]
+[node name="BackgroundShader" type="ColorRect" parent="."]
 material = SubResource("ShaderMaterial_67c32")
 layout_mode = 1
 anchors_preset = 15
@@ -40,7 +40,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MainLayout" type="VBoxContainer" parent="BackgroundShader" unique_id=405988358]
+[node name="MainLayout" type="VBoxContainer" parent="BackgroundShader"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -52,90 +52,90 @@ offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TopBar" type="HBoxContainer" parent="BackgroundShader/MainLayout" unique_id=980711358]
+[node name="TopBar" type="HBoxContainer" parent="BackgroundShader/MainLayout"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 alignment = 1
 
-[node name="TitleLabel" type="Label" parent="BackgroundShader/MainLayout/TopBar" unique_id=1872391405]
+[node name="TitleLabel" type="Label" parent="BackgroundShader/MainLayout/TopBar"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0, 1, 1, 1)
 theme_override_fonts/font = ExtResource("2_o8uih")
 theme_override_font_sizes/font_size = 31
 text = "\"BUILD SELECTOR\""
 
-[node name="PointsLabel" type="Label" parent="BackgroundShader/MainLayout/TopBar" unique_id=191782265]
+[node name="PointsLabel" type="Label" parent="BackgroundShader/MainLayout/TopBar"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "\"MEMORIA: 5 / 10\""
 
-[node name="ContentLayout" type="HBoxContainer" parent="BackgroundShader/MainLayout" unique_id=1408862002]
+[node name="ContentLayout" type="HBoxContainer" parent="BackgroundShader/MainLayout"]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 30
 
-[node name="ClassList" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout" unique_id=1665881407]
+[node name="ClassList" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout"]
 custom_minimum_size = Vector2(200, 300)
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="BtnFrontend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=127746374]
+[node name="BtnFrontend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Frontend Developer"
 
-[node name="BtnBackend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=314184285]
+[node name="BtnBackend" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Backend Developer"
 
-[node name="BtnAIDev" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=1106845092]
+[node name="BtnAIDev" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "AI Developer"
 
-[node name="BtnDataScientist" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=305712710]
+[node name="BtnDataScientist" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "DataScientist"
 
-[node name="BtnCibersegurity" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList" unique_id=1477408026]
+[node name="BtnCibersegurity" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/ClassList"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Cibersegurity Engineeer"
 
-[node name="InfoPanel" type="PanelContainer" parent="BackgroundShader/MainLayout/ContentLayout" unique_id=1961106606]
+[node name="InfoPanel" type="PanelContainer" parent="BackgroundShader/MainLayout/ContentLayout"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_o8uih")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel" unique_id=222590279]
+[node name="VBoxContainer" type="VBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel"]
 layout_mode = 2
 
-[node name="ClassTitle" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=774915857]
+[node name="ClassTitle" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0, 0.9000001, 1, 1)
+theme_override_colors/font_color = Color(0, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 28
 
-[node name="ClassDescription" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=1794890239]
+[node name="ClassDescription" type="Label" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer"]
 custom_minimum_size = Vector2(300, 450)
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 autowrap_mode = 3
 
-[node name="HBoxContainer" type="HBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer" unique_id=710846050]
+[node name="HBoxContainer" type="HBoxContainer" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 20
 alignment = 1
 
-[node name="Back to Menu" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer" unique_id=863825386]
+[node name="Back to Menu" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer"]
 layout_mode = 2
 text = "Back to Menu"
 
-[node name="ConfirmButton" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer" unique_id=1042823931]
+[node name="ConfirmButton" type="Button" parent="BackgroundShader/MainLayout/ContentLayout/InfoPanel/VBoxContainer/HBoxContainer"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9999997, 0.87377965, 0.20684853, 1)
+theme_override_colors/font_color = Color(1, 0.87378, 0.206849, 1)
 text = "Confirmar clase"
 
 [connection signal="pressed" from="BackgroundShader/MainLayout/ContentLayout/ClassList/BtnFrontend" to="." method="_on_btn_frontend_pressed"]

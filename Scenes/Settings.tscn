@@ -1,9 +1,9 @@
-[gd_scene format=3 uid="uid://cvploqs1acwhm"]
+[gd_scene load_steps=3 format=3 uid="uid://cvploqs1acwhm"]
 
 [ext_resource type="Script" uid="uid://dsb5wwraca5wv" path="res://Scenes/settings.gd" id="1_4hxq3"]
 [ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="2_flfri"]
 
-[node name="Control" type="Control" unique_id=446483661]
+[node name="Control2" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -12,12 +12,12 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_4hxq3")
 
-[node name="Panel" type="Panel" parent="." unique_id=477618459]
+[node name="Panel" type="Panel" parent="."]
 layout_mode = 0
 offset_right = 1153.0
 offset_bottom = 649.0
 
-[node name="Volume" type="Label" parent="." unique_id=337529699]
+[node name="Volume" type="Label" parent="."]
 layout_mode = 0
 offset_left = 313.0
 offset_top = 173.0
@@ -27,7 +27,7 @@ theme_override_fonts/font = ExtResource("2_flfri")
 theme_override_font_sizes/font_size = 40
 text = "Volume"
 
-[node name="Brightness" type="Label" parent="." unique_id=1381676914]
+[node name="Brightness" type="Label" parent="."]
 layout_mode = 0
 offset_left = 247.0
 offset_top = 244.0
@@ -37,21 +37,21 @@ theme_override_fonts/font = ExtResource("2_flfri")
 theme_override_font_sizes/font_size = 40
 text = "Brightness"
 
-[node name="VolumeHSlider" type="HSlider" parent="." unique_id=1588041961]
+[node name="VolumeHSlider" type="HSlider" parent="."]
 layout_mode = 0
 offset_left = 495.0
 offset_top = 199.0
 offset_right = 854.0
 offset_bottom = 215.0
 
-[node name="BrightnessHSlider" type="HSlider" parent="." unique_id=1441445264]
+[node name="BrightnessHSlider" type="HSlider" parent="."]
 layout_mode = 0
 offset_left = 495.0
 offset_top = 272.0
 offset_right = 854.0
 offset_bottom = 288.0
 
-[node name="FullScreenCheckBox" type="CheckBox" parent="." unique_id=482550646]
+[node name="FullScreenCheckBox" type="CheckBox" parent="."]
 layout_mode = 0
 offset_left = 605.0
 offset_top = 338.0
@@ -59,7 +59,7 @@ offset_right = 629.0
 offset_bottom = 362.0
 scale = Vector2(3, 3)
 
-[node name="FullScreen" type="Label" parent="." unique_id=1717812014]
+[node name="FullScreen" type="Label" parent="."]
 layout_mode = 0
 offset_left = 358.0
 offset_top = 344.0
@@ -69,7 +69,7 @@ theme_override_fonts/font = ExtResource("2_flfri")
 theme_override_font_sizes/font_size = 40
 text = "Full Screen"
 
-[node name="Button" type="Button" parent="." unique_id=547753031]
+[node name="Button" type="Button" parent="."]
 layout_mode = 0
 offset_left = 456.0
 offset_top = 479.0
@@ -79,7 +79,7 @@ theme_override_fonts/font = ExtResource("2_flfri")
 theme_override_font_sizes/font_size = 36
 text = "Back to Menu"
 
-[node name="Brightness2" type="Label" parent="." unique_id=1647081215]
+[node name="Brightness2" type="Label" parent="."]
 layout_mode = 0
 offset_left = 438.0
 offset_top = 30.0
