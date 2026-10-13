@@ -1,24 +1,18 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene format=3 uid="uid://cf2xsl8011lo7"]
 
-[ext_resource type="Script" path="res://scripts/arena_generator.gd" id="1_gen"]
-[ext_resource type="Script" path="res://scripts/weather.gd" id="2_weather"]
-[ext_resource type="Script" path="res://scripts/free_camera.gd" id="3_cam"]
-[ext_resource type="Shader" path="res://shaders/storm_sky.gdshader" id="4_sky"]
+[ext_resource type="Script" uid="uid://c8llcgy8ofler" path="res://scripts/arena_generator.gd" id="1_gen"]
+[ext_resource type="Script" uid="uid://day4b10wsvldj" path="res://scripts/weather.gd" id="2_weather"]
+[ext_resource type="Script" uid="uid://bw5m0rral57cs" path="res://scripts/free_camera.gd" id="3_cam"]
+[ext_resource type="Shader" uid="uid://g2i1m2buvn2p" path="res://shaders/storm_sky.gdshader" id="4_sky"]
+[ext_resource type="PackedScene" path="res://boss_profesor/boss_fight.tscn" id="5_kry3j"]
 
 [sub_resource type="FastNoiseLite" id="Noise_clouds"]
 frequency = 0.008
 fractal_octaves = 6
 
 [sub_resource type="NoiseTexture2D" id="Tex_clouds"]
-<<<<<<< HEAD
 noise = SubResource("Noise_clouds")
 seamless = true
-=======
-width = 512
-height = 512
-seamless = true
-noise = SubResource("Noise_clouds")
->>>>>>> 5ac6953edb904d568706921e43c4e5483ba4399d
 
 [sub_resource type="ShaderMaterial" id="Mat_sky"]
 shader = ExtResource("4_sky")
@@ -35,10 +29,6 @@ shader_parameter/lightning_dir = Vector2(0.6, -0.4)
 [sub_resource type="Sky" id="Sky_storm"]
 sky_material = SubResource("Mat_sky")
 process_mode = 2
-<<<<<<< HEAD
-=======
-radiance_size = 3
->>>>>>> 5ac6953edb904d568706921e43c4e5483ba4399d
 
 [sub_resource type="Environment" id="Env_storm"]
 background_mode = 2
@@ -71,56 +61,34 @@ adjustment_enabled = true
 adjustment_contrast = 1.08
 adjustment_saturation = 0.72
 
-<<<<<<< HEAD
-[node name="CampusBossArena" type="Node3D" unique_id=477567639]
+[node name="CampusBossArena" type="Node3D" unique_id=1565782696]
 script = ExtResource("1_gen")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=803998186]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1182321168]
 environment = SubResource("Env_storm")
 
-[node name="StormLight" type="DirectionalLight3D" parent="." unique_id=959524554]
-=======
-[node name="CampusBossArena" type="Node3D"]
-script = ExtResource("1_gen")
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Env_storm")
-
-[node name="StormLight" type="DirectionalLight3D" parent="."]
->>>>>>> 5ac6953edb904d568706921e43c4e5483ba4399d
+[node name="StormLight" type="DirectionalLight3D" parent="." unique_id=1822476815]
 transform = Transform3D(0.866025, -0.286788, 0.409576, 0, 0.819152, 0.573576, -0.5, -0.496732, 0.709406, 0, 30, 0)
 light_color = Color(0.62, 0.68, 0.8, 1)
 light_energy = 0.55
 shadow_enabled = true
 directional_shadow_max_distance = 160.0
 
-<<<<<<< HEAD
-[node name="Weather" type="Node3D" parent="." unique_id=1449079154]
-=======
-[node name="Weather" type="Node3D" parent="."]
->>>>>>> 5ac6953edb904d568706921e43c4e5483ba4399d
+[node name="Weather" type="Node3D" parent="." unique_id=2060443991]
 script = ExtResource("2_weather")
 environment_path = NodePath("../WorldEnvironment")
 sun_path = NodePath("../StormLight")
 
-<<<<<<< HEAD
-[node name="PlayerSpawn" type="Marker3D" parent="." unique_id=500357220]
+[node name="PlayerSpawn" type="Marker3D" parent="." unique_id=1205704931]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)
 
-[node name="BossSpawn" type="Marker3D" parent="." unique_id=1669182837]
+[node name="BossSpawn" type="Marker3D" parent="." unique_id=35136200]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -10)
 
-[node name="FreeCamera" type="Camera3D" parent="." unique_id=1078456926]
-=======
-[node name="PlayerSpawn" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)
-
-[node name="BossSpawn" type="Marker3D" parent="."]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -10)
-
-[node name="FreeCamera" type="Camera3D" parent="."]
->>>>>>> 5ac6953edb904d568706921e43c4e5483ba4399d
+[node name="FreeCamera" type="Camera3D" parent="." unique_id=37497350]
 transform = Transform3D(1, 0, 0, 0, 0.994522, 0.104528, 0, -0.104528, 0.994522, 0, 3.5, 35)
 fov = 70.0
 far = 600.0
 script = ExtResource("3_cam")
+
+[node name="BossFight" parent="." unique_id=795247481 instance=ExtResource("5_kry3j")]

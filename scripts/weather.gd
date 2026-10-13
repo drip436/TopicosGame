@@ -64,11 +64,30 @@ func _process(delta: float) -> void:
 	_update_lightning(delta)
 
 
+## Cambia la intensidad de la tormenta de forma gradual.
+## level: 0 = llovizna, 1 = tormenta fuerte. Lo usa el jefe al cambiar de fase.
+func set_storm(level: float, duration: float = 3.0) -> void:
+	level = clampf(level, 0.0, 1.0)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(rain, "amount_ratio", lerpf(0.12, 1.0, level), duration)
+	tw.tween_property(splashes, "amount_ratio", lerpf(0.15, 1.0, level), duration)
+	tw.tween_property(droplets, "amount_ratio", lerpf(0.15, 1.0, level), duration)
+	lightning_enabled = level > 0.5
+	lightning_min_interval = lerpf(10.0, 3.0, level)
+	lightning_max_interval = lerpf(20.0, 7.0, level)
+	_next = minf(_next, 1.0)
+
+
+## Destello de relámpago inmediato (cielo + escena). Lo usan los rayos del jefe.
+func flash(direction: Vector2 = Vector2.ZERO) -> void:
+	_since = 0.0
+	if _sky_mat and direction != Vector2.ZERO:
+		_sky_mat.set_shader_parameter("lightning_dir", direction)
+
+
 func _update_lightning(delta: float) -> void:
-	if not lightning_enabled:
-		return
 	_next -= delta
-	if _next <= 0.0:
+	if lightning_enabled and _next <= 0.0:
 		_next = _rng.randf_range(lightning_min_interval, lightning_max_interval)
 		_since = 0.0
 		var dir := Vector2.from_angle(_rng.randf() * TAU)
