@@ -29,6 +29,9 @@ signal player_died
 @export var fog_gate_width: float = 15.0
 @export_range(0.0, 1.0) var rain_phase1: float = 0.15
 @export_range(0.0, 1.0) var rain_phase2: float = 1.0
+## Al ganar la tormenta se disipa y solo cae una que otra gota (0 = deja de llover).
+@export var clear_weather_on_victory: bool = true
+@export_range(0.0, 0.3) var rain_after_victory: float = 0.03
 
 const BOSS := preload("boss_profesor.gd")
 const HUD := preload("boss_hud.gd")
@@ -168,7 +171,9 @@ func _on_boss_defeated() -> void:
 	hud.hide_boss(2.0)
 	await get_tree().create_timer(2.2).timeout
 	hud.show_banner("ENEMIGO DERROTADO", Color(0.92, 0.78, 0.38), "", 5.0)
-	if weather and weather.has_method("set_storm"):
+	if weather and clear_weather_on_victory and weather.has_method("calm"):
+		weather.calm(12.0, rain_after_victory)
+	elif weather and weather.has_method("set_storm"):
 		weather.set_storm(rain_phase1, 10.0)
 	await get_tree().create_timer(4.0).timeout
 	_open_fog_gate()

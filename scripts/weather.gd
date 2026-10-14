@@ -32,6 +32,9 @@ var _sky_mat: ShaderMaterial
 var _rain_mat: StandardMaterial3D
 var _sun_base := 0.5
 var _amb_base := 0.7
+var _storm_tween: Tween
+var _cover_t := 0.0
+var _covered := false
 
 
 func _ready() -> void:
@@ -61,6 +64,10 @@ func _process(delta: float) -> void:
 		rain.global_position = cp + ahead + Vector3(0, 14, 0)
 		splashes.global_position = Vector3(cp.x + ahead.x, 0.04, cp.z + ahead.z)
 		droplets.global_position = splashes.global_position
+		_cover_t -= delta
+		if _cover_t <= 0.0:
+			_cover_t = 0.25
+			_update_cover(cp)
 	_update_lightning(delta)
 
 
@@ -68,7 +75,7 @@ func _process(delta: float) -> void:
 ## level: 0 = llovizna, 1 = tormenta fuerte. Lo usa el jefe al cambiar de fase.
 func set_storm(level: float, duration: float = 3.0) -> void:
 	level = clampf(level, 0.0, 1.0)
-	var tw := create_tween().set_parallel(true)
+	var tw := _new_storm_tween()
 	tw.tween_property(rain, "amount_ratio", lerpf(0.12, 1.0, level), duration)
 	tw.tween_property(splashes, "amount_ratio", lerpf(0.15, 1.0, level), duration)
 	tw.tween_property(droplets, "amount_ratio", lerpf(0.15, 1.0, level), duration)
@@ -76,6 +83,53 @@ func set_storm(level: float, duration: float = 3.0) -> void:
 	lightning_min_interval = lerpf(10.0, 3.0, level)
 	lightning_max_interval = lerpf(20.0, 7.0, level)
 	_next = minf(_next, 1.0)
+
+
+## La tormenta se disipa: deja de llover (solo caen gotas sueltas), ya no hay
+## relámpagos y la niebla se aclara un poco. Se usa al derrotar al primer jefe.
+## drizzle: proporción de lluvia que queda (0 = nada, 0.03 = una que otra gota).
+func calm(duration: float = 12.0, drizzle: float = 0.03) -> void:
+	lightning_enabled = false
+	var tw := _new_storm_tween()
+	tw.tween_property(rain, "amount_ratio", drizzle, duration)
+	tw.tween_property(splashes, "amount_ratio", drizzle * 1.5, duration)
+	tw.tween_property(droplets, "amount_ratio", drizzle, duration)
+	if _env:
+		tw.tween_property(_env, "fog_density", _env.fog_density * 0.55, duration)
+		tw.tween_property(_env, "volumetric_fog_density", _env.volumetric_fog_density * 0.6, duration)
+		tw.tween_property(_env, "ambient_light_energy", _amb_base * 1.15, duration)
+		tw.tween_property(self, "_amb_base", _amb_base * 1.15, duration)
+	if _sun:
+		tw.tween_property(_sun, "light_energy", _sun_base * 1.3, duration)
+		tw.tween_property(self, "_sun_base", _sun_base * 1.3, duration)
+	if _sky_mat:
+		tw.tween_property(_sky_mat, "shader_parameter/cloud_speed", 0.0025, duration)
+
+
+func _new_storm_tween() -> Tween:
+	if _storm_tween and _storm_tween.is_valid():
+		_storm_tween.kill()
+	_storm_tween = create_tween().set_parallel(true)
+	return _storm_tween
+
+
+## Bajo un techo (biblioteca, centro de cómputo, túneles...) no se dibuja la lluvia.
+func _update_cover(cam_pos: Vector3) -> void:
+	var q := PhysicsRayQueryParameters3D.create(cam_pos, cam_pos + Vector3(0, 40, 0))
+	var exclude: Array[RID] = []
+	for g in ["player", "boss"]:
+		for n in get_tree().get_nodes_in_group(g):
+			if n is CollisionObject3D:
+				exclude.append((n as CollisionObject3D).get_rid())
+	q.exclude = exclude
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	var covered := not hit.is_empty() and hit["collider"] is StaticBody3D
+	if covered == _covered:
+		return
+	_covered = covered
+	rain.emitting = not covered
+	splashes.emitting = not covered
+	droplets.emitting = not covered
 
 
 ## Destello de relámpago inmediato (cielo + escena). Lo usan los rayos del jefe.

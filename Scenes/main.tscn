@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://bw5m0rral57cs" path="res://scripts/free_camera.gd" id="3_cam"]
 [ext_resource type="Shader" uid="uid://g2i1m2buvn2p" path="res://shaders/storm_sky.gdshader" id="4_sky"]
 [ext_resource type="PackedScene" path="res://boss_profesor/boss_fight.tscn" id="5_kry3j"]
+[ext_resource type="Script" path="res://scripts/campus_world.gd" id="6_world"]
 
 [sub_resource type="FastNoiseLite" id="Noise_clouds"]
 frequency = 0.008
@@ -92,3 +93,6 @@ far = 600.0
 script = ExtResource("3_cam")
 
 [node name="BossFight" parent="." unique_id=795247481 instance=ExtResource("5_kry3j")]
+
+[node name="CampusWorld" type="Node3D" parent="."]
+script = ExtResource("6_world")

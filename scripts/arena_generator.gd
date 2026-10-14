@@ -309,7 +309,6 @@ func _make_buildings() -> void:
 		[Vector3(0, 0, -48), 0.0, 8, 4, 5, 0.75],     # Rectoría / Biblioteca central
 		[Vector3(-44, 0, -34), 20.0, 5, 4, 4, 1.0],   # Facultad (noroeste)
 		[Vector3(44, 0, -30), -15.0, 6, 3, 6, 0.65],  # Torre de laboratorios
-		[Vector3(-50, 0, 6), 90.0, 7, 3, 3, 0.9],     # Aulas oeste
 		[Vector3(48, 0, 10), -85.0, 5, 4, 4, 1.1],    # Auditorio este
 		[Vector3(-18, 0, -88), 0.0, 6, 4, 8, 0.5],
 		[Vector3(32, 0, -82), 10.0, 4, 4, 7, 0.85],
@@ -665,7 +664,7 @@ func _make_props() -> void:
 		_bench(p, pos, rad_to_deg(atan2(pos.x, pos.z)), rng.randf() < 0.4)
 
 	# Jardineras con árboles muertos
-	for ang in [90.0, 130.0, 170.0, 190.0, 230.0, 270.0]:
+	for ang in [90.0, 130.0, 170.0, 190.0, 230.0]:
 		var a := deg_to_rad(ang + rng.randf_range(-6, 6))
 		var pos := Vector3(sin(a), 0, cos(a)) * 25.0
 		_box(p, Vector3(2.4, 0.6, 2.4), _xf(pos + Vector3(0, 0.3, 0), Vector3(0, ang, 0)), m_concrete, true)
@@ -796,6 +795,9 @@ func _make_arena_edge() -> void:
 	for k in 26:
 		var a := rng.randf_range(0.0, TAU)
 		if absf(wrapf(a, -PI, PI)) < 0.55:
+			continue
+		# Lado oeste libre: ahí empieza el Edificio de Aulas Poniente (campus_world.gd)
+		if absf(wrapf(a + PI * 0.5, -PI, PI)) < 0.35:
 			continue
 		var r := rng.randf_range(27.0, 32.0)
 		var c := Vector3(sin(a) * r, 0, cos(a) * r)
