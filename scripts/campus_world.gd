@@ -128,12 +128,38 @@ var _title_layer: CanvasLayer
 var _title_label: Label
 var _title_line: ColorRect
 var _title_tw: Tween
+var _rebuild_timer: Timer
+var _built_at := -100000
+var _zone_parent: Node3D
+var _prefab_local := false
+
+
+func _enter_tree() -> void:
+	add_to_group("campus_world")
 
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		_rebuild_timer = Timer.new()
+		_rebuild_timer.one_shot = true
+		_rebuild_timer.wait_time = 0.4
+		_rebuild_timer.timeout.connect(_build)
+		add_child(_rebuild_timer)
 	_build()
 	if not Engine.is_editor_hint():
 		_runtime_setup.call_deferred()
+
+
+## Lo llaman los prefabs al moverse o cambiar: regenera el campus en el editor
+## cuando dejas de arrastrar.
+func request_rebuild() -> void:
+	if not Engine.is_editor_hint() or not is_inside_tree():
+		return
+	if _rebuild_timer == null or not _rebuild_timer.is_inside_tree():
+		return
+	if Time.get_ticks_msec() - _built_at < 600:
+		return
+	_rebuild_timer.start()
 
 
 func _build() -> void:
@@ -142,6 +168,11 @@ func _build() -> void:
 	_root = Node3D.new()
 	_root.name = "Generated"
 	add_child(_root)
+	_zone_parent = null
+	for pf in _find_prefabs():
+		var old := (pf as Node).get_node_or_null("Generated")
+		if old and old.owner == null:
+			old.free()
 	_mm.clear()
 	_mmc.clear()
 	_units.clear()
@@ -160,11 +191,12 @@ func _build() -> void:
 	w_body = StaticBody3D.new()
 	w_body.name = "WorldCollision"
 	_root.add_child(w_body)
-	_make_world_buildings()
+	_reserve_hub()
 	_make_paths()
 	_make_connector_materials()
 	_make_connectors()
 	_reserve_sector_walls()
+	_make_prefabs()
 	_make_perimeter()
 	_make_library()
 	_make_computing()
@@ -177,13 +209,10 @@ func _build() -> void:
 	_make_cafeteria()
 	_make_water_tower()
 	_make_avenue()
-	_make_faculties()
 	_make_lake()
-	_make_fountain_plazas()
 	_make_routes()
 	_make_wrecks()
 	_make_signs()
-	_make_recreation()
 	_make_sector_walls()
 	_make_alamedas()
 	_make_nature()
@@ -192,12 +221,18 @@ func _build() -> void:
 	_make_world_fx()
 	_make_markers()
 	# Todas las luces se desvanecen a distancia (rendimiento).
-	for l in _root.find_children("*", "OmniLight3D", true, false):
+	var lights := _root.find_children("*", "OmniLight3D", true, false)
+	for pf in _find_prefabs():
+		var g := (pf as Node).get_node_or_null("Generated")
+		if g:
+			lights.append_array(g.find_children("*", "OmniLight3D", true, false))
+	for l in lights:
 		var ol := l as OmniLight3D
 		if not ol.distance_fade_enabled:
 			ol.distance_fade_enabled = true
 			ol.distance_fade_begin = 100.0
 			ol.distance_fade_length = 30.0
+	_built_at = Time.get_ticks_msec()
 
 
 # ================================================================ API pública
@@ -632,7 +667,7 @@ func _flush_colors(parent: Node3D) -> void:
 func _begin_zone(n: String) -> Node3D:
 	w_zone = Node3D.new()
 	w_zone.name = n
-	_root.add_child(w_zone)
+	(_zone_parent if _zone_parent else _root).add_child(w_zone)
 	return w_zone
 
 
@@ -710,39 +745,11 @@ func _rand_free(margin: float, tries := 30) -> Vector2:
 
 # ================================================================ edificios
 
-func _make_world_buildings() -> void:
-	# posición, giro, bahías X, bahías Z, pisos, severidad (ver arena_generator._building)
-	var defs := [
-		# Residencias (sur de la avenida)
-		[Vector3(-200, 0, 72), 0.0, 6, 3, 4, 0.6],
-		[Vector3(-252, 0, 74), 4.0, 4, 3, 5, 0.85],
-		[Vector3(-124, 0, 72), -3.0, 5, 3, 3, 0.9],
-		[Vector3(124, 0, 74), 2.0, 5, 3, 4, 0.7],
-		[Vector3(200, 0, 72), 0.0, 6, 3, 5, 0.6],
-		[Vector3(256, 0, 74), -4.0, 3, 3, 4, 1.0],
-		# Entre la plaza y los caminos
-		[Vector3(-125, 0, -12), 0.0, 3, 5, 3, 0.9],
-		[Vector3(-125, 0, -114), 0.0, 3, 3, 2, 0.7],     # Cafetería
-		[Vector3(-136, 0, -180), 0.0, 4, 4, 4, 0.8],
-		# Oeste
-		[Vector3(-140, 0, -372), 8.0, 5, 4, 5, 0.9],
-		[Vector3(-215, 0, -388), 0.0, 5, 5, 6, 0.6],
-		[Vector3(-112, 0, -385), 0.0, 6, 3, 4, 0.7],
-		[Vector3(-62, 0, -248), 0.0, 3, 3, 4, 0.8],
-		# Este
-		[Vector3(258, 0, -262), 0.0, 4, 4, 4, 0.9],
-		[Vector3(242, 0, -360), -10.0, 5, 4, 6, 0.5],
-		[Vector3(102, 0, -385), 0.0, 5, 3, 6, 0.6],
-		[Vector3(170, 0, -334), 0.0, 5, 4, 7, 0.55],     # Torre del laboratorio
-	]
-	# Edificios de la plaza (los genera arena_generator): solo se reservan
+## Los edificios de la plaza los genera arena_generator: aquí solo se reservan.
+func _reserve_hub() -> void:
 	for hb in [Vector2(-44, -34), Vector2(44, -30), Vector2(48, 10), Vector2(-18, -88), Vector2(32, -82),
 			Vector2(-80, -40), Vector2(82, -44), Vector2(-86, 22), Vector2(88, 24), Vector2(-48, 72), Vector2(46, 70), Vector2(0, -48)]:
 		_reserve(hb, 22.0)
-	for d in defs:
-		_building(d[0], d[1], d[2], d[3], d[4], d[5])
-		var o: Vector3 = d[0]
-		_reserve(Vector2(o.x, o.z), maxf(float(d[2]), float(d[3])) * BAY * 0.75 + 3.0)
 
 
 # ================================================================ caminos
@@ -2586,10 +2593,11 @@ func _classroom(o: Vector3, b: Basis, yaw: float, x0: float, right_wall: bool, s
 
 ## Facultad: cuatro alas de salones alrededor de un patio con fuente.
 ## Entradas (pasajes) en los lados local +z y -z.
-func _faculty(c: Vector3, yaw: float, title: String) -> void:
+func _faculty(c: Vector3, yaw: float, title: String, floors := 0) -> void:
 	var zone := _begin_zone("Facultad")
 	var b := Basis(Vector3.UP, deg_to_rad(yaw))
-	var floors := rng.randi_range(2, 3)
+	if floors <= 0:
+		floors = rng.randi_range(2, 3)
 	_wing(c + b * Vector3(0, 0, -20), yaw, 7, floors, 3)
 	_wing(c + b * Vector3(0, 0, 20), yaw + 180.0, 7, floors, 3)
 	_wing(c + b * Vector3(24, 0, 0), yaw - 90.0, 4, floors, -1)
@@ -2614,26 +2622,6 @@ func _faculty(c: Vector3, yaw: float, title: String) -> void:
 		_lbl(zone, title, c + b * Vector3(0, 4.15, e * 24.22), face, 46, Color(0.88, 0.82, 0.66))
 	_reserve(Vector2(c.x, c.z), 36.0)
 	_extra_zones.append([Vector2(c.x, c.z), 30.0, title.capitalize()])
-	_end_zone()
-
-
-func _make_faculties() -> void:
-	_faculty(Vector3(-232, 0, 2), 0.0, "FACULTAD DE INGENIERÍA")
-	_faculty(Vector3(240, 0, 2), 0.0, "FACULTAD DE CIENCIAS")
-	_faculty(Vector3(120, 0, -90), 90.0, "FACULTAD DE MEDICINA")
-	_faculty(Vector3(-235, 0, -185), 90.0, "FACULTAD DE FILOSOFÍA Y LETRAS")
-	_faculty(Vector3(245, 0, -180), 90.0, "FACULTAD DE QUÍMICA")
-	_faculty(Vector3(100, 0, -300), 0.0, "FACULTAD DE ARQUITECTURA")
-	_faculty(Vector3(-100, 0, -300), 0.0, "FACULTAD DE DERECHO")
-	# Alas de salones frente al paseo norte
-	var zone := _begin_zone("SalonesPaseo")
-	for sx: float in [-1.0]:
-		var c := Vector3(sx * 100.0, 0, -218)
-		_wing(c, 0.0, 7, 2, -1, 0.15, true)
-		_lbl(zone, "EDIFICIO DE AULAS A", c + Vector3(0, 4.15, 4.4), 0.0, 40, Color(0.88, 0.82, 0.66))
-		_reserve(Vector2(c.x - 18, c.z), 12.0)
-		_reserve(Vector2(c.x + 18, c.z), 12.0)
-		_reserve(Vector2(c.x, c.z), 12.0)
 	_end_zone()
 
 
@@ -2711,27 +2699,16 @@ func _make_lake() -> void:
 
 # ---------------------------------------------------------------- fuentes
 
-func _make_fountain_plazas() -> void:
-	var zone := _begin_zone("Fuentes")
-	var defs := [
-		[Vector3(170, 0, -120), 13.0, "Fuente de las Ciencias"],
-		[Vector3(-160, 0, -120), 13.0, "Fuente de las Humanidades"],
-		[Vector3(0, 0, 66), 12.0, "Fuente del Estudiante"],
-	]
-	for f in defs:
-		var c: Vector3 = f[0]
-		var r: float = f[1]
-		_mm_add(_uc(m_path, 48), Transform3D(Basis.from_scale(Vector3(r * 2.0, 0.1, r * 2.0)), c))
-		_cy(c, r + 0.35, 0.22, m_concrete_dark, Vector3.ZERO, 48)
-		_fountain(zone, c, 5.5, true)
-		for q in 4:
-			var a := TAU * (q + 0.5) / 4.0
-			_street_lamp(c + Vector3(sin(a), 0, cos(a)) * (r + 1.2), rad_to_deg(a), 0 if q % 2 == 0 else 1)
-			var bp := c + Vector3(sin(a + 0.4), 0, cos(a + 0.4)) * (r - 3.0)
-			_bench(zone, bp, rad_to_deg(atan2(c.x - bp.x, c.z - bp.z)), rng.randf() < 0.3)
-		_reserve(Vector2(c.x, c.z), r)
-		_extra_zones.append([Vector2(c.x, c.z), r + 6.0, f[2]])
-	_end_zone()
+## Plaza con fuente que todavía echa agua, faroles y bancas.
+func _fountain_plaza(zone: Node3D, c: Vector3, r: float) -> void:
+	_mm_add(_uc(m_path, 48), Transform3D(Basis.from_scale(Vector3(r * 2.0, 0.1, r * 2.0)), c))
+	_cy(c, r + 0.35, 0.22, m_concrete_dark, Vector3.ZERO, 48)
+	_fountain(zone, c, minf(5.5, r * 0.45), true)
+	for q in 4:
+		var a := TAU * (q + 0.5) / 4.0
+		_street_lamp(c + Vector3(sin(a), 0, cos(a)) * (r + 1.2), rad_to_deg(a), 0 if q % 2 == 0 else 1)
+		var bp := c + Vector3(sin(a + 0.4), 0, cos(a + 0.4)) * (r - 3.0)
+		_bench(zone, bp, rad_to_deg(atan2(c.x - bp.x, c.z - bp.z)), rng.randf() < 0.3)
 
 
 ## Fuente con tazón central. `jets` = todavía sale agua.
@@ -3063,6 +3040,8 @@ func _lawn(c: Vector3, size: Vector2, density := 0.9, edging := true, stripes :=
 
 
 func _on_path(p: Vector2, margin: float) -> bool:
+	if _prefab_local:
+		return false
 	for s in _paths:
 		var a: Vector2 = s[0]
 		var e: Vector2 = s[1]
@@ -3096,87 +3075,6 @@ func _pick_site(title: String, cands: Array, size: Vector2) -> Vector3:
 			return c
 	_skipped_sites.append(title)
 	return Vector3.INF
-
-
-func _make_recreation() -> void:
-	_skipped_sites.clear()
-	var c := _pick_site("Parque Infantil", [Vector3(-75, 0, -101), Vector3(-122, 0, -45)], Vector2(40, 22))
-	if c != Vector3.INF:
-		_make_playground(c)
-	c = _pick_site("Canchas de Básquetbol", [Vector3(-140, 0, -62), Vector3(-136, 0, -66), Vector3(124, 0, -38)], Vector2(30, 34))
-	if c != Vector3.INF:
-		_make_basketball(c)
-	c = _pick_site("Canchas de Tenis", [Vector3(-218, 0, -135), Vector3(242, 0, -135)], Vector2(54, 17))
-	if c != Vector3.INF:
-		_make_tennis(c)
-	c = _pick_site("Skatepark", [Vector3(228, 0, -134), Vector3(212, 0, -134), Vector3(244, 0, -134)], Vector2(54, 18))
-	if c != Vector3.INF:
-		_make_skatepark(c)
-	c = _pick_site("Estacionamiento Poniente", [Vector3(-273, 0, -92), Vector3(-273, 0, -80)], Vector2(22, 100))
-	if c != Vector3.INF:
-		_make_lot(c, Vector2(22, 100))
-	c = _pick_site("Estacionamiento Oriente", [Vector3(276, 0, -72), Vector3(276, 0, -64)], Vector2(18, 64))
-	if c != Vector3.INF:
-		_make_lot(c, Vector2(18, 64))
-	c = _pick_site("Gimnasio al Aire Libre", [Vector3(244, 0, -230), Vector3(235, 0, -232)], Vector2(52, 24))
-	if c != Vector3.INF:
-		_make_park_gym(c)
-	c = _pick_site("Foro al Aire Libre", [Vector3(-32, 0, -258), Vector3(-34, 0, -256)], Vector2(34, 30))
-	if c != Vector3.INF:
-		_make_theater(c)
-	c = _pick_site("Jardín de las Esculturas", [Vector3(26, 0, -258), Vector3(-74, 0, -350), Vector3(126, 0, -350)], Vector2(32, 28))
-	if c != Vector3.INF:
-		_make_sculptures(c)
-	c = _pick_site("Área de Picnic", [Vector3(-222, 0, -238), Vector3(-230, 0, -236)], Vector2(56, 16))
-	if c != Vector3.INF:
-		_make_picnic(c, Vector2(56, 16))
-	c = _pick_site("Alberca Universitaria", [Vector3(-160, 0, 72), Vector3(-90, 0, 70), Vector3(95, 0, 70)], Vector2(30, 22))
-	if c != Vector3.INF:
-		_make_pool(c)
-	c = _pick_site("Huerto Universitario", [Vector3(-262, 0, -388), Vector3(-262, 0, -380), Vector3(-185, 0, -400)], Vector2(36, 26))
-	if c != Vector3.INF:
-		_make_huerto(c)
-	c = _pick_site("Voleibol de Playa", [Vector3(266, 0, -396), Vector3(262, 0, -390), Vector3(150, 0, -400)], Vector2(26, 18))
-	if c != Vector3.INF:
-		_make_volleyball(c)
-	c = _pick_site("Cancha de Futbolito", [Vector3(-180, 0, -402), Vector3(200, 0, -398), Vector3(30, 0, 72)], Vector2(40, 24))
-	if c != Vector3.INF:
-		_make_futbolito(c)
-	c = _pick_site("Memorial", [Vector3(-62, 0, -381), Vector3(-64, 0, -382)], Vector2(32, 28))
-	if c != Vector3.INF:
-		_make_memorial(c)
-	c = _pick_site("Frontones", [Vector3(130, 0, -180), Vector3(128, 0, -178)], Vector2(30, 34))
-	if c != Vector3.INF:
-		_make_fronton(c)
-	c = _pick_site("Terminal de Autobuses", [Vector3(-136, 0, -250), Vector3(-136, 0, -252)], Vector2(54, 18))
-	if c != Vector3.INF:
-		_make_terminal(c)
-	c = _pick_site("Puesto de Rescate", [Vector3(240, 0, -326), Vector3(220, 0, -302), Vector3(264, 0, -306)], Vector2(34, 30))
-	if c != Vector3.INF:
-		_make_rescue_camp(c)
-	c = _pick_site("Mercadito", [Vector3(160, 0, 63), Vector3(160, 0, 66)], Vector2(32, 28))
-	if c != Vector3.INF:
-		_make_market(c)
-	c = _pick_site("Estacionamiento de Rectoría", [Vector3(64, 0, -381), Vector3(206, 0, -334), Vector3(198, 0, -366)], Vector2(30, 34))
-	if c != Vector3.INF:
-		_make_lot(c, Vector2(30, 34))
-	c = _pick_site("Estacionamiento Norte", [Vector3(-180, 0, -378), Vector3(-176, 0, -378)], Vector2(30, 34))
-	if c != Vector3.INF:
-		_make_lot(c, Vector2(30, 34))
-	c = _pick_site("Estacionamiento del Lago", [Vector3(-281, 0, -222), Vector3(-282, 0, -178), Vector3(-282, 0, -14)], Vector2(18, 54))
-	if c != Vector3.INF:
-		_make_lot(c, Vector2(18, 54))
-	c = _pick_site("Estacionamiento Torre", [Vector3(148, 0, -380), Vector3(148, 0, -382)], Vector2(34, 30))
-	if c != Vector3.INF:
-		_make_lot(c, Vector2(34, 30))
-	c = _pick_site("Asaderos", [Vector3(76, 0, -354), Vector3(208, 0, -338), Vector3(192, 0, -366), Vector3(136, 0, -362)], Vector2(32, 26))
-	if c != Vector3.INF:
-		_make_picnic(c, Vector2(32, 26))
-	c = _pick_site("Área de Descanso", [Vector3(-80, 0, -354), Vector3(-148, 0, -406), Vector3(-76, 0, -406)], Vector2(32, 26))
-	if c != Vector3.INF:
-		_make_picnic(c, Vector2(32, 26))
-	if not _skipped_sites.is_empty():
-		print("CampusWorld: sin espacio para ", _skipped_sites)
 
 
 func _fence_rect(c: Vector3, size: Vector2, h: float, gap_side := 1, gap := 4.0) -> void:
@@ -4375,3 +4273,136 @@ func _inside_structure(p: Vector2) -> bool:
 		if (r as Rect2).grow(1.0).has_point(p):
 			return true
 	return false
+
+
+# ================================================================ prefabs
+# Facultades, alas de salones, edificios en ruinas, zonas recreativas y fuentes
+# se colocan como nodos CampusPrefab en la escena (res://prefabs/). Cada uno se
+# genera en su espacio local como hijo "Generated" del nodo, así que se puede
+# seleccionar, mover, girar y duplicar desde el editor 3D.
+
+const PREFAB := preload("res://scripts/campus_prefab.gd")
+
+
+func _find_prefabs() -> Array:
+	var scene_root: Node = owner if owner else get_parent()
+	if scene_root == null:
+		return []
+	var out: Array = []
+	for n in scene_root.find_children("*", "Node3D", true, true):
+		if n is PREFAB:
+			out.append(n)
+	return out
+
+
+func _make_prefabs() -> void:
+	for pf in _find_prefabs():
+		_build_prefab(pf)
+
+
+func _build_prefab(pf: Node3D) -> void:
+	var content := Node3D.new()
+	content.name = "Generated"
+	pf.add_child(content)
+	# Se genera alrededor del origen; el nodo del prefab lo coloca y lo gira.
+	var saved_state := rng.state
+	var saved_body := w_body
+	var saved_root := _root
+	var nb := _blocked.size()
+	var nr := _blocked_rects.size()
+	var nz := _extra_zones.size()
+	var nt := _tree_pts.size()
+	w_body = StaticBody3D.new()
+	w_body.name = "Collision"
+	content.add_child(w_body)
+	_zone_parent = content
+	_prefab_local = true
+	rng.seed = hash(int(pf.variation) * 7919 + int(pf.kind) * 104729 + int(pf.zone) * 31 + 17)
+	var title: String = pf.title
+	var c := Vector3.ZERO
+	var kind_name: String = PREFAB.Kind.keys()[pf.kind]
+	match kind_name:
+		"FACULTAD":
+			_faculty(c, 0.0, title if title != "" else "FACULTAD", pf.floors)
+		"ALA_DE_SALONES":
+			_begin_zone("AlaDeSalones")
+			_wing(c, 0.0, pf.segments, pf.floors, pf.passage, pf.collapse, pf.end_caps)
+			if title != "":
+				_lbl(w_zone, title.to_upper(), Vector3(0, 4.15, 4.4), 0.0, 40, Color(0.88, 0.82, 0.66))
+			_end_zone()
+		"EDIFICIO_EN_RUINAS":
+			_root = content
+			_building(c, 0.0, pf.bays_x, pf.bays_z, pf.floors, pf.damage)
+			_root = saved_root
+		"FUENTE":
+			var z := _begin_zone("Fuente")
+			_fountain_plaza(z, c, pf.plaza_radius)
+			_end_zone()
+		_:
+			_build_zone(pf, c)
+	_prefab_local = false
+	_zone_parent = null
+	_root = saved_root
+	w_body = saved_body
+	rng.state = saved_state
+	_blocked.resize(nb)
+	_blocked_rects.resize(nr)
+	_extra_zones.resize(nz)
+	_tree_pts.resize(nt)
+	# Huella en el mundo: árboles, pasto y relleno no la invaden
+	var fp: Vector2 = pf.footprint()
+	var xf := pf.global_transform
+	var mn := Vector2(INF, INF)
+	var mx := Vector2(-INF, -INF)
+	for cx: float in [-0.5, 0.5]:
+		for cz: float in [-0.5, 0.5]:
+			var wp := xf * Vector3(cx * fp.x, 0, cz * fp.y)
+			mn = mn.min(Vector2(wp.x, wp.z))
+			mx = mx.max(Vector2(wp.x, wp.z))
+	_blocked_rects.append(Rect2(mn, mx - mn))
+	var gp := pf.global_position
+	if kind_name in ["FACULTAD", "ALA_DE_SALONES", "EDIFICIO_EN_RUINAS"]:
+		_reserve(Vector2(gp.x, gp.z), minf(fp.x, fp.y) * 0.5)
+	if title != "" and kind_name != "EDIFICIO_EN_RUINAS":
+		_extra_zones.push_front([Vector2(gp.x, gp.z), maxf(fp.x, fp.y) * 0.5 + 4.0, title])
+
+
+func _build_zone(pf: Node3D, c: Vector3) -> void:
+	var zone_name: String = PREFAB.Zone.keys()[pf.zone]
+	match zone_name:
+		"PARQUE_INFANTIL":
+			_make_playground(c)
+		"BASQUETBOL":
+			_make_basketball(c)
+		"TENIS":
+			_make_tennis(c)
+		"SKATEPARK":
+			_make_skatepark(c)
+		"ESTACIONAMIENTO":
+			_make_lot(c, pf.area_size)
+		"GIMNASIO":
+			_make_park_gym(c)
+		"FORO":
+			_make_theater(c)
+		"ESCULTURAS":
+			_make_sculptures(c)
+		"PICNIC":
+			_make_picnic(c, pf.area_size)
+		"ALBERCA":
+			_make_pool(c)
+		"HUERTO":
+			_make_huerto(c)
+		"VOLEIBOL":
+			_make_volleyball(c)
+		"FUTBOLITO":
+			_make_futbolito(c)
+		"MEMORIAL":
+			_make_memorial(c)
+		"FRONTONES":
+			_make_fronton(c)
+		"TERMINAL":
+			_make_terminal(c)
+		"PUESTO_DE_RESCATE":
+			_make_rescue_camp(c)
+		"MERCADITO":
+			_make_market(c)

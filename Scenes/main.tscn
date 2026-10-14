@@ -6,6 +6,11 @@
 [ext_resource type="Shader" uid="uid://g2i1m2buvn2p" path="res://shaders/storm_sky.gdshader" id="4_sky"]
 [ext_resource type="PackedScene" path="res://boss_profesor/boss_fight.tscn" id="5_kry3j"]
 [ext_resource type="Script" path="res://scripts/campus_world.gd" id="6_world"]
+[ext_resource type="PackedScene" path="res://prefabs/Facultad.tscn" id="7_d1ilt"]
+[ext_resource type="PackedScene" path="res://prefabs/AlaDeSalones.tscn" id="8_6iyac"]
+[ext_resource type="PackedScene" path="res://prefabs/EdificioEnRuinas.tscn" id="9_fdnlq"]
+[ext_resource type="PackedScene" path="res://prefabs/ZonaRecreativa.tscn" id="10_jkdf5"]
+[ext_resource type="PackedScene" path="res://prefabs/Fuente.tscn" id="11_wsu2k"]
 
 [sub_resource type="FastNoiseLite" id="Noise_clouds"]
 frequency = 0.008
@@ -94,5 +99,351 @@ script = ExtResource("3_cam")
 
 [node name="BossFight" parent="." unique_id=795247481 instance=ExtResource("5_kry3j")]
 
-[node name="CampusWorld" type="Node3D" parent="."]
+[node name="CampusWorld" type="Node3D" parent="." unique_id=633895617]
 script = ExtResource("6_world")
+bosses_for_final_gate = PackedStringArray("biblioteca", "computo", "laboratorio")
+
+[node name="Estructuras" type="Node3D" parent="CampusWorld" unique_id=408791338]
+
+[node name="Facultades" type="Node3D" parent="CampusWorld/Estructuras" unique_id=768389187]
+
+[node name="FacultadIngenieria" parent="CampusWorld/Estructuras/Facultades" unique_id=1120659146 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -232, 0, 2)
+title = "FACULTAD DE INGENIERÍA"
+floors = 3
+
+[node name="FacultadCiencias" parent="CampusWorld/Estructuras/Facultades" unique_id=1517619652 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 240, 0, 2)
+title = "FACULTAD DE CIENCIAS"
+variation = 1
+
+[node name="FacultadMedicina" parent="CampusWorld/Estructuras/Facultades" unique_id=673237798 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 120, 0, -90)
+title = "FACULTAD DE MEDICINA"
+variation = 2
+floors = 3
+
+[node name="FacultadFilosofiaYLetras" parent="CampusWorld/Estructuras/Facultades" unique_id=697272045 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -235, 0, -185)
+title = "FACULTAD DE FILOSOFÍA Y LETRAS"
+variation = 3
+
+[node name="FacultadQuimica" parent="CampusWorld/Estructuras/Facultades" unique_id=1025515013 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 245, 0, -180)
+title = "FACULTAD DE QUÍMICA"
+variation = 4
+floors = 3
+
+[node name="FacultadArquitectura" parent="CampusWorld/Estructuras/Facultades" unique_id=1815847546 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 100, 0, -300)
+title = "FACULTAD DE ARQUITECTURA"
+variation = 5
+
+[node name="FacultadDerecho" parent="CampusWorld/Estructuras/Facultades" unique_id=1785786279 instance=ExtResource("7_d1ilt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 0, -300)
+title = "FACULTAD DE DERECHO"
+variation = 6
+floors = 3
+
+[node name="AlasDeSalones" type="Node3D" parent="CampusWorld/Estructuras" unique_id=519249927]
+
+[node name="EdificioDeAulasA" parent="CampusWorld/Estructuras/AlasDeSalones" unique_id=1365696479 instance=ExtResource("8_6iyac")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 0, -218)
+title = "EDIFICIO DE AULAS A"
+collapse = 0.15
+
+[node name="EdificiosEnRuinas" type="Node3D" parent="CampusWorld/Estructuras" unique_id=1262153916]
+
+[node name="ResidenciaPoniente1" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=600945032 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -200, 0, 72)
+floors = 4
+bays_x = 6
+bays_z = 3
+damage = 0.6
+
+[node name="ResidenciaPoniente2" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=105445065 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(0.9975641, 0, 0.06975647, 0, 1, 0, -0.06975647, 0, 0.9975641, -252, 0, 74)
+variation = 1
+floors = 5
+bays_x = 4
+bays_z = 3
+damage = 0.85
+
+[node name="ResidenciaPoniente3" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=23472475 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(0.9986295, 0, -0.05233596, 0, 1, 0, 0.05233596, 0, 0.9986295, -124, 0, 72)
+variation = 2
+floors = 3
+bays_z = 3
+damage = 0.9
+
+[node name="ResidenciaOriente1" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=2126926361 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(0.99939084, 0, 0.034899496, 0, 1, 0, -0.034899496, 0, 0.99939084, 124, 0, 74)
+variation = 3
+floors = 4
+bays_z = 3
+damage = 0.7
+
+[node name="ResidenciaOriente2" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=1457219444 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 200, 0, 72)
+variation = 4
+floors = 5
+bays_x = 6
+bays_z = 3
+damage = 0.6
+
+[node name="ResidenciaOriente3" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=2139169033 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(0.9975641, 0, -0.06975647, 0, 1, 0, 0.06975647, 0, 0.9975641, 256, 0, 74)
+variation = 5
+floors = 4
+bays_x = 3
+bays_z = 3
+damage = 1.0
+
+[node name="EdificioPoniente" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=1023518171 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -125, 0, -12)
+variation = 6
+floors = 3
+bays_x = 3
+bays_z = 5
+damage = 0.9
+
+[node name="Cafeteria" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=1039982760 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -125, 0, -114)
+variation = 7
+bays_x = 3
+bays_z = 3
+damage = 0.7
+
+[node name="EdificioEstadio" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=142014569 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -136, 0, -180)
+variation = 8
+floors = 4
+bays_x = 4
+
+[node name="EdificioNorte1" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=539018413 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(0.99026805, 0, 0.1391731, 0, 1, 0, -0.1391731, 0, 0.99026805, -140, 0, -372)
+variation = 9
+floors = 5
+damage = 0.9
+
+[node name="EdificioNorte2" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=2023956873 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -215, 0, -388)
+variation = 10
+floors = 6
+bays_z = 5
+damage = 0.6
+
+[node name="EdificioNorte3" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=1279856087 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -112, 0, -385)
+variation = 11
+floors = 4
+bays_x = 6
+bays_z = 3
+damage = 0.7
+
+[node name="EdificioNorte4" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=1394366977 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62, 0, -248)
+variation = 12
+floors = 4
+bays_x = 3
+bays_z = 3
+
+[node name="EdificioNoreste1" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=415824682 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 258, 0, -262)
+variation = 13
+floors = 4
+bays_x = 4
+damage = 0.9
+
+[node name="EdificioNoreste2" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=1202100372 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(0.9848077, 0, -0.17364818, 0, 1, 0, 0.17364818, 0, 0.9848077, 242, 0, -360)
+variation = 14
+floors = 6
+damage = 0.5
+
+[node name="EdificioNoreste3" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=466956311 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 102, 0, -385)
+variation = 15
+floors = 6
+bays_z = 3
+damage = 0.6
+
+[node name="TorreDelLaboratorio" parent="CampusWorld/Estructuras/EdificiosEnRuinas" unique_id=2127086752 instance=ExtResource("9_fdnlq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 170, 0, -334)
+variation = 16
+floors = 7
+damage = 0.55
+
+[node name="ZonasRecreativas" type="Node3D" parent="CampusWorld/Estructuras" unique_id=1308441758]
+
+[node name="ParqueInfantil" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1216250419 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -75, 0, -101)
+
+[node name="CanchasDeBasquetbol" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1765089330 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140, 0, -62)
+title = "Canchas de Básquetbol"
+variation = 1
+zone = 1
+
+[node name="CanchasDeTenis" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=2028082334 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -218, 0, -135)
+title = "Canchas de Tenis"
+variation = 2
+zone = 2
+
+[node name="Skatepark" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=938864597 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 228, 0, -134)
+title = "Skatepark"
+variation = 3
+zone = 3
+
+[node name="EstacionamientoPoniente" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=909449472 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -273, 0, -92)
+title = "Estacionamiento Poniente"
+variation = 4
+zone = 4
+area_size = Vector2(22, 100)
+
+[node name="EstacionamientoOriente" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1549844935 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 276, 0, -72)
+title = "Estacionamiento Oriente"
+variation = 5
+zone = 4
+area_size = Vector2(18, 64)
+
+[node name="EstacionamientoDelLago" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=574879044 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -282, 0, -178)
+title = "Estacionamiento del Lago"
+variation = 6
+zone = 4
+area_size = Vector2(18, 54)
+
+[node name="EstacionamientoNorte" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=659436885 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -180, 0, -378)
+title = "Estacionamiento Norte"
+variation = 7
+zone = 4
+area_size = Vector2(30, 34)
+
+[node name="EstacionamientoDeRectoria" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1878698410 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 206, 0, -334)
+title = "Estacionamiento de Rectoría"
+variation = 8
+zone = 4
+area_size = Vector2(30, 34)
+
+[node name="EstacionamientoTorre" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=2079950612 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 148, 0, -380)
+title = "Estacionamiento Torre"
+variation = 9
+zone = 4
+area_size = Vector2(34, 30)
+
+[node name="GimnasioAlAireLibre" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1330730182 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 244, 0, -230)
+title = "Gimnasio al Aire Libre"
+variation = 10
+zone = 5
+
+[node name="ForoAlAireLibre" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=480430863 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -32, 0, -258)
+title = "Foro al Aire Libre"
+variation = 11
+zone = 6
+
+[node name="JardinDeLasEsculturas" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=505359068 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -74, 0, -350)
+title = "Jardín de las Esculturas"
+variation = 12
+zone = 7
+
+[node name="AreaDePicnic" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=230704229 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -222, 0, -238)
+title = "Área de Picnic"
+variation = 13
+zone = 8
+area_size = Vector2(56, 16)
+
+[node name="Asaderos" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1762810416 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 76, 0, -354)
+title = "Asaderos"
+variation = 14
+zone = 8
+area_size = Vector2(32, 26)
+
+[node name="AreaDeDescanso" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=870489685 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -148, 0, -406)
+title = "Área de Descanso"
+variation = 15
+zone = 8
+area_size = Vector2(32, 26)
+
+[node name="Alberca" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1944993010 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -160, 0, 72)
+title = "Alberca Universitaria"
+variation = 16
+zone = 9
+
+[node name="Huerto" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1364112520 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -262, 0, -388)
+title = "Huerto Universitario"
+variation = 17
+zone = 10
+
+[node name="Voleibol" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1297321223 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 266, 0, -396)
+title = "Voleibol de Playa"
+variation = 18
+zone = 11
+
+[node name="Futbolito" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1877183374 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 200, 0, -398)
+title = "Cancha de Futbolito"
+variation = 19
+zone = 12
+
+[node name="Memorial" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1628162462 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62, 0, -381)
+title = "Memorial"
+variation = 20
+zone = 13
+
+[node name="Frontones" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=762219687 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 128, 0, -178)
+title = "Frontones"
+variation = 21
+zone = 14
+
+[node name="TerminalDeAutobuses" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=390228226 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -136, 0, -250)
+title = "Terminal de Autobuses"
+variation = 22
+zone = 15
+
+[node name="PuestoDeRescate" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=903663527 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 240, 0, -326)
+title = "Puesto de Rescate"
+variation = 23
+zone = 16
+
+[node name="Mercadito" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=1580678864 instance=ExtResource("10_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 160, 0, 63)
+title = "Mercadito"
+variation = 24
+zone = 17
+
+[node name="Fuentes" type="Node3D" parent="CampusWorld/Estructuras" unique_id=1820932469]
+
+[node name="FuenteDeLasCiencias" parent="CampusWorld/Estructuras/Fuentes" unique_id=1459047957 instance=ExtResource("11_wsu2k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 170, 0, -120)
+title = "Fuente de las Ciencias"
+plaza_radius = 13.0
+
+[node name="FuenteDeLasHumanidades" parent="CampusWorld/Estructuras/Fuentes" unique_id=298028234 instance=ExtResource("11_wsu2k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -160, 0, -120)
+title = "Fuente de las Humanidades"
+plaza_radius = 13.0
+
+[node name="FuenteDelEstudiante" parent="CampusWorld/Estructuras/Fuentes" unique_id=1976404827 instance=ExtResource("11_wsu2k")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 66)
+title = "Fuente del Estudiante"
