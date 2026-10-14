@@ -102,13 +102,15 @@ func _ready() -> void:
 	add_to_group("boss")
 	add_to_group("enemy")
 	health = max_health
-	var cs := CollisionShape3D.new()
-	var cap := CapsuleShape3D.new()
-	cap.radius = 0.95
-	cap.height = 3.2
-	cs.shape = cap
-	cs.position = Vector3(0, 1.6, 0)
-	add_child(cs)
+	var cs := get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if cs == null:
+		cs = CollisionShape3D.new()
+		var cap := CapsuleShape3D.new()
+		cap.radius = 0.95
+		cap.height = 3.2
+		cs.shape = cap
+		cs.position = Vector3(0, 1.6, 0)
+		add_child(cs)
 	_build_model()
 	_build_flail()
 	_define_poses()
@@ -787,10 +789,12 @@ func _build_model() -> void:
 	m_eye.emission = Color(1.0, 0.45, 0.12)
 	m_eye.emission_energy_multiplier = 3.0
 
-	model = Node3D.new()
-	model.name = "Model"
+	model = get_node_or_null("Model") as Node3D
+	if model == null:
+		model = Node3D.new()
+		model.name = "Model"
+		add_child(model)
 	model.scale = Vector3.ONE * model_scale
-	add_child(model)
 
 	pelvis = _joint(model, "pelvis", Vector3(0, 0.95, 0))
 	# Cintura: escarcela, faldones, cinturón, tabardo

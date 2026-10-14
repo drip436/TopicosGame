@@ -33,7 +33,7 @@ signal player_died
 @export var clear_weather_on_victory: bool = true
 @export_range(0.0, 0.3) var rain_after_victory: float = 0.03
 
-const BOSS := preload("boss_profesor.gd")
+const BOSS_SCENE: PackedScene = preload("BossProfesor.tscn")
 const HUD := preload("boss_hud.gd")
 const PLAYER := preload("test_player.gd")
 
@@ -97,14 +97,16 @@ func _setup() -> void:
 		player.global_position = spawn
 		player.rotation.y = yaw
 		_disable_other_cameras()
-		hud.show_hint("WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Clic medio / Tab fijar objetivo\nF beber café (curar) · Esc soltar mouse")
+	if player:
+		hud.show_hint("WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar boss y hacer strafing\nF beber café (curar) · Esc soltar mouse")
 	if player and player.has_signal("died"):
 		player.died.connect(_on_player_died)
 
 	# Jefe
-	boss = CharacterBody3D.new()
-	boss.set_script(BOSS)
-	boss.name = "BossProfesor"
+	boss = BOSS_SCENE.instantiate() as CharacterBody3D
+	if boss == null:
+		push_error("La escena del primer jefe debe tener una raíz CharacterBody3D.")
+		return
 	boss.set("boss_name", boss_name)
 	boss.set("max_health", boss_max_health)
 	arena.add_child(boss)

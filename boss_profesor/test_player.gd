@@ -13,6 +13,8 @@ extends CharacterBody3D
 signal died
 signal health_changed(hp: float, max_hp: float)
 
+const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
+
 @export var max_hp := 100.0
 @export var max_stamina := 100.0
 @export var attack_damage := 40.0
@@ -29,6 +31,7 @@ var _cam_pitch_node: Node3D
 var _spring: SpringArm3D
 var camera: Camera3D
 var _visual: Node3D
+var _model_meshes: Array[MeshInstance3D] = []
 var _sword_pivot: Node3D
 var _trauma := 0.0
 var _st_delay := 0.0
@@ -42,6 +45,7 @@ var _stagger_t := 0.0
 var _iframes := 0.0
 var _knock := Vector3.ZERO
 var _locked := false
+var _focus_target: Node3D
 var _face_dir := Vector3.FORWARD
 var _m_body: StandardMaterial3D
 
@@ -50,13 +54,15 @@ func _ready() -> void:
 	add_to_group("player")
 	hp = max_hp
 	stamina = max_stamina
-	var cs := CollisionShape3D.new()
-	var cap := CapsuleShape3D.new()
-	cap.radius = 0.4
-	cap.height = 1.8
-	cs.shape = cap
-	cs.position = Vector3(0, 0.9, 0)
-	add_child(cs)
+	var cs := get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if cs == null:
+		cs = CollisionShape3D.new()
+		var cap := CapsuleShape3D.new()
+		cap.radius = 0.4
+		cap.height = 1.8
+		cs.shape = cap
+		cs.position = Vector3(0, 0.9, 0)
+		add_child(cs)
 	_build_visual()
 	_build_camera()
 	_yaw = rotation.y
@@ -65,40 +71,32 @@ func _ready() -> void:
 
 
 func _build_visual() -> void:
-	_visual = Node3D.new()
-	add_child(_visual)
+	_visual = get_node_or_null("Visual") as Node3D
+	if _visual == null:
+		_visual = Node3D.new()
+		_visual.name = "Visual"
+		add_child(_visual)
+	var model := _visual.get_node_or_null("ModeloJugador") as Node3D
+	if model == null:
+		model = PLAYER_MODEL.instantiate() as Node3D
+		if model == null:
+			push_error("El modelo del jugador debe tener una raíz Node3D.")
+		else:
+			model.name = "ModeloJugador"
+			model.rotation_degrees = Vector3(0.0, 180.0, 0.0)
+			model.scale = Vector3.ONE * 1.55
+			_visual.add_child(model)
+	if model:
+		for node in model.find_children("*", "MeshInstance3D", true, false):
+			_model_meshes.append(node as MeshInstance3D)
+
 	_m_body = StandardMaterial3D.new()
-	_m_body.albedo_color = Color(0.35, 0.32, 0.27)
+	_m_body.albedo_color = Color(1.0, 0.1, 0.05, 0.3)
 	_m_body.roughness = 0.5
-	_m_body.metallic = 0.4
+	_m_body.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_m_body.emission_enabled = true
 	_m_body.emission = Color(1, 0.1, 0.05)
 	_m_body.emission_energy_multiplier = 0.0
-	var body := MeshInstance3D.new()
-	var cm := CapsuleMesh.new()
-	cm.radius = 0.32
-	cm.height = 1.35
-	body.mesh = cm
-	body.position = Vector3(0, 0.85, 0)
-	body.material_override = _m_body
-	_visual.add_child(body)
-	var head := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.2
-	sm.height = 0.4
-	head.mesh = sm
-	head.position = Vector3(0, 1.66, 0)
-	head.material_override = _m_body
-	_visual.add_child(head)
-	var cloak := MeshInstance3D.new()
-	var cb := BoxMesh.new()
-	cb.size = Vector3(0.6, 1.1, 0.04)
-	cloak.mesh = cb
-	cloak.position = Vector3(0, 0.95, 0.3)
-	var cmat := StandardMaterial3D.new()
-	cmat.albedo_color = Color(0.25, 0.08, 0.06)
-	cloak.material_override = cmat
-	_visual.add_child(cloak)
 	_sword_pivot = Node3D.new()
 	_sword_pivot.position = Vector3(0.38, 1.25, 0)
 	_visual.add_child(_sword_pivot)
@@ -139,13 +137,16 @@ func _build_camera() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_MIDDLE:
+			_toggle_focus()
+			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			return
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			_try_attack()
-		elif event.button_index == MOUSE_BUTTON_MIDDLE:
-			_locked = not _locked and _find_boss() != null
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if not _locked:
 			_yaw -= event.relative.x * 0.003
@@ -157,7 +158,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				_try_roll()
 			KEY_TAB:
-				_locked = not _locked and _find_boss() != null
+				_toggle_focus()
 			KEY_F:
 				_try_heal()
 
@@ -165,9 +166,30 @@ func _unhandled_input(event: InputEvent) -> void:
 func _find_boss() -> Node3D:
 	var best: Node3D = null
 	for b in get_tree().get_nodes_in_group("boss"):
-		if b is Node3D:
-			best = b
+		if b is Node3D and b != self and is_instance_valid(b) and not b.is_queued_for_deletion():
+			if not ("state" in b and b.get("state") == 5):
+				best = b
 	return best
+
+
+func _toggle_focus() -> void:
+	if _locked:
+		_locked = false
+		_focus_target = null
+		return
+	_focus_target = _find_boss()
+	_locked = _focus_target != null
+	if _locked:
+		_face_focus_target()
+
+
+func _face_focus_target() -> void:
+	if _focus_target == null or not is_instance_valid(_focus_target):
+		return
+	var to := _focus_target.global_position - global_position
+	to.y = 0.0
+	if to.length_squared() > 0.001:
+		_face_dir = to.normalized()
 
 
 func _input_dir() -> Vector3:
@@ -232,6 +254,8 @@ func take_damage(amount: float, from: Variant = null) -> void:
 	hp = maxf(0.0, hp - amount)
 	health_changed.emit(hp, max_hp)
 	_m_body.emission_energy_multiplier = 2.0
+	for mesh in _model_meshes:
+		mesh.material_overlay = _m_body
 	add_camera_shake(0.45)
 	_attack_t = 0.0
 	_heal_t = 0.0
@@ -265,13 +289,28 @@ func _physics_process(delta: float) -> void:
 	if _st_delay <= 0.0 and _roll_t <= 0.0 and _attack_t <= 0.0:
 		stamina = minf(max_stamina, stamina + 38.0 * delta)
 	_m_body.emission_energy_multiplier = maxf(0.0, _m_body.emission_energy_multiplier - delta * 6.0)
+	if _m_body.emission_energy_multiplier == 0.0:
+		for mesh in _model_meshes:
+			mesh.material_overlay = null
 
-	var boss := _find_boss()
-	if _locked and (boss == null or ("state" in boss and boss.state == 5)):
+	if _locked and (
+		_focus_target == null
+		or not is_instance_valid(_focus_target)
+		or _focus_target.is_queued_for_deletion()
+		or ("state" in _focus_target and _focus_target.get("state") == 5)
+	):
 		_locked = false
-	if _locked and boss:
-		var to := boss.global_position - global_position
-		_yaw = lerp_angle(_yaw, atan2(-to.x, -to.z), 1.0 - exp(-8.0 * delta))
+		_focus_target = null
+	if _locked and _focus_target:
+		var to := _focus_target.global_position - global_position
+		if Vector2(to.x, to.z).length_squared() > 0.001:
+			_yaw = lerp_angle(_yaw, atan2(-to.x, -to.z), 1.0 - exp(-8.0 * delta))
+		var target_point := _focus_target.global_position + Vector3(0, 1.6, 0)
+		var camera_origin := global_position + Vector3(0, 1.7, 0)
+		var aim_offset := target_point - camera_origin
+		var target_pitch := atan2(aim_offset.y, Vector2(aim_offset.x, aim_offset.z).length())
+		_pitch = lerp_angle(_pitch, clampf(target_pitch, -1.1, 0.5), 1.0 - exp(-8.0 * delta))
+		_face_focus_target()
 
 	var vel := Vector3.ZERO
 	if is_dead:
@@ -310,8 +349,8 @@ func _physics_process(delta: float) -> void:
 			_st_delay = 0.3
 		vel += d * speed
 		if d != Vector3.ZERO and _attack_t <= 0.0:
-			if _locked and boss:
-				var tb := boss.global_position - global_position
+			if _locked and _focus_target:
+				var tb := _focus_target.global_position - global_position
 				tb.y = 0.0
 				_face_dir = tb.normalized()
 			else:

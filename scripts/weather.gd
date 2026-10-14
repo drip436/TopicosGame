@@ -6,12 +6,12 @@ extends Node3D
 
 signal lightning_struck(direction: Vector2)
 
-@export var rain_amount: int = 12000:
+@export var rain_amount: int = 7000:
 	set(v):
 		rain_amount = v
 		if rain:
 			rain.amount = v
-@export var splash_amount: int = 2400
+@export var splash_amount: int = 1200
 @export var environment_path: NodePath
 @export var sun_path: NodePath
 @export var lightning_enabled: bool = true
