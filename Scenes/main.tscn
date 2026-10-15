@@ -14,6 +14,7 @@
 [ext_resource type="PackedScene" path="res://prefabs/Ruina.tscn" id="12_jkdf5"]
 [ext_resource type="PackedScene" path="res://prefabs/Robot.tscn" id="13_wsu2k"]
 [ext_resource type="PackedScene" path="res://prefabs/Vehiculo.tscn" id="14_k12tt"]
+[ext_resource type="PackedScene" path="res://prefabs/Lago.tscn" id="15_wsu2k"]
 
 [sub_resource type="FastNoiseLite" id="Noise_clouds"]
 frequency = 0.008
@@ -152,6 +153,11 @@ floors = 3
 
 [node name="EdificioDeAulasA" parent="CampusWorld/Estructuras/AlasDeSalones" unique_id=1365696479 instance=ExtResource("8_6iyac")]
 transform = Transform3D(0.01683962, 0, 0.9998583, 0, 1, 0, -0.9998583, 0, 0.01683962, 34.617493, -0.23407364, -226.20673)
+title = "EDIFICIO DE AULAS A"
+collapse = 0.15
+
+[node name="EdificioDeAulasA2" parent="CampusWorld/Estructuras/AlasDeSalones" unique_id=215497919 instance=ExtResource("8_6iyac")]
+transform = Transform3D(-0.99991137, 0, 0.013326347, 0, 1, 0, -0.013326347, 0, -0.99991137, -173.9269, -0.23407364, -27.91062)
 title = "EDIFICIO DE AULAS A"
 collapse = 0.15
 
@@ -325,7 +331,7 @@ variation = 3
 zone = 3
 
 [node name="EstacionamientoPoniente" parent="CampusWorld/Estructuras/ZonasRecreativas" unique_id=909449472 instance=ExtResource("10_jkdf5")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -273, 0, -92)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -263.54468, 0, -76.215996)
 title = "Estacionamiento Poniente"
 variation = 4
 zone = 4
@@ -508,6 +514,41 @@ robot = 4
 eyes_on = true
 sparks = true
 
+[node name="RobotMech06" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1603799489 instance=ExtResource("13_wsu2k")]
+transform = Transform3D(0.16603857, 0, 0.9861193, 0, 1, 0, -0.9861193, 0, 0.16603857, -267.18692, 0, -42.59385)
+variation = 6459
+robot = 4
+eyes_on = true
+sparks = true
+
+[node name="RobotMech07" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1696429572 instance=ExtResource("13_wsu2k")]
+transform = Transform3D(0.16603857, 0, 0.9861193, -0.44134375, 0.8942558, 0.074311584, -0.8818429, -0.44755617, 0.14848097, -267.18692, -1.9456775, -32.275406)
+variation = 6459
+robot = 4
+eyes_on = true
+sparks = true
+
+[node name="RobotMech08" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1020563337 instance=ExtResource("13_wsu2k")]
+transform = Transform3D(0.16603857, 0, 0.9861193, 0.51334244, 0.8538199, -0.08643441, -0.8419684, 0.5205684, 0.14176705, -267.18692, -1.9456775, -56.395386)
+variation = 6459
+robot = 4
+eyes_on = true
+sparks = true
+
+[node name="RobotMech09" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=393941041 instance=ExtResource("13_wsu2k")]
+transform = Transform3D(0.16603857, 0, 0.9861193, -0.01993972, 0.9997955, 0.0033573806, -0.98591757, -0.02022025, 0.1660046, -261.99442, -0.22583795, -26.50979)
+variation = 6459
+robot = 4
+eyes_on = true
+sparks = true
+
+[node name="RobotMech10" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1234651791 instance=ExtResource("13_wsu2k")]
+transform = Transform3D(0.16603857, 0, 0.9861193, -0.01993972, 0.9997955, 0.0033573806, -0.98591757, -0.02022025, 0.1660046, -258.44672, -0.22583795, -41.583755)
+variation = 6459
+robot = 4
+eyes_on = true
+sparks = true
+
 [node name="RobotMech03" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=472801740 instance=ExtResource("13_wsu2k")]
 transform = Transform3D(-0.8660254, 0, -0.49999997, 0, 1, 0, 0.49999997, 0, -0.8660254, 80.364716, 0, -60.06142)
 variation = 6459
@@ -586,6 +627,36 @@ eyes_on = true
 
 [node name="Crater01" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=149403724 instance=ExtResource("12_jkdf5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 205, 0, -55)
+variation = 9350
+ruin = 4
+
+[node name="Crater02" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1872180478 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -262.034, 0, -55)
+variation = 9350
+ruin = 4
+
+[node name="Crater03" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1410076536 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -262.034, 0, -38.444653)
+variation = 9350
+ruin = 4
+
+[node name="Crater04" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=620270353 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -262.034, 0, -28.537052)
+variation = 9350
+ruin = 4
+
+[node name="Crater05" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1112281602 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -242.51839, 0, -28.537052)
+variation = 9350
+ruin = 4
+
+[node name="Crater06" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=1186204306 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -233.4896, 0, -46.736702)
+variation = 9350
+ruin = 4
+
+[node name="Crater07" parent="CampusWorld/Estructuras/Ambientacion/Escenas" unique_id=2123405060 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -201.74025, 0, -46.736702)
 variation = 9350
 ruin = 4
 
@@ -818,6 +889,26 @@ transform = Transform3D(-0.9223788, 0, -0.38628662, 0, 1, 0, 0.38628662, 0, -0.9
 variation = 6413
 ruin = 5
 
+[node name="Barricada04" parent="CampusWorld/Estructuras/Ambientacion/Ruinas" unique_id=36717486 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(-0.09519914, 0, -0.99545825, 0, 1, 0, 0.99545825, 0, -0.09519914, -251.25635, 0, -53.816)
+variation = 6413
+ruin = 5
+
+[node name="Barricada05" parent="CampusWorld/Estructuras/Ambientacion/Ruinas" unique_id=811278892 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(-0.09519914, 0, -0.99545825, 0, 1, 0, 0.99545825, 0, -0.09519914, -251.25635, 0, -47.266266)
+variation = 6413
+ruin = 5
+
+[node name="Barricada06" parent="CampusWorld/Estructuras/Ambientacion/Ruinas" unique_id=1722209208 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(-0.09519914, 0, -0.99545825, 0, 1, 0, 0.99545825, 0, -0.09519914, -251.25635, 0, -36.751373)
+variation = 6413
+ruin = 5
+
+[node name="Barricada07" parent="CampusWorld/Estructuras/Ambientacion/Ruinas" unique_id=2090501908 instance=ExtResource("12_jkdf5")]
+transform = Transform3D(-0.09519914, 0, -0.99545825, 0, 1, 0, 0.99545825, 0, -0.09519914, -251.25635, 0, -31.363169)
+variation = 6413
+ruin = 5
+
 [node name="Caseta02" parent="CampusWorld/Estructuras/Ambientacion/Ruinas" unique_id=965749199 instance=ExtResource("12_jkdf5")]
 transform = Transform3D(-0.0021582071, 0, 0.9999977, 0, 1, 0, -0.9999977, 0, -0.0021582071, 94.377014, 0, -173.06067)
 variation = 7464
@@ -827,3 +918,8 @@ ruin = 2
 transform = Transform3D(-0.9966555, 0, 0.08171791, 0, 1, 0, -0.08171791, 0, -0.9966555, 30.437908, 0, -275.8575)
 variation = 5956
 ruin = 3
+
+[node name="Paisaje" type="Node3D" parent="CampusWorld/Estructuras" unique_id=1176124261]
+
+[node name="MaleconDelLago" parent="CampusWorld/Estructuras/Paisaje" unique_id=1325142635 instance=ExtResource("15_wsu2k")]
+transform = Transform3D(0.65721714, 0, 0, 0, 1, 0, 0, 0, 1.1335129, 0.3680725, 0.30912876, -143.63083)

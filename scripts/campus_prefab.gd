@@ -8,7 +8,7 @@ extends Node3D
 ##
 ## Si dos copias se ven idénticas, cambia `variation`.
 
-enum Kind { FACULTAD, ALA_DE_SALONES, EDIFICIO_EN_RUINAS, ZONA_RECREATIVA, FUENTE, VEHICULO, ROBOT, RUINA }
+enum Kind { FACULTAD, ALA_DE_SALONES, EDIFICIO_EN_RUINAS, ZONA_RECREATIVA, FUENTE, VEHICULO, ROBOT, RUINA, LAGO }
 enum Vehicle { AUTO, CAMIONETA, AUTOBUS, PATRULLA, AMBULANCIA }
 enum Condition { DESTROZADO, VOLCADO, DE_LADO, CALCINADO, EN_LLAMAS }
 enum Robot { CENTINELA, PARTIDO, SENTADO, CANINO, MECH, DRON }
@@ -139,6 +139,13 @@ const ZONE_SIZES := {
 		sparks = v
 		_changed()
 
+@export_group("Lago")
+## Radios del lago en X y Z (metros). El malecón, el muelle y la isla se ajustan.
+@export var lake_radii: Vector2 = Vector2(55, 36):
+	set(v):
+		lake_radii = Vector2(maxf(v.x, 20.0), maxf(v.y, 15.0))
+		_changed()
+
 @export_group("Ruina")
 @export var ruin: Ruin = Ruin.ESCOMBROS:
 	set(v):
@@ -195,6 +202,8 @@ func footprint() -> Vector2:
 			return ROBOT_SIZES.get(robot, Vector2(3, 3))
 		Kind.RUINA:
 			return RUIN_SIZES.get(ruin, Vector2(10, 10))
+		Kind.LAGO:
+			return lake_radii * 2.0 + Vector2(18, 18)
 	if zone == Zone.ESTACIONAMIENTO or zone == Zone.PICNIC:
 		return area_size
 	return ZONE_SIZES.get(zone, Vector2(30, 30))
@@ -222,5 +231,7 @@ func _validate_property(property: Dictionary) -> void:
 			show = kind == Kind.ROBOT
 		"ruin":
 			show = kind == Kind.RUINA
+		"lake_radii":
+			show = kind == Kind.LAGO
 	if not show:
 		property.usage = PROPERTY_USAGE_NO_EDITOR

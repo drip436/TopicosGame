@@ -54,6 +54,9 @@ const ZONES := [
 ## Desmárcalo para probar la arena final con el portón abierto.
 @export var final_gate_locked: bool = true
 @export var show_area_titles: bool = true
+## Avisa en el panel Output cuando un prefab tapa un edificio de conexión o cruza
+## una barricada entre sectores (revisa que el recorrido siga funcionando).
+@export var warn_prefab_conflicts: bool = true
 ## Para pruebas: desbloquea todo al iniciar (plaza, sellos y portón final).
 @export var open_world_on_start: bool = false
 
@@ -210,7 +213,6 @@ func _build() -> void:
 	_make_cafeteria()
 	_make_water_tower()
 	_make_avenue()
-	_make_lake()
 	_make_routes()
 	_make_wrecks()
 	_make_signs()
@@ -2445,8 +2447,6 @@ func _make_markers() -> void:
 # Facultades de ladrillo con patio (al estilo de Ciudad Universitaria), alas de
 # salones, lago con malecón, fuentes, rutas de color a cada jefe, incendios.
 
-const LAKE := Vector3(-215, 0, -300)
-const LAKE_R := Vector2(55, 36)
 ## Color de la ruta que lleva a cada arena: línea pintada, flechas y bolardos.
 const ROUTE_COLORS := {
 	"biblioteca": Color(1.0, 0.72, 0.2),
@@ -2466,8 +2466,7 @@ func _make_district_materials() -> void:
 	m_water = ShaderMaterial.new()
 	m_water.shader = ws
 	m_water.set_shader_parameter("noise_tex", noise_tex)
-	m_water.set_shader_parameter("center", Vector2(LAKE.x, LAKE.z))
-	m_water.set_shader_parameter("radii", LAKE_R)
+	m_water.set_shader_parameter("local_edge", true)
 	m_fwater = ShaderMaterial.new()
 	m_fwater.shader = ws
 	m_fwater.set_shader_parameter("noise_tex", noise_tex)
@@ -2646,15 +2645,15 @@ func _faculty(c: Vector3, yaw: float, title: String, floors := 0) -> void:
 
 # ---------------------------------------------------------------- lago
 
-func _make_lake() -> void:
+## Lago con malecón, muelle, isla con puente y ambientación. Centro en c,
+## radios A (x) y B (z). Lo construye el prefab LAGO.
+func _make_lake(c: Vector3, A: float, B: float) -> void:
 	var zone := _begin_zone("Lago")
-	var c := LAKE
-	var A := LAKE_R.x
-	var B := LAKE_R.y
-	_reserve(Vector2(c.x - 25, c.z), 48.0)
-	_reserve(Vector2(c.x + 25, c.z), 48.0)
-	_extra_zones.append([Vector2(c.x, c.z), 64.0, "Malecón del Lago"])
 	_mm_add(_uc(m_water, 64), Transform3D(Basis.from_scale(Vector3(A * 2.0 + 1.0, 0.05, B * 2.0 + 1.0)), c))
+	# Isla y puente (el puente sale de la orilla norte, -z)
+	var isl := c + Vector3(-A * 0.36, 0, -B * 0.39)
+	var ir := minf(A, B) * 0.19
+	var shore_z := c.z - B * sqrt(maxf(0.0, 1.0 - pow((isl.x - c.x) / A, 2.0)))
 	var N := 96
 	for i in N:
 		var t0 := TAU * i / N
@@ -2667,14 +2666,18 @@ func _make_lake() -> void:
 		var d := p1 - p0
 		var l := d.length()
 		var bs := Basis(Vector3.UP, atan2(d.x, d.z))
-		var at_pier := absf(wrapf(tm, -PI, PI)) < 0.04
-		if not at_pier:
+		var at_pier := absf(wrapf(tm, -PI, PI)) < 1.8 / B
+		var at_bridge := absf(pm.x - isl.x) < 1.9 and pm.z < c.z
+		if not at_pier and not at_bridge:
 			var wp := pm + nrm * 0.3
 			_mm_add(_ub(m_stone_light), Transform3D(bs * Basis.from_scale(Vector3(0.6, 0.7, l + 0.15)), wp + Vector3(0, 0.35, 0)))
 			_wc(Vector3(0.6, 1.6, l + 0.15), Transform3D(bs, wp + Vector3(0, 0.8, 0)))
-			if rng.randf() > 0.06:
+			if rng.randf() > 0.07:
 				_mm_add(_ub(m_iron), Transform3D(bs * Basis.from_scale(Vector3(0.05, 0.05, l)), wp + Vector3(0, 1.25, 0)))
 				_mm_add(_ub(m_iron), Transform3D(bs * Basis.from_scale(Vector3(0.04, 0.04, l)), wp + Vector3(0, 0.95, 0)))
+			else:
+				# Tramo de barandal arrancado, flotando
+				_mm_add(_ub(m_iron), Transform3D(bs * _rb(Vector3(rng.randf_range(-20, 20), 0, 80)) * Basis.from_scale(Vector3(0.05, 0.05, l)), wp - nrm * 1.2 + Vector3(0, 0.05, 0)))
 			_mm_add(_ub(m_iron), Transform3D(Basis.from_scale(Vector3(0.07, 0.6, 0.07)), p0 + nrm * 0.3 + Vector3(0, 0.98, 0)))
 		# Malecón
 		_mm_add(_ub(m_path), Transform3D(bs * Basis.from_scale(Vector3(7.0, 0.06, l * 1.12 + 0.3)), pm + nrm * 4.1))
@@ -2689,31 +2692,199 @@ func _make_lake() -> void:
 			_wtree(tp, rng.randf_range(0.9, 1.3), Vector3(82, rng.randf_range(0, 360), 0) if rng.randf() < 0.15 else Vector3.ZERO)
 	# Muelle de madera hacia el centro del lago
 	var ps := c + Vector3(A + 0.6, 0, 0)
-	var plen := 24.0
+	var plen := minf(24.0, A * 0.45)
 	_blk(ps + Vector3(-plen * 0.5, 0.05, 0), Vector3(plen, 0.1, 3.6), m_wood)
 	for k in int(plen / 3.0) + 1:
 		for sz: float in [-1.0, 1.0]:
-			var pp := ps + Vector3(-k * 3.0, 0, sz * 1.75)
-			_cy(pp + Vector3(0, 0.4, 0), 0.1, 1.2, m_wood, Vector3.ZERO, 6)
+			_cy(ps + Vector3(-k * 3.0, 0.4, sz * 1.75), 0.1, 1.2, m_wood, Vector3.ZERO, 6)
 	for sz: float in [-1.0, 1.0]:
 		_blk(ps + Vector3(-plen * 0.5, 1.0, sz * 1.75), Vector3(plen, 0.08, 0.08), m_wood)
 		_wc(Vector3(plen, 1.6, 0.2), Transform3D(Basis.IDENTITY, ps + Vector3(-plen * 0.5, 0.8, sz * 1.85)))
 	_wc(Vector3(0.2, 1.6, 3.6), Transform3D(Basis.IDENTITY, ps + Vector3(-plen - 0.1, 0.8, 0)))
 	_street_lamp(ps + Vector3(-plen + 0.6, 0, 1.4), 0.0, 0)
-	_blk(ps + Vector3(-plen + 5.0, 0.12, 3.5), Vector3(3.6, 0.6, 1.3), m_wood, Vector3(8, 15, -10))
 	_lbl(zone, "MUELLE", ps + Vector3(0.4, 1.5, 0), 90.0, 40, Color(0.8, 0.75, 0.6))
-	# Lanchas hundidas, islote y basura flotando
-	_blk(c + Vector3(-22, 0.1, 12), Vector3(5.0, 1.0, 1.8), m_burnt, Vector3(25, 70, 15))
-	_blk(c + Vector3(18, 0.0, -14), Vector3(4.0, 0.9, 1.6), m_wood, Vector3(-30, -20, 8))
-	_cy(c + Vector3(-12, 0.2, -6), 7.0, 0.4, m_hedge, Vector3.ZERO, 24)
-	_cy(c + Vector3(-12, 0.45, -6), 5.5, 0.2, m_debris, Vector3.ZERO, 20)
-	_wtree(c + Vector3(-12, 0.5, -6), 1.6)
-	_cy(c + Vector3(-9, 1.6, -4), 0.5, 3.0, m_stone_light, Vector3(0, 0, 8), 12)
+	# Lanchas de pedales amarradas (una volteada)
+	for k in 3:
+		var bp := ps + Vector3(-4.0 - k * 4.5, 0, 3.3 * (1.0 if k % 2 == 0 else -1.0))
+		var flipped := k == 2
+		var by := 0.15 if not flipped else 0.1
+		_blk(bp + Vector3(0, by, 0), Vector3(2.4, 0.5, 1.3), m_line if k != 1 else m_blue, Vector3(180 if flipped else 0, rng.randf_range(-15, 15), rng.randf_range(-6, 6)))
+		if not flipped:
+			_sp(bp + Vector3(0.9, 0.7, 0), Vector3(0.35, 0.7, 0.3), m_line, Vector3(0, 0, -20))
+			_sp(bp + Vector3(1.05, 1.05, 0), Vector3(0.3, 0.25, 0.22), m_line)
+			_blk(bp + Vector3(-0.3, 0.55, 0), Vector3(0.6, 0.3, 1.0), m_blue)
+		_rod(bp + Vector3(0.5, 0.3, 0), bp + Vector3(0.5, 0.9, -1.6 * signf(bp.z - ps.z)), 0.01, m_canvas, 3)
+	# Letrero
+	var sg := c + Vector3(A + 5.5, 0, 4.5)
+	_cy(sg + Vector3(0, 1.0, 0), 0.05, 2.0, m_iron)
+	_blk(sg + Vector3(0, 2.0, 0), Vector3(0.08, 0.6, 1.6), m_line, Vector3(0, 0, 6))
+	_lbl(zone, "PROHIBIDO NADAR", sg + Vector3(-0.06, 2.0, 0), -90.0, 26, Color(0.6, 0.05, 0.04))
+	_lbl(zone, "PROHIBIDO NADAR", sg + Vector3(0.06, 2.0, 0), 90.0, 26, Color(0.6, 0.05, 0.04))
+	# Puente de madera a la isla
+	var b_start := Vector3(isl.x, 0, shore_z + 0.5)
+	var b_end := Vector3(isl.x, 0, isl.z - ir + 0.5)
+	var bl := b_end.z - b_start.z
+	if bl > 2.0:
+		var bm := (b_start + b_end) * 0.5
+		_blk(bm + Vector3(0, 0.06, 0), Vector3(3.0, 0.12, bl + 1.0), m_wood)
+		var n_posts := int(bl / 2.5) + 1
+		for k in n_posts + 1:
+			var z := b_start.z + bl * k / float(n_posts)
+			for sx: float in [-1.0, 1.0]:
+				_cy(Vector3(isl.x + sx * 1.45, 0.55, z), 0.07, 1.1, m_wood, Vector3.ZERO, 6)
+		for sx: float in [-1.0, 1.0]:
+			_blk(bm + Vector3(sx * 1.45, 1.05, 0), Vector3(0.08, 0.08, bl + 0.6), m_wood)
+			_wc(Vector3(0.2, 1.6, bl + 1.6), Transform3D(Basis.IDENTITY, bm + Vector3(sx * 1.55, 0.8, 0)))
+		_blk(b_start + Vector3(0, 2.4, -0.55), Vector3(4.6, 0.55, 0.08), m_wood_dark)
+		for face: float in [0.0, 180.0]:
+			_lbl(zone, "ISLA DE LOS PENSADORES", b_start + Vector3(0, 2.4, -0.55 + (0.05 if face == 0.0 else -0.05)), face, 24, Color(0.85, 0.8, 0.65))
+		for sx: float in [-1.0, 1.0]:
+			_cy(b_start + Vector3(sx * 1.7, 1.3, -0.55), 0.08, 2.6, m_wood_dark)
+	# Isla: tierra, orilla con piedras, kiosco, árbol, banca y farol
+	_mm_add(_uc(m_debris, 24), Transform3D(Basis.from_scale(Vector3(ir * 2.0, 0.1, ir * 2.0)), isl))
+	_mm_add(_uc(m_lawn, 24), Transform3D(Basis.from_scale(Vector3(ir * 1.8, 0.12, ir * 1.8)), isl))
+	var isl_pts: Array = []
+	for q in int(ir * ir * 1.6):
+		var a := rng.randf() * TAU
+		var rr := sqrt(rng.randf()) * ir * 0.88
+		isl_pts.append(isl + Vector3(cos(a) * rr, 0.06, sin(a) * rr))
+	_tufts(zone, isl, isl_pts)
+	var ni := 28
+	for i in ni:
+		var a := TAU * (i + 0.5) / ni
+		var dir := Vector3(cos(a), 0, sin(a))
+		if dir.z < -0.9:
+			continue
+		_chunk(isl + dir * ir, 0.3, 0.8)
+		_wc(Vector3(0.6, 1.4, TAU * ir / ni + 0.3), Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z) + PI * 0.5), isl + dir * (ir + 0.2) + Vector3(0, 0.7, 0)))
+	var gz := isl + Vector3(ir * 0.25, 0, ir * 0.15)
+	for k in 6:
+		var a := TAU * k / 6.0
+		if k == 4:
+			_cy(gz + Vector3(cos(a), 0, sin(a)) * 2.4 + Vector3(0, 0.9, 0), 0.12, 1.8, m_wood_dark, Vector3.ZERO, 6)
+			continue
+		_cy(gz + Vector3(cos(a), 0, sin(a)) * 2.4 + Vector3(0, 1.4, 0), 0.12, 2.8, m_wood_dark, Vector3.ZERO, 6, 1.0, true)
+	_mm_add(_uc(m_wood_dark, 6, 0.0), Transform3D(_rb(Vector3(5, 0, -4)) * Basis.from_scale(Vector3(6.0, 1.8, 6.0)), gz + Vector3(0, 3.6, 0)))
+	_bench(zone, gz + Vector3(0, 0, -0.8), 0.0, false)
+	_wtree(isl + Vector3(-ir * 0.4, 0, ir * 0.3), 1.5)
+	_cy(isl + Vector3(-ir * 0.2, 1.4, -ir * 0.45), 0.45, 2.8, m_stone_light, Vector3(0, 0, 10), 12, 0.9, true)
+	_sp(isl + Vector3(-ir * 0.2 + 0.4, 0.3, -ir * 0.45 + 1.0), Vector3(0.8, 0.9, 0.8), m_stone_light, Vector3(60, 20, 0))
+	_cy(gz + Vector3(1.6, 0.7, 1.2), 0.05, 1.4, m_iron, Vector3.ZERO, 6)
+	_sp(gz + Vector3(1.6, 1.5, 1.2), Vector3(0.25, 0.3, 0.25), m_lamp_on)
+	_omni(zone, gz + Vector3(1.6, 1.6, 1.2), Color(1.0, 0.65, 0.35), 1.4, 9.0, 0.02, 4.0)
+	# Tules en la orilla y nenúfares
+	var reed_pts: Array = []
+	for cl in 26:
+		var a := rng.randf() * TAU
+		var k := rng.randf_range(0.86, 0.96)
+		var cc := c + Vector3(cos(a) * A * k, 0, sin(a) * B * k)
+		if absf(wrapf(a, -PI, PI)) < 0.12:
+			continue
+		for q in rng.randi_range(10, 22):
+			var rp := cc + Vector3(rng.randf_range(-1.6, 1.6), 0.02, rng.randf_range(-1.6, 1.6))
+			reed_pts.append(rp)
+			if rng.randf() < 0.2:
+				var h := rng.randf_range(1.3, 1.9)
+				_rod(rp, rp + Vector3(rng.randf_range(-0.15, 0.15), h, rng.randf_range(-0.15, 0.15)), 0.012, m_hedge, 3)
+				_cy(rp + Vector3(0, h - 0.1, 0), 0.04, 0.22, m_wood_dark, Vector3.ZERO, 5)
+	_reeds(zone, c, reed_pts)
+	for q in 70:
+		var a := rng.randf() * TAU
+		var k := rng.randf_range(0.55, 0.92)
+		var lp := c + Vector3(cos(a) * A * k, 0.035, sin(a) * B * k)
+		if lp.distance_to(isl) < ir + 1.0:
+			continue
+		var lr := rng.randf_range(0.25, 0.6)
+		_mm_add(_uc(m_lily, 10), Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(lr * 2.0, 0.01, lr * 2.0)), lp))
+		if rng.randf() < 0.08:
+			_sp(lp + Vector3(0, 0.08, 0), Vector3(0.14, 0.1, 0.14), m_line)
+	# Restos en el agua: auto y robot medio hundidos, árbol caído, lanchas y basura
+	var car_p := c + Vector3(-A * 0.55, 0, B * 0.55)
+	_blk(car_p + Vector3(0, -0.1, 0), Vector3(4.3, 1.5, 1.85), m_burnt, Vector3(-12, 35, 18))
+	_blk(car_p + Vector3(-0.5, 0.6, 0.2), Vector3(2.0, 0.7, 1.6), m_rdark, Vector3(-12, 35, 18))
+	_cy(car_p + Vector3(1.4, 0.3, 1.0), 0.36, 0.26, m_tire, Vector3(80, 35, 0), 12)
+	_humanoid(Transform3D(Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, -PI * 0.5) * Basis(Vector3.BACK, 0.2), c + Vector3(A * 0.5, -0.12, -B * 0.62)), m_reye_on, {
+		"head": Vector3(0, 30, 0),
+		"arm_l": [Vector3(0, 0, -70), Vector3(-20, 0, 0)],
+		"arm_r": [Vector3(-20, 0, 60), Vector3(-50, 0, 0)],
+		"leg_l": [Vector3(-10, 0, -10), Vector3(5, 0, 0)],
+		"leg_r": [Vector3(-30, 0, 10), Vector3(40, 0, 0)],
+	})
+	var fall_a := deg_to_rad(200.0)
+	var tree_base := c + Vector3(cos(fall_a) * (A + 9.0), 0, sin(fall_a) * (B + 9.0))
+	_wtree(tree_base, 1.4, Vector3(84, rad_to_deg(atan2(c.x - tree_base.x, c.z - tree_base.z)), 0))
+	_blk(c + Vector3(-A * 0.4, 0.1, B * 0.33), Vector3(5.0, 1.0, 1.8), m_burnt, Vector3(25, 70, 15))
+	_blk(c + Vector3(A * 0.33, 0.0, -B * 0.39), Vector3(4.0, 0.9, 1.6), m_wood, Vector3(-30, -20, 8))
 	for q in 30:
 		var a := rng.randf() * TAU
 		var r := rng.randf_range(0.2, 0.9)
 		_mm_add(_ub(m_wood if rng.randf() < 0.5 else m_debris), Transform3D(_rb(Vector3(0, rng.randf_range(0, 360), 0)) * Basis.from_scale(Vector3(rng.randf_range(0.3, 1.5), 0.08, rng.randf_range(0.2, 0.6))), c + Vector3(cos(a) * A * r, 0.04, sin(a) * B * r)))
+	_lake_mist(zone, c, A, B)
 	_end_zone()
+
+
+## Matas altas de tule (MultiMesh propio, se oculta a distancia).
+func _reeds(parent: Node3D, center: Vector3, pts: Array) -> void:
+	if pts.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh_tuft
+	mm.instance_count = pts.size()
+	for i in pts.size():
+		var p: Vector3 = pts[i]
+		var s := rng.randf_range(1.2, 1.8)
+		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(s, s * rng.randf_range(2.8, 4.2), s)), p - center))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.position = center
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.visibility_range_end = 140.0
+	parent.add_child(mmi)
+
+
+## Neblina baja que se arrastra sobre el agua.
+func _lake_mist(parent: Node3D, c: Vector3, A: float, B: float) -> void:
+	var p := GPUParticles3D.new()
+	p.name = "Neblina"
+	p.position = c + Vector3(0, 0.7, 0)
+	p.amount = int(clampf(A * B / 50.0, 16.0, 70.0))
+	p.lifetime = 24.0
+	p.preprocess = 24.0
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-A - 10, -2, -B - 10), Vector3(A * 2.0 + 20, 8, B * 2.0 + 20))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(A * 0.75, 0.3, B * 0.75)
+	pm.direction = Vector3(1, 0, 0.3)
+	pm.spread = 30.0
+	pm.initial_velocity_min = 0.2
+	pm.initial_velocity_max = 0.5
+	pm.gravity = Vector3.ZERO
+	pm.angle_min = -180.0
+	pm.angle_max = 180.0
+	pm.scale_min = 7.0
+	pm.scale_max = 12.0
+	var cg := Gradient.new()
+	cg.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	cg.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.16), Color(1, 1, 1, 0.12), Color(1, 1, 1, 0)])
+	var cgt := GradientTexture1D.new()
+	cgt.gradient = cg
+	pm.color_ramp = cgt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 0.45)
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(0.72, 0.76, 0.8)
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.albedo_texture = _soft_tex(PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.4), Color(1, 1, 1, 0)]), PackedFloat32Array([0.0, 0.5, 1.0]))
+	m.roughness = 1.0
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	q.material = m
+	p.draw_pass_1 = q
+	parent.add_child(p)
 
 
 # ---------------------------------------------------------------- fuentes
@@ -4363,6 +4534,8 @@ func _build_prefab(pf: Node3D) -> void:
 			_make_robot(c, pf.robot, pf.eyes_on, pf.sparks)
 		"RUINA":
 			_make_ruin(c, pf.ruin)
+		"LAGO":
+			_make_lake(c, pf.lake_radii.x, pf.lake_radii.y)
 		_:
 			_build_zone(pf, c)
 	_prefab_local = false
@@ -4385,11 +4558,38 @@ func _build_prefab(pf: Node3D) -> void:
 			mn = mn.min(Vector2(wp.x, wp.z))
 			mx = mx.max(Vector2(wp.x, wp.z))
 	_blocked_rects.append(Rect2(mn, mx - mn))
+	_warn_conflicts(pf, kind_name)
 	var gp := pf.global_position
 	if kind_name in ["FACULTAD", "ALA_DE_SALONES", "EDIFICIO_EN_RUINAS"]:
 		_reserve(Vector2(gp.x, gp.z), minf(fp.x, fp.y) * 0.5)
 	if title != "" and kind_name != "EDIFICIO_EN_RUINAS":
 		_extra_zones.push_front([Vector2(gp.x, gp.z), maxf(fp.x, fp.y) * 0.5 + 4.0, title])
+
+
+## Avisa (panel Output) si un prefab tapa un edificio de conexión o cruza una
+## barricada entre sectores: eso puede bloquear el recorrido o abrir un atajo.
+func _warn_conflicts(pf: Node3D, kind_name: String) -> void:
+	if not warn_prefab_conflicts or kind_name in ["VEHICULO", "ROBOT"]:
+		return
+	# Rectángulo girado real (sin los márgenes de reserva)
+	var half: Vector2 = pf.footprint() * 0.5 - Vector2(3.0, 3.0)
+	if half.x <= 0.5 or half.y <= 0.5:
+		return
+	var xf := pf.global_transform
+	var poly := PackedVector2Array()
+	for cr: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		var wp := xf * Vector3(cr.x * half.x, 0, cr.y * half.y)
+		poly.append(Vector2(wp.x, wp.z))
+	for c in _connector_rects:
+		var r: Rect2 = c
+		var rp := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+		if not Geometry2D.intersect_polygons(poly, rp).is_empty():
+			push_warning("⚠ '%s' se encima con un edificio de conexión: revisa que no tape el paso." % pf.name)
+			return
+	for w in SECTOR_WALLS:
+		if not Geometry2D.intersect_polyline_with_polygon(PackedVector2Array([w[0], w[1]]), poly).is_empty():
+			push_warning("⚠ '%s' cruza una barricada entre sectores: revisa que no deje un hueco para colarse." % pf.name)
+			return
 
 
 func _build_zone(pf: Node3D, c: Vector3) -> void:
@@ -4447,6 +4647,7 @@ var m_scorch: StandardMaterial3D
 var m_ember: StandardMaterial3D
 var m_cable_r: StandardMaterial3D
 var m_cable_y: StandardMaterial3D
+var m_lily: StandardMaterial3D
 var _paints := {}
 
 
@@ -4466,6 +4667,7 @@ func _make_decor_materials() -> void:
 	m_ember = _emit(Color(1.0, 0.35, 0.05), 3.0)
 	m_cable_r = _std(Color(0.5, 0.05, 0.04), 0.5, 0.0)
 	m_cable_y = _std(Color(0.7, 0.55, 0.05), 0.5, 0.0)
+	m_lily = _std(Color(0.08, 0.16, 0.06), 0.4, 0.0)
 	_paints.clear()
 
 

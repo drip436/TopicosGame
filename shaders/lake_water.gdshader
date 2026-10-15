@@ -10,11 +10,15 @@ uniform vec3 scum_color : source_color = vec3(0.07, 0.08, 0.045);
 uniform vec2 center = vec2(0.0);
 uniform vec2 radii = vec2(1000.0);
 uniform float rain_intensity : hint_range(0.0, 2.0) = 1.0;
+// true: la orilla se calcula con la forma de la malla (sirve si el lago se mueve o gira)
+uniform bool local_edge = false;
 
 varying vec3 wpos;
+varying vec3 lpos;
 
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	lpos = VERTEX;
 }
 
 float hash12(vec2 p) {
@@ -54,7 +58,7 @@ void fragment() {
 	vec2 rip = ripple_layer(p * 1.6, TIME * 1.2) * rain_intensity * 0.45;
 	vec3 nw = normalize(vec3(-(waves.x + rip.x), 1.0, -(waves.y + rip.y)));
 
-	float e = length((p - center) / radii);
+	float e = local_edge ? length(lpos.xz) * 2.0 : length((p - center) / radii);
 	float scum = smoothstep(0.82, 1.0, e) * smoothstep(0.5, 0.68, texture(noise_tex, p * 0.12).r);
 	vec3 col = mix(deep_color, shallow_color, smoothstep(0.55, 1.0, e));
 	col = mix(col, scum_color, scum * 0.85);
