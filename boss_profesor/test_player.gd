@@ -5,13 +5,16 @@ extends CharacterBody3D
 ##   take_damage(cantidad: float, desde: Vector3)    <- el jefe lo llama al golpearte
 ##   add_camera_shake(fuerza: float)                  <- opcional
 ##   var is_dead: bool                                <- opcional
+##   apply_status(efecto, segundos)                   <- opcional: "electrocutado",
+##                                                       "quemadura" o "atrapado"
 ## Para dañar al jefe: jefe.take_damage(cantidad)  (está en el grupo "boss").
 ##
 ## Controles: WASD mover · Shift correr · Espacio rodar · Clic izq. atacar
-##            Clic medio / Tab fijar objetivo · F beber café (curar) · Esc soltar mouse
+##            Clic medio / Tab fijar objetivo · R beber café (curar) · Esc soltar mouse
 
 signal died
 signal health_changed(hp: float, max_hp: float)
+signal status_changed(effects: Array)
 
 const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
 
@@ -49,6 +52,15 @@ var _focus_target: Node3D
 var _face_dir := Vector3.FORWARD
 var _m_body: StandardMaterial3D
 
+# Estados alterados: nombre -> segundos restantes
+var _status := {}
+var _burn_tick := 0.0
+var _max_flasks := 4
+var _m_shock: StandardMaterial3D
+var _m_burn: StandardMaterial3D
+var _fx_shock: GPUParticles3D
+var _fx_burn: GPUParticles3D
+
 
 func _ready() -> void:
 	add_to_group("player")
@@ -63,7 +75,9 @@ func _ready() -> void:
 		cs.shape = cap
 		cs.position = Vector3(0, 0.9, 0)
 		add_child(cs)
+	_max_flasks = flasks
 	_build_visual()
+	_build_status_fx()
 	_build_camera()
 	_yaw = rotation.y
 	rotation.y = 0.0
@@ -159,7 +173,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_try_roll()
 			KEY_TAB:
 				_toggle_focus()
-			KEY_F:
+			KEY_R, KEY_F:
 				_try_heal()
 
 
@@ -207,11 +221,11 @@ func _input_dir() -> Vector3:
 
 
 func _busy() -> bool:
-	return _roll_t > 0.0 or _attack_t > 0.0 or _heal_t > 0.0 or _stagger_t > 0.0 or is_dead
+	return _roll_t > 0.0 or _attack_t > 0.0 or _heal_t > 0.0 or _stagger_t > 0.0 or is_dead or _stunned()
 
 
 func _try_roll() -> void:
-	if is_dead or _roll_t > 0.0 or _stagger_t > 0.0 or stamina < 18.0:
+	if is_dead or _roll_t > 0.0 or _stagger_t > 0.0 or stamina < 18.0 or _stunned():
 		return
 	_attack_t = 0.0
 	_heal_t = 0.0
@@ -236,11 +250,13 @@ func _try_attack() -> void:
 		_face_dir = to.normalized()
 
 
+## Beber café cura al instante: no hay que quedarse quieto ni se cancela con golpes.
 func _try_heal() -> void:
-	if _busy() or flasks <= 0:
+	if is_dead or _stunned() or flasks <= 0 or hp >= max_hp:
 		return
 	flasks -= 1
-	_heal_t = 1.1
+	hp = minf(max_hp, hp + 45.0)
+	health_changed.emit(hp, max_hp)
 
 
 func _use_stamina(a: float) -> void:
@@ -272,6 +288,7 @@ func take_damage(amount: float, from: Variant = null) -> void:
 func _die() -> void:
 	is_dead = true
 	_roll_t = 0.0
+	clear_statuses()
 	var tw := create_tween()
 	tw.tween_property(_visual, "rotation_degrees:x", -88.0, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	tw.parallel().tween_property(_visual, "position:y", 0.2, 0.6)
@@ -289,9 +306,17 @@ func _physics_process(delta: float) -> void:
 	if _st_delay <= 0.0 and _roll_t <= 0.0 and _attack_t <= 0.0:
 		stamina = minf(max_stamina, stamina + 38.0 * delta)
 	_m_body.emission_energy_multiplier = maxf(0.0, _m_body.emission_energy_multiplier - delta * 6.0)
+	_update_statuses(delta)
 	if _m_body.emission_energy_multiplier == 0.0:
+		var overlay: Material = null
+		if _status.has("electrocutado"):
+			_m_shock.emission_energy_multiplier = randf_range(0.5, 4.0)
+			overlay = _m_shock
+		elif _status.has("quemadura"):
+			_m_burn.emission_energy_multiplier = 1.2 + sin(Time.get_ticks_msec() * 0.012) * 0.8
+			overlay = _m_burn
 		for mesh in _model_meshes:
-			mesh.material_overlay = null
+			mesh.material_overlay = overlay
 
 	if _locked and (
 		_focus_target == null
@@ -321,7 +346,12 @@ func _physics_process(delta: float) -> void:
 		_visual.rotation_degrees.x = -(1.0 - _roll_t / 0.6) * 360.0
 	elif _stagger_t > 0.0:
 		pass
+	elif _stunned():
+		_visual.rotation_degrees.x = 0.0
+		if _status.has("electrocutado"):
+			_visual.rotation_degrees.z = randf_range(-7, 7)
 	else:
+		_visual.rotation_degrees.z = 0.0
 		_visual.rotation_degrees.x = 0.0
 		var d := _input_dir()
 		var speed := 5.2
@@ -375,6 +405,141 @@ func _physics_process(delta: float) -> void:
 	camera.h_offset = randf_range(-1, 1) * 0.35 * sh
 	camera.v_offset = randf_range(-1, 1) * 0.35 * sh
 	camera.rotation.z = randf_range(-1, 1) * 0.04 * sh
+
+
+# =====================================================================
+#  Estados alterados
+# =====================================================================
+
+## "electrocutado": no puedes moverte ni actuar (rayos del primer jefe).
+## "quemadura": pierdes un poco de vida cada medio segundo (fuego).
+## "atrapado": inmóvil mientras un jefe te sujeta.
+func apply_status(effect: String, duration: float) -> void:
+	if is_dead:
+		return
+	_status[effect] = maxf(duration, float(_status.get(effect, 0.0)))
+	if effect == "electrocutado" or effect == "atrapado":
+		_roll_t = 0.0
+		_attack_t = 0.0
+		_heal_t = 0.0
+	if effect == "electrocutado":
+		add_camera_shake(0.35)
+	_fx_shock.emitting = _status.has("electrocutado")
+	_fx_burn.emitting = _status.has("quemadura")
+	status_changed.emit(get_status_names())
+
+
+func clear_status(effect: String) -> void:
+	if _status.erase(effect):
+		_fx_shock.emitting = _status.has("electrocutado")
+		_fx_burn.emitting = _status.has("quemadura")
+		_visual.rotation_degrees.z = 0.0
+		status_changed.emit(get_status_names())
+
+
+func clear_statuses() -> void:
+	for k in _status.keys():
+		clear_status(k)
+
+
+func has_status(effect: String) -> bool:
+	return _status.has(effect)
+
+
+func get_status_names() -> Array:
+	return _status.keys()
+
+
+func _stunned() -> bool:
+	return _status.has("electrocutado") or _status.has("atrapado")
+
+
+func _update_statuses(delta: float) -> void:
+	if _status.is_empty():
+		return
+	for k in _status.keys():
+		_status[k] = float(_status[k]) - delta
+		if float(_status[k]) <= 0.0:
+			clear_status(k)
+	if _status.has("electrocutado"):
+		_trauma = maxf(_trauma, 0.25)
+	if _status.has("quemadura") and not is_dead:
+		_burn_tick -= delta
+		if _burn_tick <= 0.0:
+			_burn_tick = 0.5
+			hp = maxf(0.0, hp - 1.0)
+			health_changed.emit(hp, max_hp)
+			if hp <= 0.0:
+				_die()
+
+
+func _build_status_fx() -> void:
+	_m_shock = StandardMaterial3D.new()
+	_m_shock.albedo_color = Color(0.4, 0.7, 1.0, 0.35)
+	_m_shock.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_m_shock.emission_enabled = true
+	_m_shock.emission = Color(0.45, 0.75, 1.0)
+	_m_burn = StandardMaterial3D.new()
+	_m_burn.albedo_color = Color(1.0, 0.4, 0.1, 0.3)
+	_m_burn.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_m_burn.emission_enabled = true
+	_m_burn.emission = Color(1.0, 0.4, 0.08)
+	_fx_shock = _status_particles(Color(0.55, 0.85, 1.0), 40, 0.25, 0.05, 2.5)
+	_fx_burn = _status_particles(Color(1.0, 0.45, 0.1), 28, 0.6, 0.18, 1.2)
+
+
+func _status_particles(col: Color, amount: int, life: float, size: float, up: float) -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.amount = amount
+	p.lifetime = life
+	p.emitting = false
+	p.position = Vector3(0, 0.9, 0)
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(0.35, 0.85, 0.35)
+	pm.direction = Vector3(0, 1, 0)
+	pm.spread = 180.0 if up > 2.0 else 25.0
+	pm.initial_velocity_min = up * 0.4
+	pm.initial_velocity_max = up
+	pm.gravity = Vector3(0, 0.5, 0)
+	pm.scale_min = size * 0.6
+	pm.scale_max = size
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 1)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.albedo_color = Color(col.r * 3.0, col.g * 3.0, col.b * 3.0, 1.0)
+	q.material = m
+	p.draw_pass_1 = q
+	add_child(p)
+	return p
+
+
+## Revive al jugador (reintento tras morir contra un jefe).
+func revive(pos: Vector3, yaw: float = 0.0) -> void:
+	clear_statuses()
+	is_dead = false
+	hp = max_hp
+	stamina = max_stamina
+	flasks = _max_flasks
+	_roll_t = 0.0
+	_attack_t = 0.0
+	_heal_t = 0.0
+	_stagger_t = 0.0
+	_iframes = 1.0
+	_knock = Vector3.ZERO
+	velocity = Vector3.ZERO
+	_visual.rotation_degrees = Vector3.ZERO
+	_visual.position = Vector3.ZERO
+	global_position = pos
+	_yaw = yaw
+	_face_dir = Vector3(-sin(yaw), 0, -cos(yaw))
+	health_changed.emit(hp, max_hp)
 
 
 func _deal_damage() -> void:

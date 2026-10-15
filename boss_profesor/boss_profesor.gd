@@ -23,6 +23,8 @@ const STRIKE := preload("lightning_strike.gd")
 @export var move_speed: float = 3.1
 @export var damage_multiplier: float = 1.0
 @export var model_scale: float = 1.5
+## Probabilidad de que un golpe eléctrico (fase 2) deje al jugador electrocutado 2 s.
+@export_range(0.0, 1.0) var electrocute_chance: float = 0.2
 
 enum State { DORMANT, INTRO, FIGHT, BUSY, TRANSITION, DEAD }
 
@@ -597,7 +599,7 @@ func _start_phase2() -> void:
 	if _valid_target():
 		var d := _flat_dist(target.global_position, global_position)
 		if d < 7.0:
-			_hit_target(14.0, global_position)
+			_hit_target(14.0, global_position, true)
 	await _w(1.6)
 	if state == State.DEAD: return
 	ball_mode = "hang"
@@ -650,9 +652,14 @@ func _clamp_arena(p: Vector3) -> Vector3:
 	return Vector3(flat.x, 0.0, flat.y)
 
 
-func _hit_target(dmg: float, from: Vector3) -> void:
+func _hit_target(dmg: float, from: Vector3, electric: bool = false) -> void:
 	if _valid_target() and target.has_method("take_damage"):
+		var before: float = float(target.get("hp")) if "hp" in target else 0.0
 		target.take_damage(dmg * damage_multiplier, from)
+		# Solo si el golpe entró (rodar lo esquiva) y con baja probabilidad
+		if electric and target.has_method("apply_status") and "hp" in target \
+				and float(target.get("hp")) < before and _rng.randf() < electrocute_chance:
+			target.apply_status("electrocutado", 2.0)
 
 
 func _check_ball_hit(radius: float, dmg: float) -> void:
@@ -661,7 +668,7 @@ func _check_ball_hit(radius: float, dmg: float) -> void:
 	var c := target.global_position + Vector3(0, 0.9, 0)
 	if ball_pos.distance_to(c) < radius:
 		_hit_this_attack = true
-		_hit_target(dmg, ball_pos)
+		_hit_target(dmg, ball_pos, electrified)
 
 
 func _impact(pos: Vector3, radius: float, dmg: float, shake: float) -> void:
@@ -671,7 +678,7 @@ func _impact(pos: Vector3, radius: float, dmg: float, shake: float) -> void:
 	if dmg > 0.0 and _valid_target() and _flat_dist(target.global_position, pos) < radius:
 		if not _hit_this_attack:
 			_hit_this_attack = true
-			_hit_target(dmg, pos)
+			_hit_target(dmg, pos, electrified)
 
 
 func _electric_wave(pos: Vector3, max_r: float, time: float, dmg: float) -> void:
@@ -688,7 +695,7 @@ func _update_waves(delta: float) -> void:
 			var d := _flat_dist(target.global_position, wv["pos"])
 			if absf(d - r) < 0.8:
 				wv["hit"] = true
-				_hit_target(wv["dmg"], wv["pos"])
+				_hit_target(wv["dmg"], wv["pos"], true)
 		if r >= float(wv["max"]):
 			_waves.remove_at(i)
 

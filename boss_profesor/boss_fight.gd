@@ -98,7 +98,7 @@ func _setup() -> void:
 		player.rotation.y = yaw
 		_disable_other_cameras()
 	if player:
-		hud.show_hint("WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar boss y hacer strafing\nF beber café (curar) · Esc soltar mouse")
+		hud.show_hint("WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar boss y hacer strafing\nR beber café (curar) · Esc soltar mouse")
 	if player and player.has_signal("died"):
 		player.died.connect(_on_player_died)
 
@@ -151,6 +151,8 @@ func start_fight() -> void:
 func _physics_process(_delta: float) -> void:
 	if player and hud and "hp" in player:
 		hud.set_player(player.hp, player.max_hp, player.stamina, player.max_stamina, player.flasks)
+		if player.has_method("get_status_names") and hud.has_method("set_status"):
+			hud.set_status(player.get_status_names())
 	if _state == "waiting" and player:
 		var d := Vector2(player.global_position.x - arena_center.x, player.global_position.z - arena_center.z).length()
 		if d < trigger_distance:

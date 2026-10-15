@@ -27,6 +27,14 @@ extends "res://scripts/arena_generator.gd"
 signal final_gate_opened
 
 const LIB := Vector3(-220, 0, -85)
+## Pizarrones de la Biblioteca (posición local respecto a LIB, giro en grados).
+## Los usa el segundo jefe para escribir fórmulas de las que salen flechas.
+const LIB_BOARDS := [
+	[Vector3(-8, 0, -19.3), 0.0],
+	[Vector3(8, 0, -19.3), 0.0],
+	[Vector3(-19.5, 0, -3), 90.0],
+	[Vector3(19.5, 0, -3), -90.0],
+]
 const COMP := Vector3(225, 0, -85)
 const LAB := Vector3(170, 0, -280)
 const FINAL := Vector3(0, 0, -325)
@@ -57,6 +65,8 @@ const ZONES := [
 ## Avisa en el panel Output cuando un prefab tapa un edificio de conexión o cruza
 ## una barricada entre sectores (revisa que el recorrido siga funcionando).
 @export var warn_prefab_conflicts: bool = true
+## Crea la pelea del segundo jefe en la Biblioteca (boss_bibliotecario/LibraryFight.tscn).
+@export var spawn_library_boss: bool = true
 ## Para pruebas: desbloquea todo al iniciar (plaza, sellos y portón final).
 @export var open_world_on_start: bool = false
 
@@ -298,6 +308,13 @@ func open_final_gate(instant: bool = false) -> void:
 
 func _runtime_setup() -> void:
 	_build_title_ui()
+	if spawn_library_boss and get_tree().current_scene and get_tree().current_scene.find_child("LibraryFight", true, false) == null:
+		var lf_scene: PackedScene = load("res://boss_bibliotecario/LibraryFight.tscn")
+		if lf_scene:
+			var lf := lf_scene.instantiate()
+			lf.name = "LibraryFight"
+			lf.set("world", self)
+			get_tree().current_scene.add_child(lf)
 	if not final_gate_locked:
 		open_final_gate(true)
 	var bf: Node = null
@@ -1072,6 +1089,22 @@ func _make_library() -> void:
 	for q in 9:
 		var c := o + Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-18, 18))
 		_book_pile(c, rng.randi_range(15, 40))
+
+	# Pizarrones con ruedas (aquí escribe el Bibliófilo Demente)
+	for bd in LIB_BOARDS:
+		var bb := Basis(Vector3.UP, deg_to_rad(float(bd[1])))
+		var bo: Vector3 = o + (bd[0] as Vector3)
+		_lbox(bo, bb, Vector3(0, 1.6, 0), Vector3(4.0, 2.2, 0.06), m_chalk)
+		for sx: float in [-1.0, 1.0]:
+			_lbox(bo, bb, Vector3(sx * 2.08, 1.35, 0), Vector3(0.1, 2.7, 0.1), m_wood_dark)
+			_lbox(bo, bb, Vector3(sx * 2.08, 0.12, 0), Vector3(0.12, 0.08, 0.9), m_iron)
+			for sz: float in [-0.4, 0.4]:
+				_cy(bo + bb * Vector3(sx * 2.08, 0.06, sz), 0.06, 0.05, m_tire, Vector3(90, 0, 0), 8)
+		_lbox(bo, bb, Vector3(0, 2.74, 0), Vector3(4.24, 0.1, 0.1), m_wood_dark)
+		_lbox(bo, bb, Vector3(0, 0.47, 0), Vector3(4.24, 0.1, 0.1), m_wood_dark)
+		_lbox(bo, bb, Vector3(0, 0.5, 0.1), Vector3(4.0, 0.04, 0.14), m_wood)
+		_lbox(bo, bb, Vector3(0.6, 0.53, 0.12), Vector3(0.18, 0.05, 0.06), m_paper)
+		_wc(Vector3(4.3, 2.8, 0.3), Transform3D(bb, bo + bb * Vector3(0, 1.4, 0)))
 
 	# Mesas de lectura (una volcada)
 	for tp in [Vector3(-9, 0, -15), Vector3(9, 0, -15), Vector3(-9, 0, 15), Vector3(9, 0, 15)]:

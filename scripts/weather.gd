@@ -18,6 +18,20 @@ signal lightning_struck(direction: Vector2)
 @export var lightning_min_interval: float = 6.0
 @export var lightning_max_interval: float = 16.0
 
+@export_group("Cielo despejado (tras el primer jefe)")
+## Al llamar calm() el cielo pasa de tormenta oscura a nublado gris claro.
+@export var calm_zenith: Color = Color(0.52, 0.55, 0.59)
+@export var calm_horizon: Color = Color(0.74, 0.76, 0.78)
+@export var calm_ground: Color = Color(0.2, 0.2, 0.21)
+@export var calm_cloud_dark: Color = Color(0.45, 0.47, 0.5)
+@export var calm_cloud_light: Color = Color(0.86, 0.87, 0.89)
+@export var calm_fog_color: Color = Color(0.66, 0.69, 0.73)
+@export var calm_sun_color: Color = Color(0.93, 0.93, 0.9)
+@export var calm_sun_energy: float = 1.15
+@export var calm_ambient_color: Color = Color(0.7, 0.72, 0.76)
+@export var calm_ambient_energy: float = 1.1
+@export_group("")
+
 var rain: GPUParticles3D
 var splashes: GPUParticles3D
 var droplets: GPUParticles3D
@@ -95,15 +109,38 @@ func calm(duration: float = 12.0, drizzle: float = 0.03) -> void:
 	tw.tween_property(splashes, "amount_ratio", drizzle * 1.5, duration)
 	tw.tween_property(droplets, "amount_ratio", drizzle, duration)
 	if _env:
-		tw.tween_property(_env, "fog_density", _env.fog_density * 0.55, duration)
-		tw.tween_property(_env, "volumetric_fog_density", _env.volumetric_fog_density * 0.6, duration)
-		tw.tween_property(_env, "ambient_light_energy", _amb_base * 1.15, duration)
-		tw.tween_property(self, "_amb_base", _amb_base * 1.15, duration)
+		tw.tween_property(_env, "fog_density", _env.fog_density * 0.45, duration)
+		tw.tween_property(_env, "volumetric_fog_density", _env.volumetric_fog_density * 0.5, duration)
+		tw.tween_property(_env, "fog_light_color", calm_fog_color, duration)
+		tw.tween_property(_env, "fog_light_energy", 1.0, duration)
+		tw.tween_property(_env, "volumetric_fog_albedo", calm_fog_color.lightened(0.15), duration)
+		tw.tween_property(_env, "ambient_light_color", calm_ambient_color, duration)
+		tw.tween_property(_env, "ambient_light_energy", calm_ambient_energy, duration)
+		tw.tween_property(self, "_amb_base", calm_ambient_energy, duration)
+		tw.tween_property(_env, "adjustment_saturation", 0.85, duration)
 	if _sun:
-		tw.tween_property(_sun, "light_energy", _sun_base * 1.3, duration)
-		tw.tween_property(self, "_sun_base", _sun_base * 1.3, duration)
+		tw.tween_property(_sun, "light_color", calm_sun_color, duration)
+		tw.tween_property(_sun, "light_energy", calm_sun_energy, duration)
+		tw.tween_property(self, "_sun_base", calm_sun_energy, duration)
 	if _sky_mat:
 		tw.tween_property(_sky_mat, "shader_parameter/cloud_speed", 0.0025, duration)
+		for pair in [["zenith_color", calm_zenith], ["horizon_color", calm_horizon], ["ground_color", calm_ground],
+				["cloud_dark", calm_cloud_dark], ["cloud_light", calm_cloud_light]]:
+			tw.tween_method(_set_sky.bind(pair[0], _sky_color(pair[0]), pair[1]), 0.0, 1.0, duration)
+
+
+## El shader usa vec3, así que se interpola a mano entre dos colores.
+func _set_sky(t: float, param: String, from: Color, to: Color) -> void:
+	_sky_mat.set_shader_parameter(param, from.lerp(to, t))
+
+
+func _sky_color(param: String) -> Color:
+	var v = _sky_mat.get_shader_parameter(param)
+	if v is Color:
+		return v
+	if v is Vector3:
+		return Color(v.x, v.y, v.z)
+	return Color(0.3, 0.3, 0.3)
 
 
 func _new_storm_tween() -> Tween:

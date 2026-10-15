@@ -27,6 +27,7 @@ var _hp_fill: ColorRect
 var _st_bg: ColorRect
 var _st_fill: ColorRect
 var _flask: Label
+var _status_lbl: Label
 var _p_hp := 1.0
 var _p_trail := 1.0
 var _p_st := 1.0
@@ -78,6 +79,7 @@ func _ready() -> void:
 	_st_bg = _rect(_p_box, Color(0.05, 0.04, 0.04, 0.85))
 	_st_fill = _rect(_p_box, Color(0.18, 0.5, 0.2))
 	_flask = _label(_p_box, "", 20, Color(0.95, 0.75, 0.35))
+	_status_lbl = _label(_p_box, "", 18, Color(0.95, 0.95, 0.95))
 
 	# --- Letrero
 	_banner = Control.new()
@@ -168,6 +170,25 @@ func set_player(hp: float, hp_max: float, st: float, st_max: float, flasks: int)
 	_flask.text = "Café  x%d" % flasks
 
 
+## Estados alterados del jugador ("electrocutado", "quemadura", "atrapado").
+func set_status(names: Array) -> void:
+	if names.is_empty():
+		_status_lbl.text = ""
+		return
+	var parts: Array[String] = []
+	for n in names:
+		parts.append(String(n).to_upper())
+	_status_lbl.text = "  ·  ".join(parts)
+	var c := Color(0.95, 0.95, 0.95)
+	if "electrocutado" in names:
+		c = Color(0.55, 0.8, 1.0)
+	elif "quemadura" in names:
+		c = Color(1.0, 0.55, 0.2)
+	elif "atrapado" in names:
+		c = Color(0.9, 0.3, 0.25)
+	_status_lbl.add_theme_color_override("font_color", c)
+
+
 func show_banner(text: String, color: Color, sub: String = "", hold: float = 4.0) -> void:
 	_banner_label.text = text
 	_banner_label.add_theme_color_override("font_color", color)
@@ -234,6 +255,8 @@ func _process(delta: float) -> void:
 	_st_fill.size = Vector2(pw * 0.8 * _p_st, 6)
 	_flask.position = Vector2(40, 74)
 	_flask.size = Vector2(200, 30)
+	_status_lbl.position = Vector2(40, 100)
+	_status_lbl.size = Vector2(420, 26)
 
 	# Letrero
 	_banner_band.position = Vector2(0, vs.y * 0.5 - 75)

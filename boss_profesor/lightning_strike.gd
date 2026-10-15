@@ -9,6 +9,8 @@ signal struck(pos: Vector3)
 var radius := 2.6
 var delay := 1.2
 var damage := 30.0
+## Probabilidad de dejar al jugador electrocutado 2 s si el rayo lo alcanza.
+var electrocute_chance := 0.2
 var weather: Node = null
 var _t := 0.0
 var _ring: MeshInstance3D
@@ -49,7 +51,11 @@ func _strike() -> void:
 		if p is Node3D:
 			var flat := Vector2(p.global_position.x - ground.x, p.global_position.z - ground.z)
 			if flat.length() <= radius and p.has_method("take_damage"):
+				var before: float = float(p.get("hp")) if "hp" in p else 0.0
 				p.take_damage(damage, ground)
+				if p.has_method("apply_status") and "hp" in p and float(p.get("hp")) < before \
+						and _rng.randf() < electrocute_chance:
+					p.apply_status("electrocutado", 2.0)
 			if p.has_method("add_camera_shake"):
 				var dist: float = p.global_position.distance_to(ground)
 				p.add_camera_shake(clampf(1.0 - dist / 30.0, 0.15, 1.0) * 0.6)
