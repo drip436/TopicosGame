@@ -8,12 +8,23 @@ extends Node3D
 ##
 ## Si dos copias se ven idénticas, cambia `variation`.
 
-enum Kind { FACULTAD, ALA_DE_SALONES, EDIFICIO_EN_RUINAS, ZONA_RECREATIVA, FUENTE }
+enum Kind { FACULTAD, ALA_DE_SALONES, EDIFICIO_EN_RUINAS, ZONA_RECREATIVA, FUENTE, VEHICULO, ROBOT, RUINA }
+enum Vehicle { AUTO, CAMIONETA, AUTOBUS, PATRULLA, AMBULANCIA }
+enum Condition { DESTROZADO, VOLCADO, DE_LADO, CALCINADO, EN_LLAMAS }
+enum Robot { CENTINELA, PARTIDO, SENTADO, CANINO, MECH, DRON }
+enum Ruin { MURO_ROTO, ESCOMBROS, CASETA, POSTE_CAIDO, CRATER, BARRICADA }
 enum Zone {
 	PARQUE_INFANTIL, BASQUETBOL, TENIS, SKATEPARK, ESTACIONAMIENTO, GIMNASIO,
 	FORO, ESCULTURAS, PICNIC, ALBERCA, HUERTO, VOLEIBOL, FUTBOLITO, MEMORIAL,
 	FRONTONES, TERMINAL, PUESTO_DE_RESCATE, MERCADITO,
 }
+
+const VEHICLE_SIZES := {Vehicle.AUTO: Vector2(5, 3), Vehicle.CAMIONETA: Vector2(6, 3), Vehicle.AUTOBUS: Vector2(12, 4),
+	Vehicle.PATRULLA: Vector2(5, 3), Vehicle.AMBULANCIA: Vector2(6.5, 3)}
+const ROBOT_SIZES := {Robot.CENTINELA: Vector2(3, 3), Robot.PARTIDO: Vector2(4, 3), Robot.SENTADO: Vector2(2, 2),
+	Robot.CANINO: Vector2(2.5, 2.5), Robot.MECH: Vector2(9, 9), Robot.DRON: Vector2(4, 4)}
+const RUIN_SIZES := {Ruin.MURO_ROTO: Vector2(10, 4), Ruin.ESCOMBROS: Vector2(11, 11), Ruin.CASETA: Vector2(6, 6),
+	Ruin.POSTE_CAIDO: Vector2(16, 5), Ruin.CRATER: Vector2(14, 14), Ruin.BARRICADA: Vector2(11, 4)}
 
 ## Tamaño (x, z) que ocupa cada zona recreativa, en metros.
 const ZONE_SIZES := {
@@ -98,6 +109,42 @@ const ZONE_SIZES := {
 		plaza_radius = v
 		_changed()
 
+@export_group("Vehículo")
+@export var vehicle: Vehicle = Vehicle.AUTO:
+	set(v):
+		vehicle = v
+		_changed()
+@export var condition: Condition = Condition.DESTROZADO:
+	set(v):
+		condition = v
+		_changed()
+@export var paint: Color = Color(0.45, 0.06, 0.05):
+	set(v):
+		paint = v
+		_changed()
+
+@export_group("Robot")
+@export var robot: Robot = Robot.CENTINELA:
+	set(v):
+		robot = v
+		_changed()
+## Los ojos siguen parpadeando (rojo tenue).
+@export var eyes_on: bool = false:
+	set(v):
+		eyes_on = v
+		_changed()
+## Chispas eléctricas (agrega una luz pequeña).
+@export var sparks: bool = false:
+	set(v):
+		sparks = v
+		_changed()
+
+@export_group("Ruina")
+@export var ruin: Ruin = Ruin.ESCOMBROS:
+	set(v):
+		ruin = v
+		_changed()
+
 var _ready_done := false
 
 
@@ -142,6 +189,12 @@ func footprint() -> Vector2:
 			return Vector2(bays_x * 4.0 + 6.0, bays_z * 4.0 + 6.0)
 		Kind.FUENTE:
 			return Vector2(plaza_radius * 2.0, plaza_radius * 2.0)
+		Kind.VEHICULO:
+			return VEHICLE_SIZES.get(vehicle, Vector2(5, 3))
+		Kind.ROBOT:
+			return ROBOT_SIZES.get(robot, Vector2(3, 3))
+		Kind.RUINA:
+			return RUIN_SIZES.get(ruin, Vector2(10, 10))
 	if zone == Zone.ESTACIONAMIENTO or zone == Zone.PICNIC:
 		return area_size
 	return ZONE_SIZES.get(zone, Vector2(30, 30))
@@ -163,5 +216,11 @@ func _validate_property(property: Dictionary) -> void:
 			show = kind == Kind.ZONA_RECREATIVA and (zone == Zone.ESTACIONAMIENTO or zone == Zone.PICNIC)
 		"plaza_radius":
 			show = kind == Kind.FUENTE
+		"vehicle", "condition", "paint":
+			show = kind == Kind.VEHICULO
+		"robot", "eyes_on", "sparks":
+			show = kind == Kind.ROBOT
+		"ruin":
+			show = kind == Kind.RUINA
 	if not show:
 		property.usage = PROPERTY_USAGE_NO_EDITOR
