@@ -54,6 +54,9 @@ const ZONES := [
 ## Desmárcalo para probar la arena final con el portón abierto.
 @export var final_gate_locked: bool = true
 @export var show_area_titles: bool = true
+## Avisa en el panel Output cuando un prefab tapa un edificio de conexión o cruza
+## una barricada entre sectores (revisa que el recorrido siga funcionando).
+@export var warn_prefab_conflicts: bool = true
 ## Para pruebas: desbloquea todo al iniciar (plaza, sellos y portón final).
 @export var open_world_on_start: bool = false
 
@@ -188,6 +191,7 @@ func _build() -> void:
 	_make_world_materials()
 	_make_district_materials()
 	_make_recreation_materials()
+	_make_decor_materials()
 	w_body = StaticBody3D.new()
 	w_body.name = "WorldCollision"
 	_root.add_child(w_body)
@@ -209,7 +213,6 @@ func _build() -> void:
 	_make_cafeteria()
 	_make_water_tower()
 	_make_avenue()
-	_make_lake()
 	_make_routes()
 	_make_wrecks()
 	_make_signs()
@@ -794,7 +797,25 @@ func _make_paths() -> void:
 		[Vector2(126, -230), Vector2(164, -240), 5.0],
 		[Vector2(164, -246), Vector2(99, -252.5), 5.0],
 		[Vector2(41, -252.5), Vector2(7, -252.5), 5.0],
-		[Vector2(0, 44), Vector2(0, 56), 5.0],             # Fuente del Estudiante
+		# Desvíos alrededor de las estructuras acomodadas en la escena (calculados con A*)
+		[Vector2(89, -63.5), Vector2(97, -60), 5.0],
+		[Vector2(97, -60), Vector2(127, -55), 5.0],
+		[Vector2(127, -55), Vector2(130, -48), 5.0],
+		[Vector2(130, -48), Vector2(130, -45), 5.0],
+		[Vector2(130, -45), Vector2(137, -43), 5.0],
+		[Vector2(137, -43), Vector2(163, -46), 5.0],
+		[Vector2(163, -46), Vector2(214, -45), 5.0],
+		[Vector2(214, -45), Vector2(173, -51), 5.0],
+		[Vector2(173, -51), Vector2(159, -149), 5.0],
+		[Vector2(159, -149), Vector2(124, -152), 5.0],
+		[Vector2(124, -152), Vector2(115, -157), 5.0],
+		[Vector2(115, -157), Vector2(90, -195), 5.0],
+		[Vector2(90, -195), Vector2(78, -212), 5.0],
+		[Vector2(164, -246), Vector2(138, -246), 5.0],
+		[Vector2(138, -246), Vector2(126, -247), 5.0],
+		[Vector2(126, -247), Vector2(111, -246), 5.0],
+		[Vector2(111, -246), Vector2(107, -248), 5.0],
+		[Vector2(107, -248), Vector2(99, -252.5), 5.0],
 	]
 	var idx := 0
 	for d in defs:
@@ -2426,8 +2447,6 @@ func _make_markers() -> void:
 # Facultades de ladrillo con patio (al estilo de Ciudad Universitaria), alas de
 # salones, lago con malecón, fuentes, rutas de color a cada jefe, incendios.
 
-const LAKE := Vector3(-215, 0, -300)
-const LAKE_R := Vector2(55, 36)
 ## Color de la ruta que lleva a cada arena: línea pintada, flechas y bolardos.
 const ROUTE_COLORS := {
 	"biblioteca": Color(1.0, 0.72, 0.2),
@@ -2447,8 +2466,7 @@ func _make_district_materials() -> void:
 	m_water = ShaderMaterial.new()
 	m_water.shader = ws
 	m_water.set_shader_parameter("noise_tex", noise_tex)
-	m_water.set_shader_parameter("center", Vector2(LAKE.x, LAKE.z))
-	m_water.set_shader_parameter("radii", LAKE_R)
+	m_water.set_shader_parameter("local_edge", true)
 	m_fwater = ShaderMaterial.new()
 	m_fwater.shader = ws
 	m_fwater.set_shader_parameter("noise_tex", noise_tex)
@@ -2627,15 +2645,15 @@ func _faculty(c: Vector3, yaw: float, title: String, floors := 0) -> void:
 
 # ---------------------------------------------------------------- lago
 
-func _make_lake() -> void:
+## Lago con malecón, muelle, isla con puente y ambientación. Centro en c,
+## radios A (x) y B (z). Lo construye el prefab LAGO.
+func _make_lake(c: Vector3, A: float, B: float) -> void:
 	var zone := _begin_zone("Lago")
-	var c := LAKE
-	var A := LAKE_R.x
-	var B := LAKE_R.y
-	_reserve(Vector2(c.x - 25, c.z), 48.0)
-	_reserve(Vector2(c.x + 25, c.z), 48.0)
-	_extra_zones.append([Vector2(c.x, c.z), 64.0, "Malecón del Lago"])
 	_mm_add(_uc(m_water, 64), Transform3D(Basis.from_scale(Vector3(A * 2.0 + 1.0, 0.05, B * 2.0 + 1.0)), c))
+	# Isla y puente (el puente sale de la orilla norte, -z)
+	var isl := c + Vector3(-A * 0.36, 0, -B * 0.39)
+	var ir := minf(A, B) * 0.19
+	var shore_z := c.z - B * sqrt(maxf(0.0, 1.0 - pow((isl.x - c.x) / A, 2.0)))
 	var N := 96
 	for i in N:
 		var t0 := TAU * i / N
@@ -2648,14 +2666,18 @@ func _make_lake() -> void:
 		var d := p1 - p0
 		var l := d.length()
 		var bs := Basis(Vector3.UP, atan2(d.x, d.z))
-		var at_pier := absf(wrapf(tm, -PI, PI)) < 0.04
-		if not at_pier:
+		var at_pier := absf(wrapf(tm, -PI, PI)) < 1.8 / B
+		var at_bridge := absf(pm.x - isl.x) < 1.9 and pm.z < c.z
+		if not at_pier and not at_bridge:
 			var wp := pm + nrm * 0.3
 			_mm_add(_ub(m_stone_light), Transform3D(bs * Basis.from_scale(Vector3(0.6, 0.7, l + 0.15)), wp + Vector3(0, 0.35, 0)))
 			_wc(Vector3(0.6, 1.6, l + 0.15), Transform3D(bs, wp + Vector3(0, 0.8, 0)))
-			if rng.randf() > 0.06:
+			if rng.randf() > 0.07:
 				_mm_add(_ub(m_iron), Transform3D(bs * Basis.from_scale(Vector3(0.05, 0.05, l)), wp + Vector3(0, 1.25, 0)))
 				_mm_add(_ub(m_iron), Transform3D(bs * Basis.from_scale(Vector3(0.04, 0.04, l)), wp + Vector3(0, 0.95, 0)))
+			else:
+				# Tramo de barandal arrancado, flotando
+				_mm_add(_ub(m_iron), Transform3D(bs * _rb(Vector3(rng.randf_range(-20, 20), 0, 80)) * Basis.from_scale(Vector3(0.05, 0.05, l)), wp - nrm * 1.2 + Vector3(0, 0.05, 0)))
 			_mm_add(_ub(m_iron), Transform3D(Basis.from_scale(Vector3(0.07, 0.6, 0.07)), p0 + nrm * 0.3 + Vector3(0, 0.98, 0)))
 		# Malecón
 		_mm_add(_ub(m_path), Transform3D(bs * Basis.from_scale(Vector3(7.0, 0.06, l * 1.12 + 0.3)), pm + nrm * 4.1))
@@ -2670,31 +2692,199 @@ func _make_lake() -> void:
 			_wtree(tp, rng.randf_range(0.9, 1.3), Vector3(82, rng.randf_range(0, 360), 0) if rng.randf() < 0.15 else Vector3.ZERO)
 	# Muelle de madera hacia el centro del lago
 	var ps := c + Vector3(A + 0.6, 0, 0)
-	var plen := 24.0
+	var plen := minf(24.0, A * 0.45)
 	_blk(ps + Vector3(-plen * 0.5, 0.05, 0), Vector3(plen, 0.1, 3.6), m_wood)
 	for k in int(plen / 3.0) + 1:
 		for sz: float in [-1.0, 1.0]:
-			var pp := ps + Vector3(-k * 3.0, 0, sz * 1.75)
-			_cy(pp + Vector3(0, 0.4, 0), 0.1, 1.2, m_wood, Vector3.ZERO, 6)
+			_cy(ps + Vector3(-k * 3.0, 0.4, sz * 1.75), 0.1, 1.2, m_wood, Vector3.ZERO, 6)
 	for sz: float in [-1.0, 1.0]:
 		_blk(ps + Vector3(-plen * 0.5, 1.0, sz * 1.75), Vector3(plen, 0.08, 0.08), m_wood)
 		_wc(Vector3(plen, 1.6, 0.2), Transform3D(Basis.IDENTITY, ps + Vector3(-plen * 0.5, 0.8, sz * 1.85)))
 	_wc(Vector3(0.2, 1.6, 3.6), Transform3D(Basis.IDENTITY, ps + Vector3(-plen - 0.1, 0.8, 0)))
 	_street_lamp(ps + Vector3(-plen + 0.6, 0, 1.4), 0.0, 0)
-	_blk(ps + Vector3(-plen + 5.0, 0.12, 3.5), Vector3(3.6, 0.6, 1.3), m_wood, Vector3(8, 15, -10))
 	_lbl(zone, "MUELLE", ps + Vector3(0.4, 1.5, 0), 90.0, 40, Color(0.8, 0.75, 0.6))
-	# Lanchas hundidas, islote y basura flotando
-	_blk(c + Vector3(-22, 0.1, 12), Vector3(5.0, 1.0, 1.8), m_burnt, Vector3(25, 70, 15))
-	_blk(c + Vector3(18, 0.0, -14), Vector3(4.0, 0.9, 1.6), m_wood, Vector3(-30, -20, 8))
-	_cy(c + Vector3(-12, 0.2, -6), 7.0, 0.4, m_hedge, Vector3.ZERO, 24)
-	_cy(c + Vector3(-12, 0.45, -6), 5.5, 0.2, m_debris, Vector3.ZERO, 20)
-	_wtree(c + Vector3(-12, 0.5, -6), 1.6)
-	_cy(c + Vector3(-9, 1.6, -4), 0.5, 3.0, m_stone_light, Vector3(0, 0, 8), 12)
+	# Lanchas de pedales amarradas (una volteada)
+	for k in 3:
+		var bp := ps + Vector3(-4.0 - k * 4.5, 0, 3.3 * (1.0 if k % 2 == 0 else -1.0))
+		var flipped := k == 2
+		var by := 0.15 if not flipped else 0.1
+		_blk(bp + Vector3(0, by, 0), Vector3(2.4, 0.5, 1.3), m_line if k != 1 else m_blue, Vector3(180 if flipped else 0, rng.randf_range(-15, 15), rng.randf_range(-6, 6)))
+		if not flipped:
+			_sp(bp + Vector3(0.9, 0.7, 0), Vector3(0.35, 0.7, 0.3), m_line, Vector3(0, 0, -20))
+			_sp(bp + Vector3(1.05, 1.05, 0), Vector3(0.3, 0.25, 0.22), m_line)
+			_blk(bp + Vector3(-0.3, 0.55, 0), Vector3(0.6, 0.3, 1.0), m_blue)
+		_rod(bp + Vector3(0.5, 0.3, 0), bp + Vector3(0.5, 0.9, -1.6 * signf(bp.z - ps.z)), 0.01, m_canvas, 3)
+	# Letrero
+	var sg := c + Vector3(A + 5.5, 0, 4.5)
+	_cy(sg + Vector3(0, 1.0, 0), 0.05, 2.0, m_iron)
+	_blk(sg + Vector3(0, 2.0, 0), Vector3(0.08, 0.6, 1.6), m_line, Vector3(0, 0, 6))
+	_lbl(zone, "PROHIBIDO NADAR", sg + Vector3(-0.06, 2.0, 0), -90.0, 26, Color(0.6, 0.05, 0.04))
+	_lbl(zone, "PROHIBIDO NADAR", sg + Vector3(0.06, 2.0, 0), 90.0, 26, Color(0.6, 0.05, 0.04))
+	# Puente de madera a la isla
+	var b_start := Vector3(isl.x, 0, shore_z + 0.5)
+	var b_end := Vector3(isl.x, 0, isl.z - ir + 0.5)
+	var bl := b_end.z - b_start.z
+	if bl > 2.0:
+		var bm := (b_start + b_end) * 0.5
+		_blk(bm + Vector3(0, 0.06, 0), Vector3(3.0, 0.12, bl + 1.0), m_wood)
+		var n_posts := int(bl / 2.5) + 1
+		for k in n_posts + 1:
+			var z := b_start.z + bl * k / float(n_posts)
+			for sx: float in [-1.0, 1.0]:
+				_cy(Vector3(isl.x + sx * 1.45, 0.55, z), 0.07, 1.1, m_wood, Vector3.ZERO, 6)
+		for sx: float in [-1.0, 1.0]:
+			_blk(bm + Vector3(sx * 1.45, 1.05, 0), Vector3(0.08, 0.08, bl + 0.6), m_wood)
+			_wc(Vector3(0.2, 1.6, bl + 1.6), Transform3D(Basis.IDENTITY, bm + Vector3(sx * 1.55, 0.8, 0)))
+		_blk(b_start + Vector3(0, 2.4, -0.55), Vector3(4.6, 0.55, 0.08), m_wood_dark)
+		for face: float in [0.0, 180.0]:
+			_lbl(zone, "ISLA DE LOS PENSADORES", b_start + Vector3(0, 2.4, -0.55 + (0.05 if face == 0.0 else -0.05)), face, 24, Color(0.85, 0.8, 0.65))
+		for sx: float in [-1.0, 1.0]:
+			_cy(b_start + Vector3(sx * 1.7, 1.3, -0.55), 0.08, 2.6, m_wood_dark)
+	# Isla: tierra, orilla con piedras, kiosco, árbol, banca y farol
+	_mm_add(_uc(m_debris, 24), Transform3D(Basis.from_scale(Vector3(ir * 2.0, 0.1, ir * 2.0)), isl))
+	_mm_add(_uc(m_lawn, 24), Transform3D(Basis.from_scale(Vector3(ir * 1.8, 0.12, ir * 1.8)), isl))
+	var isl_pts: Array = []
+	for q in int(ir * ir * 1.6):
+		var a := rng.randf() * TAU
+		var rr := sqrt(rng.randf()) * ir * 0.88
+		isl_pts.append(isl + Vector3(cos(a) * rr, 0.06, sin(a) * rr))
+	_tufts(zone, isl, isl_pts)
+	var ni := 28
+	for i in ni:
+		var a := TAU * (i + 0.5) / ni
+		var dir := Vector3(cos(a), 0, sin(a))
+		if dir.z < -0.9:
+			continue
+		_chunk(isl + dir * ir, 0.3, 0.8)
+		_wc(Vector3(0.6, 1.4, TAU * ir / ni + 0.3), Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z) + PI * 0.5), isl + dir * (ir + 0.2) + Vector3(0, 0.7, 0)))
+	var gz := isl + Vector3(ir * 0.25, 0, ir * 0.15)
+	for k in 6:
+		var a := TAU * k / 6.0
+		if k == 4:
+			_cy(gz + Vector3(cos(a), 0, sin(a)) * 2.4 + Vector3(0, 0.9, 0), 0.12, 1.8, m_wood_dark, Vector3.ZERO, 6)
+			continue
+		_cy(gz + Vector3(cos(a), 0, sin(a)) * 2.4 + Vector3(0, 1.4, 0), 0.12, 2.8, m_wood_dark, Vector3.ZERO, 6, 1.0, true)
+	_mm_add(_uc(m_wood_dark, 6, 0.0), Transform3D(_rb(Vector3(5, 0, -4)) * Basis.from_scale(Vector3(6.0, 1.8, 6.0)), gz + Vector3(0, 3.6, 0)))
+	_bench(zone, gz + Vector3(0, 0, -0.8), 0.0, false)
+	_wtree(isl + Vector3(-ir * 0.4, 0, ir * 0.3), 1.5)
+	_cy(isl + Vector3(-ir * 0.2, 1.4, -ir * 0.45), 0.45, 2.8, m_stone_light, Vector3(0, 0, 10), 12, 0.9, true)
+	_sp(isl + Vector3(-ir * 0.2 + 0.4, 0.3, -ir * 0.45 + 1.0), Vector3(0.8, 0.9, 0.8), m_stone_light, Vector3(60, 20, 0))
+	_cy(gz + Vector3(1.6, 0.7, 1.2), 0.05, 1.4, m_iron, Vector3.ZERO, 6)
+	_sp(gz + Vector3(1.6, 1.5, 1.2), Vector3(0.25, 0.3, 0.25), m_lamp_on)
+	_omni(zone, gz + Vector3(1.6, 1.6, 1.2), Color(1.0, 0.65, 0.35), 1.4, 9.0, 0.02, 4.0)
+	# Tules en la orilla y nenúfares
+	var reed_pts: Array = []
+	for cl in 26:
+		var a := rng.randf() * TAU
+		var k := rng.randf_range(0.86, 0.96)
+		var cc := c + Vector3(cos(a) * A * k, 0, sin(a) * B * k)
+		if absf(wrapf(a, -PI, PI)) < 0.12:
+			continue
+		for q in rng.randi_range(10, 22):
+			var rp := cc + Vector3(rng.randf_range(-1.6, 1.6), 0.02, rng.randf_range(-1.6, 1.6))
+			reed_pts.append(rp)
+			if rng.randf() < 0.2:
+				var h := rng.randf_range(1.3, 1.9)
+				_rod(rp, rp + Vector3(rng.randf_range(-0.15, 0.15), h, rng.randf_range(-0.15, 0.15)), 0.012, m_hedge, 3)
+				_cy(rp + Vector3(0, h - 0.1, 0), 0.04, 0.22, m_wood_dark, Vector3.ZERO, 5)
+	_reeds(zone, c, reed_pts)
+	for q in 70:
+		var a := rng.randf() * TAU
+		var k := rng.randf_range(0.55, 0.92)
+		var lp := c + Vector3(cos(a) * A * k, 0.035, sin(a) * B * k)
+		if lp.distance_to(isl) < ir + 1.0:
+			continue
+		var lr := rng.randf_range(0.25, 0.6)
+		_mm_add(_uc(m_lily, 10), Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(lr * 2.0, 0.01, lr * 2.0)), lp))
+		if rng.randf() < 0.08:
+			_sp(lp + Vector3(0, 0.08, 0), Vector3(0.14, 0.1, 0.14), m_line)
+	# Restos en el agua: auto y robot medio hundidos, árbol caído, lanchas y basura
+	var car_p := c + Vector3(-A * 0.55, 0, B * 0.55)
+	_blk(car_p + Vector3(0, -0.1, 0), Vector3(4.3, 1.5, 1.85), m_burnt, Vector3(-12, 35, 18))
+	_blk(car_p + Vector3(-0.5, 0.6, 0.2), Vector3(2.0, 0.7, 1.6), m_rdark, Vector3(-12, 35, 18))
+	_cy(car_p + Vector3(1.4, 0.3, 1.0), 0.36, 0.26, m_tire, Vector3(80, 35, 0), 12)
+	_humanoid(Transform3D(Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, -PI * 0.5) * Basis(Vector3.BACK, 0.2), c + Vector3(A * 0.5, -0.12, -B * 0.62)), m_reye_on, {
+		"head": Vector3(0, 30, 0),
+		"arm_l": [Vector3(0, 0, -70), Vector3(-20, 0, 0)],
+		"arm_r": [Vector3(-20, 0, 60), Vector3(-50, 0, 0)],
+		"leg_l": [Vector3(-10, 0, -10), Vector3(5, 0, 0)],
+		"leg_r": [Vector3(-30, 0, 10), Vector3(40, 0, 0)],
+	})
+	var fall_a := deg_to_rad(200.0)
+	var tree_base := c + Vector3(cos(fall_a) * (A + 9.0), 0, sin(fall_a) * (B + 9.0))
+	_wtree(tree_base, 1.4, Vector3(84, rad_to_deg(atan2(c.x - tree_base.x, c.z - tree_base.z)), 0))
+	_blk(c + Vector3(-A * 0.4, 0.1, B * 0.33), Vector3(5.0, 1.0, 1.8), m_burnt, Vector3(25, 70, 15))
+	_blk(c + Vector3(A * 0.33, 0.0, -B * 0.39), Vector3(4.0, 0.9, 1.6), m_wood, Vector3(-30, -20, 8))
 	for q in 30:
 		var a := rng.randf() * TAU
 		var r := rng.randf_range(0.2, 0.9)
 		_mm_add(_ub(m_wood if rng.randf() < 0.5 else m_debris), Transform3D(_rb(Vector3(0, rng.randf_range(0, 360), 0)) * Basis.from_scale(Vector3(rng.randf_range(0.3, 1.5), 0.08, rng.randf_range(0.2, 0.6))), c + Vector3(cos(a) * A * r, 0.04, sin(a) * B * r)))
+	_lake_mist(zone, c, A, B)
 	_end_zone()
+
+
+## Matas altas de tule (MultiMesh propio, se oculta a distancia).
+func _reeds(parent: Node3D, center: Vector3, pts: Array) -> void:
+	if pts.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh_tuft
+	mm.instance_count = pts.size()
+	for i in pts.size():
+		var p: Vector3 = pts[i]
+		var s := rng.randf_range(1.2, 1.8)
+		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(s, s * rng.randf_range(2.8, 4.2), s)), p - center))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.position = center
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.visibility_range_end = 140.0
+	parent.add_child(mmi)
+
+
+## Neblina baja que se arrastra sobre el agua.
+func _lake_mist(parent: Node3D, c: Vector3, A: float, B: float) -> void:
+	var p := GPUParticles3D.new()
+	p.name = "Neblina"
+	p.position = c + Vector3(0, 0.7, 0)
+	p.amount = int(clampf(A * B / 50.0, 16.0, 70.0))
+	p.lifetime = 24.0
+	p.preprocess = 24.0
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.visibility_aabb = AABB(Vector3(-A - 10, -2, -B - 10), Vector3(A * 2.0 + 20, 8, B * 2.0 + 20))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(A * 0.75, 0.3, B * 0.75)
+	pm.direction = Vector3(1, 0, 0.3)
+	pm.spread = 30.0
+	pm.initial_velocity_min = 0.2
+	pm.initial_velocity_max = 0.5
+	pm.gravity = Vector3.ZERO
+	pm.angle_min = -180.0
+	pm.angle_max = 180.0
+	pm.scale_min = 7.0
+	pm.scale_max = 12.0
+	var cg := Gradient.new()
+	cg.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	cg.colors = PackedColorArray([Color(1, 1, 1, 0), Color(1, 1, 1, 0.16), Color(1, 1, 1, 0.12), Color(1, 1, 1, 0)])
+	var cgt := GradientTexture1D.new()
+	cgt.gradient = cg
+	pm.color_ramp = cgt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 0.45)
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(0.72, 0.76, 0.8)
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.albedo_texture = _soft_tex(PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.4), Color(1, 1, 1, 0)]), PackedFloat32Array([0.0, 0.5, 1.0]))
+	m.roughness = 1.0
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	q.material = m
+	p.draw_pass_1 = q
+	parent.add_child(p)
 
 
 # ---------------------------------------------------------------- fuentes
@@ -2777,10 +2967,10 @@ func _make_routes() -> void:
 	var routes := [
 		["biblioteca", 1.0, [Vector2(-109, 0.5), Vector2(-160, 0.5), Vector2(-160, -40), Vector2(-207, -40)]],
 		["computo", 1.0, [Vector2(-207, -40), Vector2(-160, -40), Vector2(-118, -40), Vector2(-96, -60), Vector2(-89, -63.5)]],
-		["computo", 1.0, [Vector2(89, -63.5), Vector2(94, -58), Vector2(170, -58), Vector2(170, -45), Vector2(214, -45)]],
-		["laboratorio", 1.0, [Vector2(214, -45), Vector2(170, -45), Vector2(170, -200), Vector2(78, -200), Vector2(78, -213)]],
-		["laboratorio", 1.0, [Vector2(126, -223), Vector2(126, -230), Vector2(164, -240)]],
-		["final", 1.0, [Vector2(164, -246), Vector2(99, -252.5)]],
+		["computo", 1.0, [Vector2(89, -63.5), Vector2(97, -60), Vector2(127, -55), Vector2(130, -48), Vector2(130, -45), Vector2(137, -43), Vector2(163, -46), Vector2(214, -45)]],
+		["laboratorio", 1.0, [Vector2(214, -45), Vector2(173, -51), Vector2(159, -149), Vector2(124, -152), Vector2(115, -157), Vector2(90, -195), Vector2(78, -212)]],
+		["laboratorio", 1.0, [Vector2(126, -223), Vector2(126, -230), Vector2(158, -237.5)]],
+		["final", 1.0, [Vector2(164, -246), Vector2(138, -246), Vector2(126, -247), Vector2(111, -246), Vector2(107, -248), Vector2(99, -252.5)]],
 		["final", 1.0, [Vector2(41, -252.5), Vector2(7, -252.5), Vector2(0, -258), Vector2(0, -276)]],
 	]
 	for rt in routes:
@@ -4317,7 +4507,7 @@ func _build_prefab(pf: Node3D) -> void:
 	content.add_child(w_body)
 	_zone_parent = content
 	_prefab_local = true
-	rng.seed = hash(int(pf.variation) * 7919 + int(pf.kind) * 104729 + int(pf.zone) * 31 + 17)
+	rng.seed = hash(int(pf.variation) * 7919 + int(pf.kind) * 104729 + int(pf.zone) * 31 + int(pf.robot) * 13 + int(pf.vehicle) * 7 + int(pf.ruin) * 3 + 17)
 	var title: String = pf.title
 	var c := Vector3.ZERO
 	var kind_name: String = PREFAB.Kind.keys()[pf.kind]
@@ -4338,6 +4528,14 @@ func _build_prefab(pf: Node3D) -> void:
 			var z := _begin_zone("Fuente")
 			_fountain_plaza(z, c, pf.plaza_radius)
 			_end_zone()
+		"VEHICULO":
+			_make_vehicle(c, pf.vehicle, pf.condition, pf.paint)
+		"ROBOT":
+			_make_robot(c, pf.robot, pf.eyes_on, pf.sparks)
+		"RUINA":
+			_make_ruin(c, pf.ruin)
+		"LAGO":
+			_make_lake(c, pf.lake_radii.x, pf.lake_radii.y)
 		_:
 			_build_zone(pf, c)
 	_prefab_local = false
@@ -4360,11 +4558,38 @@ func _build_prefab(pf: Node3D) -> void:
 			mn = mn.min(Vector2(wp.x, wp.z))
 			mx = mx.max(Vector2(wp.x, wp.z))
 	_blocked_rects.append(Rect2(mn, mx - mn))
+	_warn_conflicts(pf, kind_name)
 	var gp := pf.global_position
 	if kind_name in ["FACULTAD", "ALA_DE_SALONES", "EDIFICIO_EN_RUINAS"]:
 		_reserve(Vector2(gp.x, gp.z), minf(fp.x, fp.y) * 0.5)
 	if title != "" and kind_name != "EDIFICIO_EN_RUINAS":
 		_extra_zones.push_front([Vector2(gp.x, gp.z), maxf(fp.x, fp.y) * 0.5 + 4.0, title])
+
+
+## Avisa (panel Output) si un prefab tapa un edificio de conexión o cruza una
+## barricada entre sectores: eso puede bloquear el recorrido o abrir un atajo.
+func _warn_conflicts(pf: Node3D, kind_name: String) -> void:
+	if not warn_prefab_conflicts or kind_name in ["VEHICULO", "ROBOT"]:
+		return
+	# Rectángulo girado real (sin los márgenes de reserva)
+	var half: Vector2 = pf.footprint() * 0.5 - Vector2(3.0, 3.0)
+	if half.x <= 0.5 or half.y <= 0.5:
+		return
+	var xf := pf.global_transform
+	var poly := PackedVector2Array()
+	for cr: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		var wp := xf * Vector3(cr.x * half.x, 0, cr.y * half.y)
+		poly.append(Vector2(wp.x, wp.z))
+	for c in _connector_rects:
+		var r: Rect2 = c
+		var rp := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+		if not Geometry2D.intersect_polygons(poly, rp).is_empty():
+			push_warning("⚠ '%s' se encima con un edificio de conexión: revisa que no tape el paso." % pf.name)
+			return
+	for w in SECTOR_WALLS:
+		if not Geometry2D.intersect_polyline_with_polygon(PackedVector2Array([w[0], w[1]]), poly).is_empty():
+			push_warning("⚠ '%s' cruza una barricada entre sectores: revisa que no deje un hueco para colarse." % pf.name)
+			return
 
 
 func _build_zone(pf: Node3D, c: Vector3) -> void:
@@ -4406,3 +4631,537 @@ func _build_zone(pf: Node3D, c: Vector3) -> void:
 			_make_rescue_camp(c)
 		"MERCADITO":
 			_make_market(c)
+
+
+# ================================================================ vehículos, robots y ruinas
+# Prefabs pequeños de ambientación. Se construyen en el espacio local del nodo
+# (frente hacia +x en vehículos y ruinas alargadas).
+
+var m_rshell: StandardMaterial3D
+var m_rdark: StandardMaterial3D
+var m_rjoint: StandardMaterial3D
+var m_reye_on: ShaderMaterial
+var m_reye_off: StandardMaterial3D
+var m_oil: StandardMaterial3D
+var m_scorch: StandardMaterial3D
+var m_ember: StandardMaterial3D
+var m_cable_r: StandardMaterial3D
+var m_cable_y: StandardMaterial3D
+var m_lily: StandardMaterial3D
+var _paints := {}
+
+
+func _make_decor_materials() -> void:
+	m_rshell = _std(Color(0.58, 0.6, 0.62), 0.35, 0.35)
+	m_rdark = _std(Color(0.05, 0.055, 0.06), 0.4, 0.8)
+	m_rjoint = _std(Color(0.17, 0.18, 0.19), 0.3, 0.9)
+	m_reye_on = ShaderMaterial.new()
+	m_reye_on.shader = load("res://shaders/blink_led.gdshader")
+	m_reye_on.set_shader_parameter("tint", Color(1.0, 0.08, 0.04))
+	m_reye_on.set_shader_parameter("energy", 4.0)
+	m_reye_on.set_shader_parameter("rate", 0.5)
+	m_reye_on.set_shader_parameter("blink", 0.7)
+	m_reye_off = _std(Color(0.06, 0.02, 0.02), 0.1, 0.5)
+	m_oil = _std(Color(0.01, 0.01, 0.012), 0.04, 0.3)
+	m_scorch = _std(Color(0.035, 0.03, 0.025), 0.95, 0.0)
+	m_ember = _emit(Color(1.0, 0.35, 0.05), 3.0)
+	m_cable_r = _std(Color(0.5, 0.05, 0.04), 0.5, 0.0)
+	m_cable_y = _std(Color(0.7, 0.55, 0.05), 0.5, 0.0)
+	m_lily = _std(Color(0.08, 0.16, 0.06), 0.4, 0.0)
+	_paints.clear()
+
+
+func _paint_mat(c: Color) -> StandardMaterial3D:
+	var k := c.to_html(false)
+	if not _paints.has(k):
+		_paints[k] = _std(c, 0.28, 0.55)
+	return _paints[k]
+
+
+## Pieza transformada por T (la pose del objeto completo).
+func _tbox(T: Transform3D, pos: Vector3, size: Vector3, mat: Material, rot := Vector3.ZERO) -> void:
+	_mm_add(_ub(mat), T * Transform3D(_rb(rot) * Basis.from_scale(size), pos))
+
+
+func _tcyl(T: Transform3D, pos: Vector3, r: float, h: float, mat: Material, rot := Vector3.ZERO, segs := 10, top := 1.0) -> void:
+	_mm_add(_uc(mat, segs, top), T * Transform3D(_rb(rot) * Basis.from_scale(Vector3(r * 2.0, h, r * 2.0)), pos))
+
+
+func _tsph(T: Transform3D, pos: Vector3, size: Vector3, mat: Material, rot := Vector3.ZERO) -> void:
+	_mm_add(_us(mat, 10), T * Transform3D(_rb(rot) * Basis.from_scale(size), pos))
+
+
+func _puddle(pos: Vector3, r: float, mat: Material) -> void:
+	_mm_add(_uc(mat, 20), Transform3D(Basis.from_scale(Vector3(r * 2.0, 0.01, r * rng.randf_range(1.2, 1.8))), pos + Vector3(0, 0.015, 0)))
+
+
+# ---------------------------------------------------------------- vehículos
+
+func _make_vehicle(c: Vector3, type: int, cond: int, paint: Color) -> void:
+	var zone := _begin_zone("Vehiculo")
+	var tname: String = PREFAB.Vehicle.keys()[type]
+	var cname: String = PREFAB.Condition.keys()[cond]
+	var burnt := cname == "CALCINADO" or cname == "EN_LLAMAS"
+	var L := 4.4
+	var W := 1.85
+	var bh := 0.75
+	var cab_l := 2.2
+	var cab_h := 0.62
+	var cab_x := -0.2
+	var wr := 0.36
+	match tname:
+		"CAMIONETA":
+			L = 5.3
+			W = 2.0
+			bh = 0.9
+			cab_l = 1.9
+			cab_h = 0.78
+			cab_x = 0.75
+			wr = 0.42
+		"AUTOBUS":
+			L = 11.0
+			W = 2.6
+			bh = 2.6
+			cab_l = 0.0
+			wr = 0.5
+		"AMBULANCIA":
+			L = 6.0
+			W = 2.1
+			bh = 2.2
+			cab_l = 0.0
+			wr = 0.4
+	var floor_y := wr + 0.02
+	var total_h := floor_y + bh + cab_h
+	var T := Transform3D.IDENTITY
+	match cname:
+		"VOLCADO":
+			T = Transform3D(Basis(Vector3.RIGHT, PI) * Basis(Vector3.FORWARD, deg_to_rad(rng.randf_range(-4, 4))), Vector3(0, total_h - 0.15, 0))
+		"DE_LADO":
+			T = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, W * 0.5, 0))
+		"DESTROZADO":
+			T = Transform3D(Basis(Vector3.BACK, deg_to_rad(rng.randf_range(-3, 3))) * Basis(Vector3.RIGHT, deg_to_rad(rng.randf_range(-3, 3))), Vector3.ZERO)
+		_:
+			T = Transform3D(Basis.IDENTITY, Vector3(0, -0.18, 0))
+	var body: Material = m_burnt if burnt else _paint_mat(paint)
+	if tname == "PATRULLA" and not burnt:
+		body = _paint_mat(Color(0.05, 0.06, 0.08))
+	if tname == "AMBULANCIA" and not burnt:
+		body = _paint_mat(Color(0.75, 0.76, 0.74))
+	if tname == "AUTOBUS" and not burnt and paint == Color(0.45, 0.06, 0.05):
+		body = _paint_mat(Color(0.75, 0.55, 0.08))
+	var holder := Node3D.new()
+	holder.transform = T
+	zone.add_child(holder)
+	# Carrocería
+	var front_crush := cname == "DESTROZADO" and rng.randf() < 0.7
+	var body_len := L - (0.5 if front_crush else 0.0)
+	_tbox(T, Vector3(-(L - body_len) * 0.5, floor_y + bh * 0.5, 0), Vector3(body_len, bh, W), body)
+	if front_crush:
+		_tbox(T, Vector3(L * 0.5 - 0.45, floor_y + bh * 0.55, 0), Vector3(0.7, bh * 0.75, W * 0.95), body, Vector3(rng.randf_range(-15, 15), rng.randf_range(-20, 20), rng.randf_range(10, 30)))
+		_tbox(T, Vector3(L * 0.5 - 0.1, floor_y + 0.15, W * 0.3), Vector3(0.12, 0.18, W * 0.9), m_iron, Vector3(0, 25, 30))
+	if tname == "AUTOBUS" or tname == "AMBULANCIA":
+		var gl := m_glass if not burnt else m_rdark
+		var band_y := floor_y + bh * (0.72 if tname == "AUTOBUS" else 0.8)
+		_tbox(T, Vector3(0.3 if tname == "AUTOBUS" else L * 0.32, band_y, 0), Vector3(L * (0.85 if tname == "AUTOBUS" else 0.3), bh * 0.3, W + 0.03), gl)
+		_tbox(T, Vector3(L * 0.5 + 0.01, band_y, 0), Vector3(0.04, bh * 0.35, W * 0.85), gl)
+		if tname == "AMBULANCIA" and not burnt:
+			_tbox(T, Vector3(0, floor_y + bh * 0.45, 0), Vector3(L + 0.02, 0.25, W + 0.02), m_red)
+			for sd: float in [-1.0, 1.0]:
+				var lb := Label3D.new()
+				lb.text = "AMBULANCIA"
+				lb.font_size = 48
+				lb.pixel_size = 0.01
+				lb.modulate = Color(0.6, 0.06, 0.05)
+				lb.position = Vector3(-0.4, floor_y + bh * 0.66, sd * (W * 0.5 + 0.02))
+				lb.rotation.y = 0.0 if sd > 0.0 else PI
+				holder.add_child(lb)
+		if tname == "AUTOBUS" and not burnt:
+			var sign_l := Label3D.new()
+			sign_l.text = "CIUDAD UNIVERSITARIA"
+			sign_l.font_size = 30
+			sign_l.pixel_size = 0.01
+			sign_l.modulate = Color(1.0, 0.55, 0.1)
+			sign_l.shaded = false
+			sign_l.position = Vector3(L * 0.5 + 0.04, floor_y + bh * 0.92, 0)
+			sign_l.rotation.y = PI * 0.5
+			holder.add_child(sign_l)
+	else:
+		# Cabina: con vidrios, o solo el esqueleto si se quemó
+		var cy := floor_y + bh + cab_h * 0.5
+		if burnt:
+			for px: float in [-0.5, 0.5]:
+				for pz: float in [-0.5, 0.5]:
+					_tbox(T, Vector3(cab_x + px * cab_l * 0.9, cy, pz * W * 0.85), Vector3(0.07, cab_h, 0.07), m_burnt, Vector3(0, 0, px * 18.0))
+			_tbox(T, Vector3(cab_x, floor_y + bh + cab_h - 0.03, 0), Vector3(cab_l * 0.85, 0.05, W * 0.85), m_burnt, Vector3(rng.randf_range(-6, 6), 0, rng.randf_range(-6, 6)))
+			_tbox(T, Vector3(cab_x, floor_y + bh + 0.1, 0), Vector3(cab_l * 0.7, 0.2, W * 0.7), m_rdark)
+		else:
+			_tbox(T, Vector3(cab_x, cy, 0), Vector3(cab_l, cab_h, W * 0.9), body)
+			if rng.randf() < 0.75:
+				_tbox(T, Vector3(cab_x, cy + 0.03, 0), Vector3(cab_l + 0.03, cab_h * 0.62, W * 0.92), m_glass)
+			if tname == "CAMIONETA":
+				for sd: float in [-1.0, 1.0]:
+					_tbox(T, Vector3(-L * 0.25, floor_y + bh + 0.25, sd * W * 0.47), Vector3(L * 0.45, 0.5, 0.06), body)
+				_tbox(T, Vector3(-L * 0.47, floor_y + bh + 0.25, 0), Vector3(0.06, 0.5, W * 0.95), body, Vector3(0, 0, -70 if rng.randf() < 0.5 else 0))
+				for q in 3:
+					_tbox(T, Vector3(-L * 0.3 + rng.randf_range(-0.6, 0.6), floor_y + bh + 0.22, rng.randf_range(-0.5, 0.5)), Vector3(0.5, 0.4, 0.4), m_wood, Vector3(0, rng.randf_range(0, 90), 0))
+			if tname == "PATRULLA":
+				for sd: float in [-1.0, 1.0]:
+					_tbox(T, Vector3(0, floor_y + bh * 0.55, sd * (W * 0.5 + 0.005)), Vector3(1.8, bh * 0.6, 0.02), _paint_mat(Color(0.8, 0.8, 0.78)))
+					var lb := Label3D.new()
+					lb.text = "SEGURIDAD"
+					lb.font_size = 26
+					lb.pixel_size = 0.01
+					lb.modulate = Color(0.05, 0.08, 0.2)
+					lb.position = Vector3(0, floor_y + bh * 0.55, sd * (W * 0.5 + 0.03))
+					lb.rotation.y = 0.0 if sd > 0.0 else PI
+					holder.add_child(lb)
+				_tbox(T, Vector3(cab_x, floor_y + bh + cab_h + 0.07, -0.3), Vector3(0.25, 0.12, 0.55), m_red)
+				_tbox(T, Vector3(cab_x, floor_y + bh + cab_h + 0.07, 0.3), Vector3(0.25, 0.12, 0.55), m_blue)
+		# Puerta abierta o arrancada
+		if cname == "DESTROZADO" and rng.randf() < 0.6:
+			var dz := W * 0.5 + 0.35
+			_tbox(T, Vector3(cab_x + 0.7, floor_y + bh * 0.6 + 0.15, dz), Vector3(1.0, bh * 0.9, 0.06), body, Vector3(0, -48, 0))
+	# Llantas
+	var axles := [L * 0.32, -L * 0.32]
+	if tname == "AUTOBUS":
+		axles = [L * 0.36, -L * 0.3]
+	for ax in axles:
+		for sd: float in [-1.0, 1.0]:
+			if rng.randf() < 0.15:
+				continue
+			if burnt:
+				_tcyl(T, Vector3(ax, wr, sd * (W * 0.5 - 0.1)), wr * 0.75, 0.2, m_iron, Vector3(90, 0, 0), 10)
+			else:
+				var flat := 0.8 if rng.randf() < 0.3 else 1.0
+				_mm_add(_uc(m_tire, 12), T * Transform3D(_rb(Vector3(90, 0, 0)) * Basis.from_scale(Vector3(wr * 2.0, 0.28, wr * 2.0 * flat)), Vector3(ax, wr * flat, sd * (W * 0.5 - 0.1))))
+	# Vidrios rotos, aceite y escombro alrededor
+	if not burnt:
+		for q in 14:
+			var gp := Vector3(rng.randf_range(-L * 0.7, L * 0.7), 0.03, rng.randf_range(-W - 1.0, W + 1.0))
+			_mm_add(_ub(m_glass_clear), Transform3D(_rb(Vector3(0, rng.randf_range(0, 360), 0)) * Basis.from_scale(Vector3(rng.randf_range(0.05, 0.25), 0.01, rng.randf_range(0.05, 0.2))), gp))
+	_puddle(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-0.5, 0.5)), rng.randf_range(0.8, 1.6), m_scorch if burnt else m_oil)
+	for q in 5:
+		_chunk(Vector3(rng.randf_range(-L * 0.6, L * 0.6), 0, rng.randf_range(-W - 1.0, W + 1.0)), 0.1, 0.35)
+	if cname == "EN_LLAMAS":
+		var fp: Vector3 = T * Vector3(L * 0.3, floor_y + bh + 0.1, 0)
+		_fire(zone, fp, 1.0 if tname != "AUTOBUS" else 1.4)
+		_smoke(zone, fp + Vector3(0, 1.2, 0), 0.6)
+	elif cname == "CALCINADO" and rng.randf() < 0.5:
+		_smoke(zone, T * Vector3(0, floor_y + bh, 0), 0.3)
+	var hgt := floor_y + bh + cab_h
+	_wc(Vector3(L, hgt, W), T * Transform3D(Basis.IDENTITY, Vector3(0, hgt * 0.5, 0)))
+	_end_zone()
+
+
+# ---------------------------------------------------------------- robots
+
+## Extremidad de dos segmentos que cuelga desde `start` (pose en grados).
+func _limb(T: Transform3D, start: Vector3, rot1: Vector3, l1: float, r1: float, rot2: Vector3, l2: float, r2: float, end_size: Vector3) -> void:
+	var b1 := _rb(rot1)
+	_mm_add(_uc(m_rjoint, 8), T * Transform3D(b1 * Basis.from_scale(Vector3(r1 * 2.0, l1, r1 * 2.0)), start + b1 * Vector3(0, -l1 * 0.5, 0)))
+	_mm_add(_uc(m_rshell, 8, 0.85), T * Transform3D(b1 * Basis.from_scale(Vector3(r1 * 2.6, l1 * 0.7, r1 * 2.6)), start + b1 * Vector3(0, -l1 * 0.45, 0)))
+	var j := start + b1 * Vector3(0, -l1, 0)
+	_mm_add(_us(m_rdark, 8), T * Transform3D(Basis.from_scale(Vector3.ONE * r1 * 2.3), j))
+	var b2 := b1 * _rb(rot2)
+	_mm_add(_uc(m_rjoint, 8), T * Transform3D(b2 * Basis.from_scale(Vector3(r2 * 2.0, l2, r2 * 2.0)), j + b2 * Vector3(0, -l2 * 0.5, 0)))
+	_mm_add(_uc(m_rshell, 8, 0.8), T * Transform3D(b2 * Basis.from_scale(Vector3(r2 * 2.5, l2 * 0.65, r2 * 2.5)), j + b2 * Vector3(0, -l2 * 0.4, 0)))
+	_mm_add(_ub(m_rdark), T * Transform3D(b2 * Basis.from_scale(end_size), j + b2 * Vector3(0, -l2 - end_size.y * 0.4, 0)))
+
+
+## Robot humanoide (de pie mide 2 m) en el marco T. pose: rotaciones en grados.
+func _humanoid(T: Transform3D, eye: Material, pose: Dictionary, upper := true, lower := true) -> void:
+	if upper:
+		_tbox(T, Vector3(0, 1.42, 0), Vector3(0.5, 0.6, 0.3), m_rdark)
+		_tbox(T, Vector3(0, 1.5, 0.155), Vector3(0.46, 0.34, 0.06), m_rshell, Vector3(-6, 0, 0))
+		_tbox(T, Vector3(0, 1.3, 0.15), Vector3(0.36, 0.14, 0.05), m_rshell)
+		_tbox(T, Vector3(0, 1.45, -0.2), Vector3(0.36, 0.42, 0.12), m_rjoint)
+		_tcyl(T, Vector3(0, 1.78, 0), 0.06, 0.14, m_rjoint)
+		var hb := _rb(pose.get("head", Vector3.ZERO))
+		var hc := Vector3(0, 1.8, 0)
+		_mm_add(_ub(m_rshell), T * Transform3D(hb * Basis.from_scale(Vector3(0.26, 0.28, 0.28)), hc + hb * Vector3(0, 0.15, 0)))
+		_mm_add(_ub(eye), T * Transform3D(hb * Basis.from_scale(Vector3(0.21, 0.045, 0.02)), hc + hb * Vector3(0, 0.17, 0.142)))
+		_mm_add(_ub(m_rdark), T * Transform3D(hb * Basis.from_scale(Vector3(0.03, 0.12, 0.03)), hc + hb * Vector3(0.1, 0.34, -0.05)))
+		for sd: float in [-1.0, 1.0]:
+			_tsph(T, Vector3(sd * 0.32, 1.66, 0), Vector3(0.22, 0.2, 0.22), m_rshell)
+			var key := "arm_l" if sd < 0.0 else "arm_r"
+			if pose.has(key):
+				var a: Array = pose[key]
+				_limb(T, Vector3(sd * 0.34, 1.64, 0), a[0], 0.32, 0.06, a[1], 0.3, 0.055, Vector3(0.09, 0.13, 0.06))
+	if lower:
+		_tbox(T, Vector3(0, 1.0, 0), Vector3(0.36, 0.22, 0.22), m_rdark)
+		_tbox(T, Vector3(0, 1.0, 0.115), Vector3(0.3, 0.16, 0.02), m_rshell)
+		for sd: float in [-1.0, 1.0]:
+			var key := "leg_l" if sd < 0.0 else "leg_r"
+			if pose.has(key):
+				var lg: Array = pose[key]
+				_limb(T, Vector3(sd * 0.12, 0.92, 0), lg[0], 0.45, 0.08, lg[1], 0.45, 0.07, Vector3(0.13, 0.07, 0.26))
+
+
+func _cables(from: Vector3, n: int) -> void:
+	var mats := [m_cable_r, m_cable_y, m_rdark, m_rjoint]
+	for q in n:
+		var to := from + Vector3(rng.randf_range(-1.0, 1.0), 0, rng.randf_range(-1.0, 1.0))
+		to.y = 0.03
+		var mid := (from + to) * 0.5 + Vector3(rng.randf_range(-0.2, 0.2), 0.1, rng.randf_range(-0.2, 0.2))
+		_rod(from, mid, 0.015, mats[q % mats.size()], 4)
+		_rod(mid, to, 0.015, mats[q % mats.size()], 4)
+
+
+func _make_robot(c: Vector3, type: int, eyes_on: bool, sparks_on: bool) -> void:
+	var zone := _begin_zone("Robot")
+	var rname: String = PREFAB.Robot.keys()[type]
+	var eye: Material = m_reye_on if eyes_on else m_reye_off
+	var r := func(a: float, b: float) -> float: return rng.randf_range(a, b)
+	match rname:
+		"CENTINELA":
+			# Tirado boca arriba, brazos abiertos
+			var T := Transform3D(Basis(Vector3.UP, deg_to_rad(r.call(-20, 20))) * Basis(Vector3.RIGHT, -PI * 0.5), Vector3(0, 0.2, 1.0))
+			_humanoid(T, eye, {
+				"head": Vector3(r.call(-10, 10), r.call(-40, 40), 0),
+				"arm_l": [Vector3(0, 0, -r.call(40, 85)), Vector3(r.call(-60, 0), 0, 0)],
+				"arm_r": [Vector3(r.call(-30, 10), 0, r.call(30, 80)), Vector3(r.call(-70, -10), 0, 0)],
+				"leg_l": [Vector3(r.call(-10, 0), 0, -r.call(5, 20)), Vector3(r.call(0, 10), 0, 0)],
+				"leg_r": [Vector3(r.call(-50, -20), 0, r.call(5, 15)), Vector3(r.call(40, 80), 0, 0)],
+			})
+			_puddle(Vector3(0, 0, 0), 0.9, m_oil)
+			_wc(Vector3(0.7, 0.4, 2.0), Transform3D(Basis.IDENTITY, Vector3(0, 0.2, 0)))
+			if sparks_on:
+				_sparks(zone, Vector3(0.2, 0.3, -0.2))
+		"PARTIDO":
+			# Mitad superior boca abajo arrastrando cables; las piernas, lejos
+			var T := Transform3D(Basis(Vector3.UP, deg_to_rad(r.call(-30, 30))) * Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 0.18, -1.15))
+			_humanoid(T, eye, {
+				"head": Vector3(r.call(10, 30), r.call(-30, 30), 0),
+				"arm_l": [Vector3(r.call(-160, -120), 0, -r.call(10, 30)), Vector3(r.call(-40, 0), 0, 0)],
+				"arm_r": [Vector3(r.call(-20, 10), 0, r.call(20, 50)), Vector3(r.call(-60, -20), 0, 0)],
+			}, true, false)
+			_cables(T * Vector3(0, 1.12, 0), 7)
+			var T2 := Transform3D(Basis(Vector3.UP, deg_to_rad(r.call(0, 360))) * Basis(Vector3.BACK, PI * 0.5), Vector3(r.call(1.6, 2.2), 0.15, r.call(0.5, 1.5)))
+			_humanoid(T2, eye, {
+				"leg_l": [Vector3(r.call(-20, 0), 0, 0), Vector3(r.call(0, 40), 0, 0)],
+				"leg_r": [Vector3(r.call(-60, -20), 0, 0), Vector3(r.call(40, 90), 0, 0)],
+			}, false, true)
+			_cables(T2 * Vector3(0, 1.1, 0), 4)
+			_puddle(Vector3(0.6, 0, 0), 1.3, m_oil)
+			_wc(Vector3(0.7, 0.4, 1.2), Transform3D(Basis.IDENTITY, Vector3(0, 0.2, -0.6)))
+			if sparks_on:
+				_sparks(zone, T * Vector3(0, 1.12, 0))
+		"SENTADO":
+			# Recargado contra algo (respaldo hacia -z), cabeza caída
+			var T := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-14)), Vector3(0, -0.74, 0.1))
+			_humanoid(T, eye, {
+				"head": Vector3(r.call(25, 40), 0, r.call(-25, 25)),
+				"arm_l": [Vector3(r.call(-10, 20), 0, -r.call(5, 20)), Vector3(r.call(-40, -10), 0, 0)],
+				"arm_r": [Vector3(r.call(-50, -20), 0, r.call(5, 15)), Vector3(r.call(-70, -40), 0, 0)],
+				"leg_l": [Vector3(-88, r.call(-10, 0), -r.call(5, 15)), Vector3(r.call(0, 20), 0, 0)],
+				"leg_r": [Vector3(r.call(-90, -60), 0, r.call(5, 15)), Vector3(r.call(20, 60), 0, 0)],
+			})
+			_tbox(Transform3D.IDENTITY, Vector3(0, 0.6, -0.55), Vector3(1.4, 1.2, 0.5), m_concrete, Vector3(0, r.call(-10, 10), r.call(-4, 4)))
+			_puddle(Vector3(0, 0, 0.6), 0.6, m_oil)
+			_wc(Vector3(1.4, 1.2, 1.6), Transform3D(Basis.IDENTITY, Vector3(0, 0.6, 0.1)))
+			if sparks_on:
+				_sparks(zone, Vector3(0.25, 1.0, 0.0))
+		"CANINO":
+			# Robot cuadrúpedo tumbado de lado
+			var T := Transform3D(Basis(Vector3.UP, deg_to_rad(r.call(0, 360))) * Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 0.22, 0))
+			_tbox(T, Vector3(0, 0, 0), Vector3(1.0, 0.28, 0.42), m_rshell)
+			_tbox(T, Vector3(0, 0.16, 0), Vector3(0.7, 0.06, 0.3), m_rdark)
+			_tbox(T, Vector3(0.6, 0.05, 0), Vector3(0.28, 0.2, 0.26), m_rdark)
+			_tbox(T, Vector3(0.75, 0.06, 0), Vector3(0.02, 0.06, 0.18), eye)
+			for lx: float in [-0.4, 0.4]:
+				for lz: float in [-0.2, 0.2]:
+					if rng.randf() < 0.15:
+						continue
+					_limb(T, Vector3(lx, -0.08, lz), Vector3(r.call(-40, 40), 0, r.call(-50, 50)), 0.32, 0.05, Vector3(r.call(30, 90), 0, 0), 0.32, 0.04, Vector3(0.08, 0.05, 0.08))
+			_puddle(Vector3.ZERO, 0.7, m_oil)
+			_wc(Vector3(1.2, 0.5, 0.8), T * Transform3D(Basis.IDENTITY, Vector3.ZERO))
+			if sparks_on:
+				_sparks(zone, T * Vector3(-0.4, 0.1, 0))
+		"MECH":
+			_make_mech(zone, eye, sparks_on)
+		"DRON":
+			var T := Transform3D(Basis(Vector3.UP, deg_to_rad(r.call(0, 360))) * Basis(Vector3.BACK, deg_to_rad(r.call(15, 30))), Vector3(0, 0.3, 0))
+			_tsph(T, Vector3.ZERO, Vector3(1.2, 0.42, 1.2), m_rshell)
+			_tsph(T, Vector3(0, -0.2, 0.3), Vector3(0.32, 0.32, 0.32), m_rdark)
+			_tsph(T, Vector3(0, -0.22, 0.44), Vector3(0.1, 0.1, 0.05), eye)
+			for q in 4:
+				var a := deg_to_rad(45.0 + q * 90.0)
+				var dir := Vector3(cos(a), 0, sin(a))
+				if q == 2:
+					_tbox(Transform3D.IDENTITY, dir * 1.6 + Vector3(0, 0.05, 0), Vector3(0.9, 0.08, 0.1), m_rdark, Vector3(0, r.call(0, 360), 0))
+					_tcyl(Transform3D.IDENTITY, dir * 2.0 + Vector3(0.3, 0.03, 0.2), 0.42, 0.03, m_rdark, Vector3(r.call(-10, 10), 0, r.call(-10, 10)), 14)
+					continue
+				_mm_add(_ub(m_rdark), T * Transform3D(Basis(Vector3.UP, -a) * Basis.from_scale(Vector3(0.9, 0.08, 0.1)), dir * 0.7))
+				_tcyl(T, dir * 1.15 + Vector3(0, 0.08, 0), 0.42, 0.03, m_rdark, Vector3(r.call(-15, 15), 0, r.call(-15, 15)), 14)
+			_puddle(Vector3.ZERO, 1.5, m_scorch)
+			for q in 8:
+				_chunk(Vector3(r.call(-2, 2), 0, r.call(-2, 2)), 0.08, 0.3)
+			_wc(Vector3(1.3, 0.6, 1.3), Transform3D(Basis.IDENTITY, Vector3(0, 0.3, 0)))
+			if sparks_on:
+				_sparks(zone, Vector3(0, 0.5, 0))
+	_end_zone()
+
+
+## Mech de combate de 5 m, derribado sobre una rodilla, con un brazo arrancado.
+func _make_mech(zone: Node3D, eye: Material, sparks_on: bool) -> void:
+	var tilt := _rb(Vector3(rng.randf_range(14, 24), 0, rng.randf_range(-8, 8)))
+	var T := Transform3D(tilt, Vector3(0, 0, 0))
+	var hip := Vector3(0, 2.4, 0)
+	# Torso y cabina
+	_tbox(T, hip + Vector3(0, 0.9, 0), Vector3(2.6, 1.5, 2.0), m_rdark)
+	_tbox(T, hip + Vector3(0, 1.0, 1.02), Vector3(2.2, 1.1, 0.1), m_rshell, Vector3(-8, 0, 0))
+	_tbox(T, hip + Vector3(0, 1.75, 0.2), Vector3(1.6, 0.4, 1.4), m_rshell)
+	_tbox(T, hip + Vector3(0, 1.0, 1.09), Vector3(1.0, 0.12, 0.03), eye)
+	_tbox(T, hip + Vector3(0, 0.95, -1.15), Vector3(1.8, 1.0, 0.4), m_rjoint)
+	for sd: float in [-1.0, 1.0]:
+		_tcyl(T, hip + Vector3(sd * 0.6, 1.8, -1.0), 0.18, 0.6, m_rjoint, Vector3(70, 0, 0))
+	# Piernas de rodilla invertida: la izquierda arrodillada
+	var hips := [hip + Vector3(-1.0, 0.2, 0), hip + Vector3(1.0, 0.2, 0)]
+	var knees := [Vector3(-1.1, 0.45, 1.3), Vector3(1.2, 1.4, 0.9)]
+	var feet := [Vector3(-1.2, 0.25, -0.6), Vector3(1.3, 0.2, -0.4)]
+	for i in 2:
+		var hp: Vector3 = T * (hips[i] as Vector3)
+		var kn: Vector3 = knees[i]
+		var ft: Vector3 = feet[i]
+		_rod(hp, kn, 0.32, m_rshell, 10)
+		_mm_add(_us(m_rdark, 10), Transform3D(Basis.from_scale(Vector3.ONE * 0.75), kn))
+		_rod(kn, ft, 0.26, m_rjoint, 10)
+		_mm_add(_ub(m_rdark), Transform3D(Basis(Vector3.UP, rng.randf_range(-0.2, 0.2)) * Basis.from_scale(Vector3(0.9, 0.35, 1.6)), ft + Vector3(0, -0.05, 0.3)))
+		_wc(Vector3(0.7, 0.7, hp.distance_to(kn)), Transform3D(Basis.looking_at((kn - hp).normalized(), Vector3.UP if absf((kn - hp).normalized().y) < 0.95 else Vector3.RIGHT), (hp + kn) * 0.5))
+	# Brazo cañón que cuelga hasta el piso
+	var sh: Vector3 = T * (hip + Vector3(-1.55, 1.2, 0.2))
+	var hand := Vector3(-2.2, 0.3, 1.8)
+	_mm_add(_us(m_rshell, 10), Transform3D(Basis.from_scale(Vector3.ONE * 0.8), sh))
+	_rod(sh, hand, 0.28, m_rjoint, 10)
+	_rod(hand, hand + Vector3(-0.2, 0.0, 1.8), 0.22, m_rdark, 10)
+	_rod(hand + Vector3(-0.2, 0.0, 1.8), hand + Vector3(-0.2, 0.0, 2.1), 0.12, m_rdark, 10)
+	# Brazo derecho arrancado, en el piso con cables
+	var stump: Vector3 = T * (hip + Vector3(1.4, 1.2, 0.2))
+	_cables(stump, 5)
+	var arm_p := Vector3(rng.randf_range(2.6, 3.4), 0.3, rng.randf_range(-1.5, 1.5))
+	_mm_add(_uc(m_rjoint, 10), Transform3D(_rb(Vector3(0, rng.randf_range(0, 180), 90)) * Basis.from_scale(Vector3(0.6, 2.4, 0.6)), arm_p))
+	_mm_add(_us(m_rshell, 10), Transform3D(Basis.from_scale(Vector3.ONE * 0.75), arm_p + Vector3(0.4, 0.15, 0.6)))
+	_cables(arm_p + Vector3(0.6, 0.2, 0.7), 4)
+	_puddle(Vector3(0, 0, 0.5), 2.4, m_oil)
+	for q in 16:
+		_chunk(Vector3(rng.randf_range(-4, 4), 0, rng.randf_range(-4, 4)), 0.15, 0.6)
+	_wc(Vector3(2.8, 2.0, 2.4), T * Transform3D(Basis.IDENTITY, hip + Vector3(0, 0.9, 0)))
+	_wc(Vector3(0.8, 0.8, 2.6), Transform3D(_rb(Vector3(0, 0, 0)), arm_p))
+	_smoke(zone, T * (hip + Vector3(0, 2.2, -0.8)), 0.45)
+	if sparks_on:
+		_sparks(zone, stump)
+
+
+# ---------------------------------------------------------------- ruinas menores
+
+func _make_ruin(c: Vector3, type: int) -> void:
+	var zone := _begin_zone("Ruina")
+	var rname: String = PREFAB.Ruin.keys()[type]
+	match rname:
+		"MURO_ROTO":
+			# Fachada de dos pisos que quedó en pie
+			for k in 2:
+				var px := -2.0 + k * 4.0
+				var floors := 2 if (k == 0 or rng.randf() < 0.5) else 1
+				for fl in floors:
+					_mm_add(mesh_panel, Transform3D(Basis.IDENTITY, Vector3(px, fl * FLOOR_H + FLOOR_H * 0.5, 0)))
+				var top := floors * FLOOR_H
+				for q in 3:
+					_chunk(Vector3(px + rng.randf_range(-1.6, 1.6), top, rng.randf_range(-0.2, 0.2)), 0.3, 0.9)
+				_rebar(Vector3(px + rng.randf_range(-1.5, 1.5), top, 0), 3)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(-4.2, 3.0, 0), Vector3(0.6, 6.0, 0.6), m_concrete_dark, true)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(-1.5, FLOOR_H + 0.15, -1.6), Vector3(3.5, 0.3, 3.0), m_concrete, false, Vector3(rng.randf_range(10, 25), 0, rng.randf_range(-8, 8)))
+			for sd: float in [-1.0, 1.0]:
+				_mound(Vector3(rng.randf_range(-2, 2), 0, sd * 2.2), 4.0, 1.2)
+			for q in 18:
+				_chunk(Vector3(rng.randf_range(-5, 5), 0, rng.randf_range(-3.5, 3.5)), 0.2, 1.0)
+			_wc(Vector3(8.0, FLOOR_H * 2.0, 0.4), Transform3D(Basis.IDENTITY, Vector3(0, FLOOR_H, 0)))
+		"ESCOMBROS":
+			for q in 3:
+				_mound(Vector3(rng.randf_range(-2.5, 2.5), 0, rng.randf_range(-2.5, 2.5)), rng.randf_range(4.5, 7.0), rng.randf_range(1.4, 2.4))
+			for q in 4:
+				var sp := Vector3(rng.randf_range(-3, 3), rng.randf_range(0.6, 1.6), rng.randf_range(-3, 3))
+				_blk(sp, Vector3(rng.randf_range(2.5, 4.0), 0.3, rng.randf_range(1.8, 3.0)), m_concrete, Vector3(rng.randf_range(-35, 35), rng.randf_range(0, 180), rng.randf_range(-35, 35)))
+				_rebar(sp, 3)
+			_blk(Vector3(2.5, 0.9, 1.0), Vector3(1.4, 0.06, 0.7), m_desk, Vector3(40, 30, 10))
+			_blk(Vector3(-2.0, 1.4, -1.5), Vector3(0.45, 0.05, 0.45), m_metal_light, Vector3(70, 10, 20))
+			_cy(Vector3(-3.0, 0.6, 2.0), 0.25, 3.0, m_metal, Vector3(0, 30, 70))
+			for q in 40:
+				_chunk(Vector3(rng.randf_range(-5.5, 5.5), 0, rng.randf_range(-5.5, 5.5)), 0.15, 1.1)
+			_wc(Vector3(6.0, 1.4, 6.0), Transform3D(Basis(Vector3.UP, rng.randf_range(0, 1.5)), Vector3(0, 0.7, 0)))
+		"CASETA":
+			var gray := m_white_lab
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(0, 1.25, -1.25), Vector3(2.6, 2.5, 0.15), gray, true)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(-1.25, 1.25, 0), Vector3(0.15, 2.5, 2.6), gray, true)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(1.25, 0.5, 0), Vector3(0.15, 1.0, 2.6), gray, true)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(0.35, 0.5, 1.25), Vector3(1.9, 1.0, 0.15), gray, true)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(1.25, 1.8, -0.9), Vector3(0.15, 1.4, 0.4), gray)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(0.4, 2.1, 0.2), Vector3(3.0, 0.15, 3.0), m_concrete_dark, false, Vector3(18, 0, -12))
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(0.0, 0.42, -0.6), Vector3(1.6, 0.06, 0.6), m_desk)
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(0.6, 0.8, -0.85), Vector3(0.45, 0.35, 0.35), m_concrete_dark)
+			for q in 10:
+				_mm_add(_ub(m_glass_clear), Transform3D(_rb(Vector3(0, rng.randf_range(0, 360), 0)) * Basis.from_scale(Vector3(rng.randf_range(0.1, 0.4), 0.01, rng.randf_range(0.1, 0.3))), Vector3(rng.randf_range(1.3, 3.0), 0.03, rng.randf_range(-1.5, 1.5))))
+			# Pluma de acceso caída
+			_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(2.0, 0.55, 1.6), Vector3(0.3, 1.1, 0.3), m_hazard_y, true)
+			for q in 6:
+				_lbox(Vector3.ZERO, Basis.IDENTITY, Vector3(2.1 + q * 0.75 * 0.98, 0.25 + q * 0.06, 1.75 + q * 0.12), Vector3(0.75, 0.1, 0.1), m_red if q % 2 == 0 else m_line, false, Vector3(0, -9, -5))
+			var t := _lbl(zone, "VIGILANCIA", Vector3(0, 2.35, 1.4), 0.0, 40, Color(0.75, 0.75, 0.7))
+			t.rotation_degrees.z = 6.0
+		"POSTE_CAIDO":
+			# Poste de luz con cables, caído sobre la banqueta
+			_cy(Vector3(-6.0, 0.6, 0), 0.25, 1.2, m_concrete, Vector3.ZERO, 8, 0.9, true)
+			_rebar(Vector3(-6.0, 1.2, 0), 3)
+			var top := Vector3(5.0, 0.3, rng.randf_range(-1.0, 1.0))
+			_rod(Vector3(-5.6, 0.9, 0), top, 0.17, m_concrete, 8)
+			_blk(top + Vector3(-0.3, 0.2, 0), Vector3(0.12, 0.12, 1.8), m_wood, Vector3(0, 0, 80))
+			_blk(top + Vector3(-1.2, 0.35, 0.6), Vector3(0.6, 0.8, 0.6), m_metal, Vector3(30, 20, 70), true)
+			_wc(Vector3(11.0, 0.5, 0.5), Transform3D(Basis(Vector3.UP, atan2(-(top.z), top.x + 5.6)), (Vector3(-5.6, 0.6, 0) + top) * 0.5))
+			# Cables colgando hacia el poste que sigue en pie
+			var other := Vector3(8.0, 0, -3.5)
+			_cy(other + Vector3(0, 4.5, 0), 0.17, 9.0, m_concrete, Vector3(0, 0, -4), 8, 0.75, true)
+			_blk(other + Vector3(0, 8.6, 0), Vector3(0.12, 0.12, 1.8), m_wood)
+			for w in 3:
+				var a := other + Vector3(0, 8.6, -0.8 + w * 0.8)
+				var b := top + Vector3(0, 0.1, -0.6 + w * 0.6)
+				var m1 := a.lerp(b, 0.4) + Vector3(0, -2.5 - w * 0.4, 0)
+				var m2 := a.lerp(b, 0.75) + Vector3(0, -1.2, 0)
+				m1.y = maxf(m1.y, 0.1)
+				_rod(a, m1, 0.02, m_tire, 4)
+				_rod(m1, m2, 0.02, m_tire, 4)
+				_rod(m2, b, 0.02, m_tire, 4)
+			if rng.randf() < 0.5:
+				_sparks(zone, top + Vector3(0, 0.2, 0))
+		"CRATER":
+			_mm_add(_uc(m_scorch, 32), Transform3D(Basis.from_scale(Vector3(13.0, 0.02, 13.0)), Vector3(0, 0.025, 0)))
+			_mm_add(_uc(m_debris, 24), Transform3D(Basis.from_scale(Vector3(5.0, 0.02, 5.0)), Vector3(0, 0.035, 0)))
+			for i in 28:
+				var a := TAU * i / 28.0 + rng.randf_range(-0.1, 0.1)
+				var rr := rng.randf_range(3.2, 4.6)
+				_chunk(Vector3(cos(a) * rr, rng.randf_range(0.0, 0.5), sin(a) * rr), 0.4, 1.4)
+			for i in 6:
+				var a := TAU * i / 6.0
+				_mound(Vector3(cos(a), 0, sin(a)) * 4.0, 3.0, 0.8)
+			for q in 30:
+				var a := rng.randf() * TAU
+				var rr := rng.randf_range(4.5, 7.0)
+				_chunk(Vector3(cos(a) * rr, 0, sin(a) * rr), 0.08, 0.35)
+			for q in 25:
+				_sp(Vector3(rng.randf_range(-2.5, 2.5), 0.05, rng.randf_range(-2.5, 2.5)), Vector3.ONE * rng.randf_range(0.06, 0.14), m_ember, Vector3.ZERO, 6)
+			_fire(zone, Vector3(0.3, 0.3, -0.4), 0.6)
+			_smoke(zone, Vector3(0, 0.8, 0), 0.7)
+		"BARRICADA":
+			_sandbag_wall(Vector3(-3.6, 0, 0), 0.0, 3.2)
+			_blk(Vector3(-0.8, 0.45, 0), Vector3(1.6, 0.9, 0.8), m_desk, Vector3(0, 8, 0))
+			_blk(Vector3(-0.6, 1.0, 0.1), Vector3(1.4, 0.06, 0.7), m_desk, Vector3(0, -10, 80))
+			_blk(Vector3(1.0, 0.25, 0.2), Vector3(2.0, 0.5, 0.45), m_wood_dark, Vector3(0, 12, 0))
+			_blk(Vector3(1.2, 0.75, 0.1), Vector3(0.9, 2.0, 0.05), m_wood, Vector3(-75, 15, 0))
+			for q in 4:
+				var tp := Vector3(2.8 + (q % 2) * 0.8, 0.2 + (q / 2) * 0.32, rng.randf_range(-0.3, 0.3))
+				_cy(tp, 0.38, 0.3, m_tire, Vector3(0, 0, 0), 12)
+			_blk(Vector3(4.4, 0.5, 0), Vector3(0.45, 1.0, 1.0), m_metal_light, Vector3(0, 20, 90))
+			for q in 3:
+				_blk(Vector3(rng.randf_range(-4, 4), 0.25, rng.randf_range(0.8, 1.5)), Vector3(0.45, 0.05, 0.45), m_metal_light, Vector3(rng.randf_range(0, 90), rng.randf_range(0, 360), 0))
+			_wc(Vector3(10.0, 1.3, 1.2), Transform3D(Basis.IDENTITY, Vector3(0, 0.65, 0)))
+			var spray := _lbl(zone, "AQUÍ RESISTIMOS", Vector3(-3.6, 0.75, 0.4), 0.0, 42, Color(0.75, 0.08, 0.05))
+			spray.rotation_degrees.z = -4.0
+	_end_zone()
