@@ -314,7 +314,7 @@ func _atk_scratch(id: int) -> void:
 		_pose("scratch_" + side, 0.1)
 		await _w(0.1)
 		if _x(id): return
-		_melee(2.9, 13.0, 0.25)
+		_melee(2.9, 7.0, 0.2)
 		await _w(0.18 * _sp())
 		if _x(id): return
 	await _w(0.6 * _sp())
@@ -363,7 +363,7 @@ func _atk_grab(id: int) -> void:
 		if _x(id) or not _valid_target(): break
 		target.global_position = global_position - global_basis.z * 1.3
 		_pose("scratch_l" if i % 2 == 0 else "scratch_r", 0.08)
-		_hit(6.0, global_position, true)
+		_hit(3.0, global_position, true)
 		LFX.puff(fx_parent, target.global_position + Vector3(0, 1.2, 0), Color(0.6, 0.05, 0.03, 0.9), 10, 0.2, 2.0, -5.0)
 		await _w(0.3)
 		_pose("hold", 0.08)
@@ -373,7 +373,7 @@ func _atk_grab(id: int) -> void:
 	if _valid_target():
 		if target.has_method("clear_status"):
 			target.clear_status("atrapado")
-		_hit(12.0, global_position, true)
+		_hit(6.0, global_position, true)
 	_kinematic = false
 	await _w(1.0 * _sp())
 	_end(id, 0.8)

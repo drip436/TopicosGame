@@ -21,8 +21,8 @@ extends "res://scripts/arena_generator.gd"
 ##     aparición del jefe de cada arena ("biblioteca", "computo",
 ##     "laboratorio", "final") para configurar sus peleas.
 ##   - Llama `register_boss_defeated(id)` al vencer a cada jefe: disipa el sello
-##     del siguiente edificio y, cuando caen los de `bosses_for_final_gate`, abre
-##     el portón del Aula Magna.
+##     del siguiente edificio. Cada jefe suelta una pieza de la llave; al recoger
+##     las 4 (`add_key_piece`) se abre el portón del Aula Magna.
 
 signal final_gate_opened
 
@@ -57,7 +57,7 @@ const ZONES := [
 	[Vector2(210, 72), 60.0, "Residencias Estudiantiles"],
 ]
 
-## Jefes que hay que vencer para abrir el portón del Aula Magna.
+## (Ya no se usa: el portón se abre con las 4 piezas de la llave.)
 @export var bosses_for_final_gate: PackedStringArray = PackedStringArray(["biblioteca", "computo", "laboratorio"])
 ## Desmárcalo para probar la arena final con el portón abierto.
 @export var final_gate_locked: bool = true
@@ -67,6 +67,14 @@ const ZONES := [
 @export var warn_prefab_conflicts: bool = true
 ## Crea la pelea del segundo jefe en la Biblioteca (boss_bibliotecario/LibraryFight.tscn).
 @export var spawn_library_boss: bool = true
+## Crea la pelea del tercer jefe (Centro de Cómputo) al jugar.
+@export var spawn_compute_boss: bool = true
+## Crea la pelea del cuarto jefe (Laboratorio) al jugar.
+@export var spawn_lab_boss: bool = true
+## Crea el enfrentamiento final (Aula Magna) al jugar.
+@export var spawn_final_boss: bool = true
+## Crea VidaDelCampus al jugar: enemigos, hogueras, tazas de café y la ameba del lago.
+@export var spawn_world_life: bool = true
 ## Para pruebas: desbloquea todo al iniciar (plaza, sellos y portón final).
 @export var open_world_on_start: bool = false
 
@@ -133,6 +141,9 @@ var _gate_body: StaticBody3D
 var _gate_seal: Node3D
 var _gate_open := false
 var _defeated := {}
+## Piezas de la llave del Aula Magna recogidas (las sueltan los jefes).
+var key_pieces := {}
+const KEY_PIECES_NEEDED := 4
 var _explore := false
 var _zone := ""
 var _zone_t := 0.0
@@ -268,15 +279,45 @@ func get_arena(id: String) -> Dictionary:
 	return {}
 
 
-## Avísale al campus que un jefe fue derrotado.
+## Edificios de conexión: id, título, origen, base (giro) y largo. El pasillo
+## interior corre por z local = 2.5 (de -largo/2 a +largo/2 en x local).
+func get_connector_halls() -> Array:
+	return _hall_data
+
+
+## Lagos del campus (prefabs "Lago"): nodo y radios de la elipse.
+func get_lakes() -> Array:
+	var out: Array = []
+	for pf in _find_prefabs():
+		if PREFAB.Kind.keys()[pf.kind] == "LAGO":
+			out.append({"node": pf, "radii": pf.lake_radii})
+	return out
+
+
+## Prefabs del campus de un tipo ("FUENTE", "FACULTAD", "ZONA_RECREATIVA"...).
+func get_prefabs_of_kind(kind_name: String) -> Array:
+	var out: Array = []
+	for pf in _find_prefabs():
+		if PREFAB.Kind.keys()[pf.kind] == kind_name:
+			out.append(pf)
+	return out
+
+
+## Avísale al campus que un jefe fue derrotado (abre el siguiente edificio).
+## El portón del Aula Magna ya no se abre aquí: hacen falta las piezas de la llave.
 func register_boss_defeated(id: String) -> void:
 	_defeated[id] = true
 	if SEAL_FOR_BOSS.has(id):
 		unseal(SEAL_FOR_BOSS[id])
-	for b in bosses_for_final_gate:
-		if not _defeated.has(b):
-			return
-	open_final_gate()
+
+
+## Se recogió una pieza de la llave (amuleto). Con las 4 se abre el Aula Magna.
+## Devuelve cuántas piezas se tienen.
+func add_key_piece(id: String) -> int:
+	key_pieces[id] = true
+	if key_pieces.size() >= KEY_PIECES_NEEDED:
+		open_final_gate()
+	return key_pieces.size()
 
 
 ## Abre el portón sellado del Aula Magna.
@@ -315,6 +356,34 @@ func _runtime_setup() -> void:
 			lf.name = "LibraryFight"
 			lf.set("world", self)
 			get_tree().current_scene.add_child(lf)
+	if spawn_compute_boss and get_tree().current_scene and get_tree().current_scene.find_child("ComputeFight", true, false) == null:
+		var cf_scene: PackedScene = load("res://boss_computo/ComputeFight.tscn")
+		if cf_scene:
+			var cf := cf_scene.instantiate()
+			cf.name = "ComputeFight"
+			cf.set("world", self)
+			get_tree().current_scene.add_child(cf)
+	if spawn_lab_boss and get_tree().current_scene and get_tree().current_scene.find_child("LabFight", true, false) == null:
+		var lab_scene: PackedScene = load("res://boss_laboratorio/LabFight.tscn")
+		if lab_scene:
+			var lab := lab_scene.instantiate()
+			lab.name = "LabFight"
+			lab.set("world", self)
+			get_tree().current_scene.add_child(lab)
+	if spawn_final_boss and get_tree().current_scene and get_tree().current_scene.find_child("FinalFight", true, false) == null:
+		var ff_scene: PackedScene = load("res://boss_final/FinalFight.tscn")
+		if ff_scene:
+			var ff := ff_scene.instantiate()
+			ff.name = "FinalFight"
+			ff.set("world", self)
+			get_tree().current_scene.add_child(ff)
+	if spawn_world_life and get_tree().current_scene and get_tree().current_scene.find_child("VidaDelCampus", true, false) == null:
+		var wl_scene: PackedScene = load("res://mundo/VidaDelCampus.tscn")
+		if wl_scene:
+			var wl := wl_scene.instantiate()
+			wl.name = "VidaDelCampus"
+			wl.set("world", self)
+			get_tree().current_scene.add_child.call_deferred(wl)
 	if not final_gate_locked:
 		open_final_gate(true)
 	var bf: Node = null
@@ -1954,7 +2023,7 @@ func _make_final_arena() -> void:
 		bar.mesh = bm
 		bar.rotation_degrees = Vector3(0, 0, q * 60.0)
 		_gate_seal.add_child(bar)
-	_lbl(_gate_seal, "Solo quien venza a los tres guardianes\npodrá cruzar este umbral", Vector3(0, -3.0, 0.05), 0.0, 28, Color(1.0, 0.55, 0.3), false)
+	_lbl(_gate_seal, "Solo quien reúna las cuatro piezas de la llave\npodrá cruzar este umbral", Vector3(0, -3.0, 0.05), 0.0, 28, Color(1.0, 0.55, 0.3), false)
 	_omni(_gate_seal, Vector3(0, 0, 1.2), Color(1.0, 0.3, 0.1), 2.5, 10.0, 0.0, 2.0)
 
 	# Braseros
@@ -2703,9 +2772,16 @@ func _make_lake(c: Vector3, A: float, B: float) -> void:
 		var at_bridge := absf(pm.x - isl.x) < 1.9 and pm.z < c.z
 		if not at_pier and not at_bridge:
 			var wp := pm + nrm * 0.3
-			_mm_add(_ub(m_stone_light), Transform3D(bs * Basis.from_scale(Vector3(0.6, 0.7, l + 0.15)), wp + Vector3(0, 0.35, 0)))
-			_wc(Vector3(0.6, 1.6, l + 0.15), Transform3D(bs, wp + Vector3(0, 0.8, 0)))
-			if rng.randf() > 0.07:
+			var intact := rng.randf() > 0.07
+			# Donde el barandal está arrancado el murete también se rompió y no hay
+			# colisión: por ahí se puede entrar al agua (y contagiarse de la ameba).
+			if intact:
+				_mm_add(_ub(m_stone_light), Transform3D(bs * Basis.from_scale(Vector3(0.6, 0.7, l + 0.15)), wp + Vector3(0, 0.35, 0)))
+			else:
+				_mm_add(_ub(m_stone_light), Transform3D(bs * _rb(Vector3(0, 0, 8)) * Basis.from_scale(Vector3(0.6, 0.18, l * 0.5)), wp + nrm * 0.4 + Vector3(0, 0.09, 0)))
+			if intact:
+				_wc(Vector3(0.6, 1.6, l + 0.15), Transform3D(bs, wp + Vector3(0, 0.8, 0)))
+			if intact:
 				_mm_add(_ub(m_iron), Transform3D(bs * Basis.from_scale(Vector3(0.05, 0.05, l)), wp + Vector3(0, 1.25, 0)))
 				_mm_add(_ub(m_iron), Transform3D(bs * Basis.from_scale(Vector3(0.04, 0.04, l)), wp + Vector3(0, 0.95, 0)))
 			else:
@@ -4150,6 +4226,7 @@ void fragment() {
 """
 
 var _connector_rects: Array = []
+var _hall_data: Array = []
 var _seals := {}
 var _ring_opened := false
 var m_chain: StandardMaterial3D
@@ -4298,6 +4375,7 @@ func _hall(id: String, title: String, o: Vector3, yaw: float, segs: int, floors:
 	var c1: Vector3 = corners[1]
 	var r := Rect2(Vector2(minf(c0.x, c1.x), minf(c0.z, c1.z)), Vector2(absf(c1.x - c0.x), absf(c1.z - c0.z)))
 	_connector_rects.append(r)
+	_hall_data.append({"id": id, "title": title, "origin": o, "basis": b, "length": L})
 	_blocked_rects.append(r)
 	_end_zone()
 
@@ -4392,6 +4470,7 @@ func unseal(id: String, announce := true) -> void:
 
 func _make_connectors() -> void:
 	_connector_rects.clear()
+	_hall_data.clear()
 	_seals.clear()
 	# 1) Plaza → Sector Poniente (se abre al vencer al Catedrático)
 	_hall("aulas_poniente", "Edificio de Aulas Poniente", Vector3(-68, 0, 2.5), 180.0, 10, 2, {"start": true, "end": true}, [])

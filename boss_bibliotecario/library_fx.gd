@@ -246,3 +246,45 @@ static func paper_burst(parent: Node, pos: Vector3, amount := 10) -> void:
 	p.emitting = true
 	var t := parent.get_tree().create_timer(2.0)
 	t.timeout.connect(p.queue_free)
+
+
+const STREAK_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 color : source_color = vec4(1.0);
+uniform float energy = 1.0;
+void fragment() {
+	float along = pow(1.0 - UV.y, 1.6);
+	float across = 1.0 - pow(abs(UV.x - 0.5) * 2.0, 2.0);
+	ALBEDO = color.rgb * energy;
+	ALPHA = clamp(along * across, 0.0, 1.0);
+}
+"""
+static var _streak_shader: Shader
+
+
+## Estela delgada detrás de una flecha (dos planos cruzados a lo largo de +Z).
+static func streak(col: Color, length: float, width: float, energy := 1.0) -> Node3D:
+	if _streak_shader == null:
+		_streak_shader = Shader.new()
+		_streak_shader.code = STREAK_SHADER
+	var m := ShaderMaterial.new()
+	m.shader = _streak_shader
+	m.set_shader_parameter("color", col)
+	m.set_shader_parameter("energy", energy)
+	var q := QuadMesh.new()
+	q.size = Vector2(width, length)
+	var root := Node3D.new()
+	root.name = "Estela"
+	for k in 2:
+		var h := Node3D.new()
+		h.rotation_degrees = Vector3(0, 0, k * 90.0)
+		root.add_child(h)
+		var mi := MeshInstance3D.new()
+		mi.mesh = q
+		mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.rotation_degrees = Vector3(-90, 0, 0)
+		mi.position = Vector3(0, 0, length * 0.5 + 0.3)
+		h.add_child(mi)
+	return root

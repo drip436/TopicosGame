@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://887histgx4fs"]
+[gd_scene format=3 uid="uid://887histgx4fs"]
 
 [ext_resource type="VideoStream" uid="uid://bg7svhpgk3vt2" path="res://background.ogv" id="1_dewlx"]
 [ext_resource type="Script" uid="uid://bvo8wgr3724pw" path="res://Scenes/ui.gd" id="1_hfhsn"]
@@ -32,7 +32,7 @@ border_width_right = 2
 border_width_bottom = 4
 border_color = Color(0.584314, 0.588235, 0.639216, 1)
 
-[node name="Control" type="Control"]
+[node name="Control" type="Control" unique_id=564074271]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -46,7 +46,7 @@ grow_vertical = 2
 script = ExtResource("1_hfhsn")
 canciones = Array[AudioStream]([ExtResource("5_qwshj"), ExtResource("3_xjg7p"), ExtResource("4_mg6lk")])
 
-[node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="."]
+[node name="VideoStreamPlayer" type="VideoStreamPlayer" parent="." unique_id=1018328518]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -62,7 +62,7 @@ autoplay = true
 expand = true
 loop = true
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=245807111]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -73,35 +73,35 @@ offset_right = 420.0
 offset_bottom = -2095.5
 grow_vertical = 2
 
-[node name="ContinueButton" type="Button" parent="VBoxContainer"]
+[node name="ContinueButton" type="Button" parent="VBoxContainer" unique_id=1049240465]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("1_nxvpl")
 theme_override_font_sizes/font_size = 30
 theme_override_styles/normal = SubResource("StyleBoxFlat_nxvpl")
 text = "Continue"
 
-[node name="NewGameButtom" type="Button" parent="VBoxContainer"]
+[node name="NewGameButtom" type="Button" parent="VBoxContainer" unique_id=1681966126]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("1_nxvpl")
 theme_override_font_sizes/font_size = 30
 theme_override_styles/normal = SubResource("StyleBoxFlat_3iaii")
 text = "New Game"
 
-[node name="SettingsButtom" type="Button" parent="VBoxContainer"]
+[node name="SettingsButtom" type="Button" parent="VBoxContainer" unique_id=1940669989]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("1_nxvpl")
 theme_override_font_sizes/font_size = 30
 theme_override_styles/normal = SubResource("StyleBoxFlat_3iaii")
 text = "Settings"
 
-[node name="ExitButtom" type="Button" parent="VBoxContainer"]
+[node name="ExitButtom" type="Button" parent="VBoxContainer" unique_id=60488711]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("1_nxvpl")
 theme_override_font_sizes/font_size = 30
 theme_override_styles/normal = SubResource("StyleBoxFlat_3iaii")
 text = "Exit"
 
-[node name="TextureRect" type="TextureRect" parent="."]
+[node name="TextureRect" type="TextureRect" parent="." unique_id=87288319]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -115,7 +115,7 @@ rotation = -0.00270141
 scale = Vector2(0.351614, 0.361567)
 texture = ExtResource("2_dewlx")
 
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1169502398]
 volume_db = 24.0
 
 [connection signal="pressed" from="VBoxContainer/ContinueButton" to="." method="_on_continue_button_pressed"]

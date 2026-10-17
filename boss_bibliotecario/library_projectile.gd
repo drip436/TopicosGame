@@ -80,89 +80,125 @@ func _build_book() -> void:
 	_spin = Vector3(randf_range(-9, 9), randf_range(-6, 6), randf_range(-9, 9))
 
 
+## Flecha de gis (fase 1) o de fuego (fase 2): astil, punta, plumas y estela fina.
 func _build_arrow(fire: bool) -> void:
-	var col := Color(1.0, 0.45, 0.1) if fire else Color(0.85, 0.95, 1.0)
-	var m := LFX.emissive(col, 3.5 if fire else 2.2)
+	var shaft_m := StandardMaterial3D.new()
+	var tip_m: StandardMaterial3D
+	if fire:
+		shaft_m.albedo_color = Color(0.12, 0.07, 0.05)
+		shaft_m.emission_enabled = true
+		shaft_m.emission = Color(1.0, 0.35, 0.05)
+		shaft_m.emission_energy_multiplier = 0.8
+		tip_m = LFX.emissive(Color(1.0, 0.55, 0.12), 2.2)
+	else:
+		shaft_m.albedo_color = Color(0.93, 0.93, 0.88)
+		shaft_m.emission_enabled = true
+		shaft_m.emission = Color(0.85, 0.9, 1.0)
+		shaft_m.emission_energy_multiplier = 0.5
+		tip_m = LFX.emissive(Color(0.8, 0.9, 1.0), 1.3)
+	_arrow_body(shaft_m, tip_m, 1.25, 0.022, 0.1)
+	var col := Color(1.0, 0.5, 0.12) if fire else Color(0.8, 0.9, 1.0)
+	_vis.add_child(LFX.streak(col, 2.6 if fire else 2.2, 0.16, 1.6 if fire else 1.0))
+	if fire:
+		_sparks(Color(1.0, 0.45, 0.1), 20, 0.09, 1.2)
+
+
+## Flecha mágica (como las de Elden Ring): cristal azul brillante con estela.
+func _build_magic() -> void:
+	var core := LFX.emissive(Color(0.55, 0.85, 1.0), 2.6)
+	var tip := LFX.emissive(Color(0.85, 0.95, 1.0), 3.5)
+	_arrow_body(core, tip, 1.0, 0.018, 0.08, LFX.emissive(Color(0.35, 0.65, 1.0), 1.1, 0.85))
+	# Halo alrededor de la punta
+	var halo := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 0.5
+	hm.height = 1.0
+	hm.radial_segments = 10
+	hm.rings = 5
+	hm.material = LFX.emissive(Color(0.35, 0.7, 1.0), 1.5, 0.22)
+	halo.mesh = hm
+	halo.scale = Vector3(0.16, 0.16, 0.5)
+	halo.position = Vector3(0, 0, -0.45)
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_vis.add_child(halo)
+	_vis.add_child(LFX.streak(Color(0.35, 0.75, 1.0), 3.2, 0.14, 1.8))
+	_sparks(Color(0.5, 0.85, 1.0), 14, 0.045, 0.0)
+	var l := OmniLight3D.new()
+	l.light_color = Color(0.45, 0.75, 1.0)
+	l.light_energy = 0.8
+	l.omni_range = 3.5
+	l.shadow_enabled = false
+	_vis.add_child(l)
+
+
+## Astil a lo largo de -Z (hacia adelante), punta piramidal y tres plumas.
+func _arrow_body(shaft_m: Material, tip_m: Material, length: float, r: float, tip_r: float, fletch_m: Material = null) -> void:
 	var shaft := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
-	cm.top_radius = 0.03
-	cm.bottom_radius = 0.03
-	cm.height = 1.0
+	cm.top_radius = r
+	cm.bottom_radius = r
+	cm.height = length
 	cm.radial_segments = 6
-	cm.material = m
+	cm.rings = 1
+	cm.material = shaft_m
 	shaft.mesh = cm
 	shaft.rotation_degrees = Vector3(-90, 0, 0)
 	_vis.add_child(shaft)
 	var head := MeshInstance3D.new()
 	var hm := CylinderMesh.new()
 	hm.top_radius = 0.0
-	hm.bottom_radius = 0.11
-	hm.height = 0.3
-	hm.radial_segments = 6
-	hm.material = m
+	hm.bottom_radius = tip_r
+	hm.height = tip_r * 3.6
+	hm.radial_segments = 4
+	hm.rings = 1
+	hm.material = tip_m
 	head.mesh = hm
-	head.rotation_degrees = Vector3(-90, 0, 0)
-	head.position = Vector3(0, 0, -0.62)
+	head.rotation_degrees = Vector3(-90, 45, 0)
+	head.position = Vector3(0, 0, -length * 0.5 - tip_r * 1.6)
 	_vis.add_child(head)
-	for k in 2:
+	var fm := BoxMesh.new()
+	fm.size = Vector3(0.008, tip_r * 1.5, length * 0.2)
+	fm.material = fletch_m if fletch_m else tip_m
+	for k in 3:
+		var holder := Node3D.new()
+		holder.rotation_degrees = Vector3(0, 0, k * 120.0)
+		_vis.add_child(holder)
 		var f := MeshInstance3D.new()
-		var fb := BoxMesh.new()
-		fb.size = Vector3(0.22 if k == 0 else 0.02, 0.02 if k == 0 else 0.22, 0.18)
-		fb.material = m
-		f.mesh = fb
-		f.position = Vector3(0, 0, 0.42)
-		_vis.add_child(f)
-	_trail(col, fire)
+		f.mesh = fm
+		f.position = Vector3(0, tip_r * 0.75 + r, length * 0.4)
+		f.rotation_degrees = Vector3(-12, 0, 0)
+		holder.add_child(f)
+	for c in _vis.get_children():
+		if c is GeometryInstance3D:
+			(c as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
-func _build_magic() -> void:
-	var col := Color(0.35, 0.75, 1.0)
-	var core := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.5
-	sm.height = 1.0
-	sm.radial_segments = 8
-	sm.rings = 4
-	sm.material = LFX.emissive(Color(0.75, 0.92, 1.0), 6.0)
-	core.mesh = sm
-	core.scale = Vector3(0.12, 0.12, 0.7)
-	_vis.add_child(core)
-	var glow := MeshInstance3D.new()
-	var gm := SphereMesh.new()
-	gm.radius = 0.5
-	gm.height = 1.0
-	gm.radial_segments = 8
-	gm.rings = 4
-	gm.material = LFX.emissive(col, 3.0, 0.35)
-	glow.mesh = gm
-	glow.scale = Vector3(0.32, 0.32, 1.1)
-	_vis.add_child(glow)
-	_trail(col, false)
-
-
-func _trail(col: Color, fire: bool) -> void:
+## Chispas diminutas que deja la flecha (no humo).
+func _sparks(col: Color, amount: int, size: float, rise: float) -> void:
 	var p := GPUParticles3D.new()
-	p.amount = 24 if fire else 16
-	p.lifetime = 0.45
+	p.amount = amount
+	p.lifetime = 0.35
 	p.local_coords = false
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var pm := ParticleProcessMaterial.new()
-	pm.direction = Vector3(0, 1 if fire else 0, 0)
-	pm.spread = 30.0
-	pm.initial_velocity_min = 0.1
-	pm.initial_velocity_max = 0.8 if fire else 0.2
-	pm.gravity = Vector3(0, 1.5 if fire else 0.0, 0)
-	pm.scale_min = 0.15
-	pm.scale_max = 0.35 if fire else 0.25
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.06
+	pm.direction = Vector3(0, 1, 0)
+	pm.spread = 180.0
+	pm.initial_velocity_min = 0.2
+	pm.initial_velocity_max = 0.7
+	pm.gravity = Vector3(0, rise, 0)
+	pm.scale_min = 0.5
+	pm.scale_max = 1.0
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array([0.0, 1.0])
-	g.colors = PackedColorArray([Color(col.r * 2.5, col.g * 2.5, col.b * 2.5, 0.9), Color(col.r, col.g, col.b, 0)])
+	g.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0)])
 	var gt := GradientTexture1D.new()
 	gt.gradient = g
 	pm.color_ramp = gt
 	p.process_material = pm
 	var q := QuadMesh.new()
-	q.size = Vector2(1, 1)
+	q.size = Vector2(size, size)
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -170,9 +206,11 @@ func _trail(col: Color, fire: bool) -> void:
 	m.vertex_color_use_as_albedo = true
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.albedo_texture = LFX.soft_tex()
+	m.albedo_color = Color(col.r * 1.8, col.g * 1.8, col.b * 1.8, 1)
 	q.material = m
 	p.draw_pass_1 = q
-	add_child(p)
+	p.position = Vector3(0, 0, 0.3)
+	_vis.add_child(p)
 
 
 func _path_point(s: float) -> Vector3:
@@ -271,7 +309,7 @@ func _finish(_hit_player: bool) -> void:
 				if burn:
 					LFX.puff(parent, global_position, Color(3.0, 1.2, 0.3, 1), 18, 0.35, 3.0, 1.0)
 				else:
-					LFX.puff(parent, global_position, Color(0.9, 0.92, 0.95, 0.9), 14, 0.3, 2.0, -3.0)
+					LFX.puff(parent, global_position, Color(0.9, 0.92, 0.95, 0.7), 8, 0.14, 1.6, -3.0)
 			_:
 				LFX.puff(parent, global_position, Color(1.2, 2.2, 3.0, 1), 16, 0.3, 2.5, 0.0)
 	queue_free()

@@ -10,11 +10,19 @@ extends CharacterBody3D
 ## Para dañar al jefe: jefe.take_damage(cantidad)  (está en el grupo "boss").
 ##
 ## Controles: WASD mover · Shift correr · Espacio rodar · Clic izq. atacar
-##            Clic medio / Tab fijar objetivo · R beber café (curar) · Esc soltar mouse
+##            Clic medio / Tab fijar objetivo · R beber café (curar) · E interactuar
+##            (hogueras) · Esc soltar mouse
 
 signal died
 signal health_changed(hp: float, max_hp: float)
 signal status_changed(effects: Array)
+signal interact_pressed
+
+## Acumulación ("barra de afecto"): al llenarse a 100 se aplica el estado.
+const BUILDUP := {
+	"veneno": {"duration": 15.0, "decay": 5.0},
+	"ameba": {"duration": 10.0, "decay": 12.0},
+}
 
 const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
 
@@ -26,6 +34,8 @@ const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
 var hp := 100.0
 var stamina := 100.0
 var is_dead := false
+## Diálogos y finales: el jugador no se mueve ni ataca (la cámara sí gira).
+var input_locked := false
 
 var _yaw := 0.0
 var _pitch := -0.25
@@ -60,6 +70,13 @@ var _m_shock: StandardMaterial3D
 var _m_burn: StandardMaterial3D
 var _fx_shock: GPUParticles3D
 var _fx_burn: GPUParticles3D
+var _fx_poison: GPUParticles3D
+var _m_poison: StandardMaterial3D
+var _m_amoeba: StandardMaterial3D
+var _buildup := {}
+var _buildup_wait := {}
+var _poison_tick := 0.0
+var _amoeba_tick := 0.0
 
 
 func _ready() -> void:
@@ -150,6 +167,8 @@ func _build_camera() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if input_locked and not (event is InputEventMouseMotion):
+		return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			_toggle_focus()
@@ -175,15 +194,38 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toggle_focus()
 			KEY_R, KEY_F:
 				_try_heal()
+			KEY_E:
+				if not is_dead:
+					interact_pressed.emit()
 
 
-func _find_boss() -> Node3D:
+## Objetivo más cercano (jefe o enemigo) a menos de `max_dist` metros.
+func _find_boss(max_dist := 30.0) -> Node3D:
 	var best: Node3D = null
-	for b in get_tree().get_nodes_in_group("boss"):
-		if b is Node3D and b != self and is_instance_valid(b) and not b.is_queued_for_deletion():
-			if not ("state" in b and b.get("state") == 5):
-				best = b
+	var best_d := max_dist
+	for b in _targets():
+		var d := global_position.distance_to((b as Node3D).global_position)
+		if d < best_d:
+			best_d = d
+			best = b
 	return best
+
+
+func _targets() -> Array:
+	var out: Array = []
+	for g in ["boss", "enemy"]:
+		for b in get_tree().get_nodes_in_group(g):
+			if b is Node3D and b != self and not out.has(b) and not _target_dead(b):
+				out.append(b)
+	return out
+
+
+func _target_dead(b: Node) -> bool:
+	if not is_instance_valid(b) or b.is_queued_for_deletion():
+		return true
+	if "is_dead" in b and b.get("is_dead"):
+		return true
+	return b.is_in_group("boss") and "state" in b and b.get("state") == 5
 
 
 func _toggle_focus() -> void:
@@ -207,6 +249,8 @@ func _face_focus_target() -> void:
 
 
 func _input_dir() -> Vector3:
+	if input_locked:
+		return Vector3.ZERO
 	var v := Vector2.ZERO
 	if Input.is_key_pressed(KEY_W): v.y -= 1
 	if Input.is_key_pressed(KEY_S): v.y += 1
@@ -243,7 +287,7 @@ func _try_attack() -> void:
 	_attack_t = 0.55
 	_attack_hit = false
 	_use_stamina(14.0)
-	var b := _find_boss()
+	var b := _focus_target if _locked and _focus_target else _find_boss(7.0)
 	if b and global_position.distance_to(b.global_position) < 7.0:
 		var to := b.global_position - global_position
 		to.y = 0.0
@@ -315,15 +359,17 @@ func _physics_process(delta: float) -> void:
 		elif _status.has("quemadura"):
 			_m_burn.emission_energy_multiplier = 1.2 + sin(Time.get_ticks_msec() * 0.012) * 0.8
 			overlay = _m_burn
+		elif _status.has("ameba"):
+			_m_amoeba.emission_energy_multiplier = 1.0 + sin(Time.get_ticks_msec() * 0.02) * 0.9
+			overlay = _m_amoeba
+		elif _status.has("veneno"):
+			_m_poison.emission_energy_multiplier = 0.8 + sin(Time.get_ticks_msec() * 0.008) * 0.5
+			overlay = _m_poison
 		for mesh in _model_meshes:
 			mesh.material_overlay = overlay
 
-	if _locked and (
-		_focus_target == null
-		or not is_instance_valid(_focus_target)
-		or _focus_target.is_queued_for_deletion()
-		or ("state" in _focus_target and _focus_target.get("state") == 5)
-	):
+	if _locked and (_focus_target == null or _target_dead(_focus_target)
+			or global_position.distance_to(_focus_target.global_position) > 40.0):
 		_locked = false
 		_focus_target = null
 	if _locked and _focus_target:
@@ -424,15 +470,22 @@ func apply_status(effect: String, duration: float) -> void:
 		_heal_t = 0.0
 	if effect == "electrocutado":
 		add_camera_shake(0.35)
+	_update_status_fx()
+	status_changed.emit(get_status_names())
+
+
+func _update_status_fx() -> void:
 	_fx_shock.emitting = _status.has("electrocutado")
 	_fx_burn.emitting = _status.has("quemadura")
-	status_changed.emit(get_status_names())
+	_fx_poison.emitting = _status.has("veneno") or _status.has("ameba")
+	var pm := _fx_poison.draw_pass_1.surface_get_material(0) as StandardMaterial3D
+	if pm:
+		pm.albedo_color = Color(2.4, 0.6, 1.8) if _status.has("ameba") else Color(0.9, 2.6, 0.4)
 
 
 func clear_status(effect: String) -> void:
 	if _status.erase(effect):
-		_fx_shock.emitting = _status.has("electrocutado")
-		_fx_burn.emitting = _status.has("quemadura")
+		_update_status_fx()
 		_visual.rotation_degrees.z = 0.0
 		status_changed.emit(get_status_names())
 
@@ -455,8 +508,25 @@ func _stunned() -> bool:
 
 
 func _update_statuses(delta: float) -> void:
+	for k in _buildup.keys():
+		_buildup_wait[k] = float(_buildup_wait.get(k, 0.0)) - delta
+		if float(_buildup_wait[k]) <= 0.0:
+			_buildup[k] = float(_buildup[k]) - float(BUILDUP[k]["decay"]) * delta
+			if float(_buildup[k]) <= 0.0:
+				_buildup.erase(k)
 	if _status.is_empty():
 		return
+	if _status.has("veneno") and not is_dead:
+		_poison_tick -= delta
+		if _poison_tick <= 0.0:
+			_poison_tick = 0.6
+			_status_damage(1.0)
+	if _status.has("ameba") and not is_dead:
+		_amoeba_tick -= delta
+		if _amoeba_tick <= 0.0:
+			_amoeba_tick = 0.3
+			_status_damage(3.0)
+			_trauma = maxf(_trauma, 0.2)
 	for k in _status.keys():
 		_status[k] = float(_status[k]) - delta
 		if float(_status[k]) <= 0.0:
@@ -467,10 +537,69 @@ func _update_statuses(delta: float) -> void:
 		_burn_tick -= delta
 		if _burn_tick <= 0.0:
 			_burn_tick = 0.5
-			hp = maxf(0.0, hp - 1.0)
-			health_changed.emit(hp, max_hp)
-			if hp <= 0.0:
-				_die()
+			_status_damage(1.0)
+
+
+func _status_damage(amount: float) -> void:
+	if is_dead:
+		return
+	hp = maxf(0.0, hp - amount)
+	health_changed.emit(hp, max_hp)
+	if hp <= 0.0:
+		_die()
+
+
+## Suma a la barra de acumulación de un estado ("veneno", "ameba"). Al llegar
+## a 100 se aplica el estado y la barra se vacía.
+func add_buildup(effect: String, amount: float) -> void:
+	if is_dead or not BUILDUP.has(effect):
+		return
+	_buildup_wait[effect] = 1.5
+	var v := float(_buildup.get(effect, 0.0)) + amount
+	if v >= 100.0:
+		_buildup.erase(effect)
+		apply_status(effect, float(BUILDUP[effect]["duration"]))
+		add_camera_shake(0.3)
+	else:
+		_buildup[effect] = v
+
+
+## Barras para el HUD: efecto -> {"value": 0..1, "active": segundos restantes o 0}.
+func get_buildups() -> Dictionary:
+	var out := {}
+	for k in BUILDUP.keys():
+		var active := float(_status.get(k, 0.0))
+		var v := float(_buildup.get(k, 0.0)) / 100.0
+		if active > 0.0 or v > 0.0:
+			out[k] = {"value": 1.0 if active > 0.0 else v, "active": active}
+	return out
+
+
+func clear_buildups() -> void:
+	_buildup.clear()
+	_buildup_wait.clear()
+
+
+## Hoguera: vida completa, cafés recargados y sin estados alterados.
+func rest() -> void:
+	if is_dead:
+		return
+	clear_statuses()
+	clear_buildups()
+	hp = max_hp
+	stamina = max_stamina
+	flasks = _max_flasks
+	health_changed.emit(hp, max_hp)
+
+
+## Taza de café recogida: una taza más en el inventario (y llena).
+func add_flask_capacity(n: int = 1) -> void:
+	_max_flasks += n
+	flasks = mini(flasks + n, _max_flasks)
+
+
+func get_max_flasks() -> int:
+	return _max_flasks
 
 
 func _build_status_fx() -> void:
@@ -484,8 +613,19 @@ func _build_status_fx() -> void:
 	_m_burn.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_m_burn.emission_enabled = true
 	_m_burn.emission = Color(1.0, 0.4, 0.08)
+	_m_poison = StandardMaterial3D.new()
+	_m_poison.albedo_color = Color(0.4, 0.9, 0.2, 0.3)
+	_m_poison.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_m_poison.emission_enabled = true
+	_m_poison.emission = Color(0.35, 0.85, 0.1)
+	_m_amoeba = StandardMaterial3D.new()
+	_m_amoeba.albedo_color = Color(0.95, 0.4, 0.7, 0.32)
+	_m_amoeba.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_m_amoeba.emission_enabled = true
+	_m_amoeba.emission = Color(0.95, 0.3, 0.65)
 	_fx_shock = _status_particles(Color(0.55, 0.85, 1.0), 40, 0.25, 0.05, 2.5)
 	_fx_burn = _status_particles(Color(1.0, 0.45, 0.1), 28, 0.6, 0.18, 1.2)
+	_fx_poison = _status_particles(Color(0.3, 0.85, 0.15), 22, 0.9, 0.09, 0.8)
 
 
 func _status_particles(col: Color, amount: int, life: float, size: float, up: float) -> GPUParticles3D:
@@ -523,6 +663,7 @@ func _status_particles(col: Color, amount: int, life: float, size: float, up: fl
 ## Revive al jugador (reintento tras morir contra un jefe).
 func revive(pos: Vector3, yaw: float = 0.0) -> void:
 	clear_statuses()
+	clear_buildups()
 	is_dead = false
 	hp = max_hp
 	stamina = max_stamina
@@ -543,11 +684,13 @@ func revive(pos: Vector3, yaw: float = 0.0) -> void:
 
 
 func _deal_damage() -> void:
-	for b in get_tree().get_nodes_in_group("boss"):
-		if not (b is Node3D) or not b.has_method("take_damage"):
+	for b in _targets():
+		if not b.has_method("take_damage"):
 			continue
 		var to: Vector3 = b.global_position - global_position
 		to.y = 0.0
-		if to.length() < 3.4 and _face_dir.dot(to.normalized()) > 0.3:
+		# Jefes: alcance fijo; enemigos: según su tamaño (hit_radius)
+		var reach := 3.4 if b.is_in_group("boss") else 2.3 + float(b.get("hit_radius") if "hit_radius" in b else 0.5)
+		if to.length() < reach and _face_dir.dot(to.normalized()) > 0.3:
 			b.take_damage(attack_damage, global_position)
 			add_camera_shake(0.12)

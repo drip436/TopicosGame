@@ -115,6 +115,9 @@ func _physics_process(_delta: float) -> void:
 		hud.set_player(player.hp, player.max_hp, player.stamina, player.max_stamina, player.flasks)
 		if player.has_method("get_status_names"):
 			hud.set_status(player.get_status_names())
+		if player.has_method("get_buildups") and hud.has_method("set_buildups"):
+			hud.set_buildups(player.get_buildups())
+			hud.set_flask_max(player.get_max_flasks())
 	if _state == "waiting" and player and is_instance_valid(player):
 		var l := player.global_position - _center
 		if absf(l.x) < 27.0 and l.z > -20.0 and l.z < 18.5:

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://mundo/bonfire.gd" id="1_bonfire"]
+
+[node name="Hoguera" type="Node3D"]
+script = ExtResource("1_bonfire")
