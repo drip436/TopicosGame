@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://boss_final/boss_rector.gd" id="1_boss"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rector"]
+radius = 0.5
+height = 2.3
+
+[node name="BossRector" type="CharacterBody3D" groups=["boss", "enemy"]]
+script = ExtResource("1_boss")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 1.15, 0)
+shape = SubResource("CapsuleShape3D_rector")

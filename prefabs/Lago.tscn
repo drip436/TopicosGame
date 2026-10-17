@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/campus_prefab.gd" id="1_pf"]
+
+[node name="Lago" type="Node3D"]
+script = ExtResource("1_pf")
+kind = 8
+title = "Malecón del Lago"

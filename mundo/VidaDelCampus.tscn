@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://mundo/world_life.gd" id="1_life"]
+
+[node name="VidaDelCampus" type="Node3D"]
+script = ExtResource("1_life")

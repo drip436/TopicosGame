@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://mundo/coffee_cup.gd" id="1_cup"]
+
+[node name="TazaDeCafe" type="Node3D"]
+script = ExtResource("1_cup")
