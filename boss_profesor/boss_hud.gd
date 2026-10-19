@@ -1,7 +1,10 @@
 extends CanvasLayer
 ## Interfaz estilo Dark Souls: barra del jefe abajo al centro con nombre y daño acumulado,
 ## barras de vida/estamina del jugador arriba a la izquierda y letreros
-## ("ENEMIGO DERROTADO", "HAS MUERTO").
+## ("ENEMIGO DERROTADO", "HAS MUERTO"). Abajo a la izquierda, la cruz de equipo
+## (armas, hechizo/IA, cafés y bebidas energéticas; ver equip_slots.gd).
+
+const EQUIP := preload("equip_slots.gd")
 
 var _font: SystemFont
 var _root: Control
@@ -33,6 +36,14 @@ var _hp_fill: ColorRect
 var _st_bg: ColorRect
 var _st_fill: ColorRect
 var _flask: Label
+var _equip: Control
+# Maná (clase Frontend) y habilidad de la clase
+var _mana_bg: ColorRect
+var _mana_fill: ColorRect
+var _ability: Label
+var _mana := 0.0
+var _mana_max := 0.0
+var _drinks := 0
 var _status_lbl: Label
 var _p_hp := 1.0
 var _p_trail := 1.0
@@ -47,6 +58,8 @@ var _sub_label: Label
 var _hint: Label
 var _hurt: ColorRect
 var _prompt: Label
+var _menu_bg: ColorRect
+var _menu: Label
 var _keys_lbl: Label
 var _toast: Label
 var _toast_t := 0.0
@@ -102,7 +115,16 @@ func _ready() -> void:
 	_st_bg = _rect(_p_box, Color(0.05, 0.04, 0.04, 0.85))
 	_st_fill = _rect(_p_box, Color(0.18, 0.5, 0.2))
 	_flask = _label(_p_box, "", 20, Color(0.95, 0.75, 0.35))
+	_mana_bg = _rect(_p_box, Color(0.05, 0.04, 0.06, 0.85))
+	_mana_fill = _rect(_p_box, Color(0.2, 0.45, 1.0))
+	_ability = _label(_p_box, "", 16, Color(0.75, 0.85, 1.0))
+	# Cafés, bebidas y habilidad se ven en la cruz de equipo
+	_flask.visible = false
+	_ability.visible = false
 	_status_lbl = _label(_p_box, "", 18, Color(0.95, 0.95, 0.95))
+	_menu_bg = _rect(_root, Color(0.02, 0.02, 0.03, 0.8))
+	_menu_bg.visible = false
+	_menu = _label(_root, "", 19, Color(0.92, 0.9, 0.85))
 	_keys_lbl = _label(_root, "", 18, Color(0.95, 0.8, 0.45))
 	_keys_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
@@ -130,6 +152,11 @@ func _ready() -> void:
 	_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_sub_label = _label(_banner, "", 22, Color(0.8, 0.8, 0.8))
 	_sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_equip = EQUIP.new()
+	_equip.font = _font
+	_equip.visible = false
+	_root.add_child(_equip)
 
 	_hint = _label(_root, "", 15, Color(0.85, 0.85, 0.85, 0.8))
 	_hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -201,6 +228,7 @@ func boss_damaged(amount: float) -> void:
 
 func set_player(hp: float, hp_max: float, st: float, st_max: float, flasks: int) -> void:
 	_p_box.visible = true
+	_equip.visible = true
 	var r := clampf(hp / maxf(hp_max, 1.0), 0.0, 1.0)
 	if r < _p_hp:
 		_hurt.color.a = 0.35
@@ -210,6 +238,20 @@ func set_player(hp: float, hp_max: float, st: float, st_max: float, flasks: int)
 	_flask.text = "Café  x%d" % flasks
 	if _flask_max > 0:
 		_flask.text = "Café  %d / %d" % [flasks, _flask_max]
+	if _mana_max > 0.0:
+		_flask.text += "   ·   Energéticas  x%d" % _drinks
+
+
+## Barra de maná (azul, bajo la vida). maximum 0 = la clase no usa maná.
+func set_mana(current: float, maximum: float, drinks: int) -> void:
+	_mana = current
+	_mana_max = maximum
+	_drinks = drinks
+
+
+## Texto de la habilidad de la clase (hechizo actual, IA invocada...).
+func set_ability(text: String) -> void:
+	_ability.text = text
 
 
 var _flask_max := 0
@@ -233,6 +275,12 @@ func set_buildups(data: Dictionary) -> void:
 		var vis := data.has(k)
 		for n in _bu[k].values():
 			(n as CanvasItem).visible = vis
+
+
+## Menú de texto (armaduras en la hoguera). Texto vacío lo oculta.
+func show_menu(text: String) -> void:
+	_menu.text = text
+	_menu_bg.visible = text != ""
 
 
 ## Piezas de la llave del Aula Magna (arriba a la derecha).
@@ -345,20 +393,34 @@ func _process(delta: float) -> void:
 	_hp_trail.size = Vector2(pw * _p_trail, 10)
 	_hp_fill.position = Vector2(40, 40)
 	_hp_fill.size = Vector2(pw * _p_hp, 10)
-	_st_bg.position = Vector2(38, 58)
+	var off := 0.0
+	var has_mana := _mana_max > 0.0
+	_mana_bg.visible = has_mana
+	_mana_fill.visible = has_mana
+	if has_mana:
+		_mana_bg.position = Vector2(38, 56)
+		_mana_bg.size = Vector2(pw * 0.9 + 4, 12)
+		_mana_fill.position = Vector2(40, 58)
+		_mana_fill.size = Vector2(pw * 0.9 * clampf(_mana / _mana_max, 0.0, 1.0), 8)
+		off = 16.0
+	_st_bg.position = Vector2(38, 58 + off)
 	_st_bg.size = Vector2(pw * 0.8 + 4, 10)
-	_st_fill.position = Vector2(40, 60)
+	_st_fill.position = Vector2(40, 60 + off)
 	_st_fill.size = Vector2(pw * 0.8 * _p_st, 6)
-	_flask.position = Vector2(40, 74)
-	_flask.size = Vector2(200, 30)
-	_status_lbl.position = Vector2(40, 100)
+	_flask.position = Vector2(40, 74 + off)
+	_flask.size = Vector2(520, 30)
+	_ability.position = Vector2(40, 100 + off)
+	_ability.size = Vector2(620, 24)
+	if _ability.visible and _ability.text != "":
+		off += 22.0
+	_status_lbl.position = Vector2(40, 100 + off)
 	_status_lbl.size = Vector2(420, 26)
 	var row := 0
 	for k in BUILDUP_STYLE.keys():
 		if not _bu.has(k) or not _bu_data.has(k):
 			continue
 		var d: Dictionary = _bu_data[k]
-		var y := 132.0 + row * 34.0
+		var y := 132.0 + off + row * 34.0
 		var bw2 := 200.0
 		var b: Dictionary = _bu[k]
 		(b["label"] as Label).position = Vector2(40, y - 4)
@@ -372,6 +434,10 @@ func _process(delta: float) -> void:
 		var blink := 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.012) if active > 0.0 else 1.0
 		(b["fill"] as ColorRect).modulate.a = blink
 		row += 1
+	_menu.position = Vector2(vs.x - 500, vs.y * 0.32)
+	_menu.size = Vector2(460, 300)
+	_menu_bg.position = _menu.position - Vector2(16, 12)
+	_menu_bg.size = Vector2(480, _menu.get_line_count() * 28 + 24)
 	_keys_lbl.position = Vector2(vs.x - 440, 34)
 	_keys_lbl.size = Vector2(400, 26)
 	_prompt.position = Vector2(0, vs.y - 190)
@@ -389,5 +455,10 @@ func _process(delta: float) -> void:
 	_banner_label.size = Vector2(vs.x, 100)
 	_sub_label.position = Vector2(0, vs.y * 0.5 + 38)
 	_sub_label.size = Vector2(vs.x, 30)
-	_hint.position = Vector2(20, vs.y - 150)
+	# Cruz de equipo abajo a la izquierda (sin tapar la barra del jefe)
+	var es := clampf(vs.y / 720.0, 0.85, 1.6)
+	es = minf(es, (vs.x * 0.19 - 34.0) / EQUIP.BASE_SIZE.x)
+	_equip.scale = Vector2.ONE * es
+	_equip.position = Vector2(28, vs.y - 18.0 - EQUIP.BASE_SIZE.y * es)
+	_hint.position = Vector2(20, _equip.position.y - 36.0 - 130.0)
 	_hint.size = Vector2(600, 130)

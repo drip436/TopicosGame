@@ -8,23 +8,23 @@ extends Control
 var classes_data = {
 	"frontend": {
 		"title": "Frontend Developer",
-		"desc": "Especialista en control de masas y velocidad. Ataca a distancia manipulando el entorno visual y aplicando cegueras/alucinaciones a los enemigos."
+		"desc": "Mago. Lanza hechizos a distancia escribiendo código: bolas de fuego, rayos del cielo, lluvia de flechas, flechas que siguen funciones matemáticas, nova de área y frascos de veneno. Usa maná (barra azul) que recarga con bebidas energéticas. Armas: bastón tecnológico y estoque."
 	},
 	"backend": {
 		"title": "Backend Developer",
-		"desc": "Tanque de alta resistencia y fuerza bruta. Soporta grandes cantidades de daño, genera escudos de datos y ejecuta ataques pesados de área."
+		"desc": "Tanque. Armadura pesada que reduce el daño y un mazo con golpe sísmico de área. A cambio es lento y rodar para esquivar le cuesta mucha estamina."
 	},
 	"ai": {
 		"title": "AI Dev",
-		"desc": "Invocador y táctico. Despliega drones autónomos y centinelas inteligentes que atacan solos mientras predice y esquiva los patrones del enemigo."
+		"desc": "Invocador. Pelea con IAs al estilo de los stands: ChatGPT (gigante de fuerza bruta), Gemini (arquero) y Claude (espadachín). Q cambia de IA; clic derecho usa su ataque especial."
 	},
 	"data": {
 		"title": "Data Scientist",
-		"desc": "Atacante de precisión y puntos débiles. Analiza las estadísticas de los rivales en tiempo real para asestar golpes críticos devastadores."
+		"desc": "Arquero. Flechas infinitas a distancia y una lanza para el cuerpo a cuerpo. Armadura básica pero es la clase más rápida."
 	},
 	"cyber": {
 		"title": "Cybersecurity Engineer",
-		"desc": "Especialista en contraataque y debuffs. Cifra a los enemigos para inmovilizarlos, devuelve el daño recibido y anula sus habilidades."
+		"desc": "Caballero. Espada y escudo con armadura básica: mantén clic derecho para cubrirte y bloquear los golpes de frente."
 	}
 }
 
@@ -61,6 +61,7 @@ func _on_btn_cibersegurity_pressed() -> void:
 
 func _on_confirm_button_pressed() -> void:
 	print("¡Build confirmada! Clase elegida: ", current_selected_class)
+	preload("res://jugador/player_classes.gd").selected = current_selected_class
 	# Aquí puedes poner la lógica para cambiar de escena al juego real:
 	get_tree().change_scene_to_file("res://Scenes/main.tscn")
 

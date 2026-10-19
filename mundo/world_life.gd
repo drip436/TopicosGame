@@ -16,6 +16,16 @@ const ENEMY := preload("enemy.gd")
 const BONFIRE := preload("bonfire.gd")
 const CUP := preload("coffee_cup.gd")
 const KEY := preload("key_piece.gd")
+const PCLASSES := preload("res://jugador/player_classes.gd")
+const M := preload("enemy_models.gd")
+
+## Armaduras de resistencia: dónde están (cerca de qué hoguera, por título).
+const ARMOR_SPOTS := {
+	"aislante": "Hoguera de la Plaza",
+	"ignifuga": "Hoguera de la Biblioteca",
+	"anclaje": "Hoguera del Centro de Cómputo",
+	"antiveneno": "Hoguera de la Fuente de las Ciencias",
+}
 
 ## Piezas de la llave que suelta cada jefe: nodo de la pelea -> [id, nombre, color].
 const KEY_DROPS := {
@@ -118,6 +128,10 @@ var _water_fx_t := 0.0
 var _amoeba_warned := false
 var _excl_rects: Array = []
 var _pieces: Array = []
+var _armor_nodes: Array = []
+var armors_found: Array = []
+var _menu_open := false
+var _menu_bonfire: Node3D
 var _enemy_root: Node3D
 
 
@@ -158,6 +172,7 @@ func _setup() -> void:
 	_make_bonfires()
 	_make_cups()
 	_connect_key_drops()
+	_make_armors()
 	if enemies_enabled:
 		_make_enemy_records()
 	_ready_done = true
@@ -412,6 +427,119 @@ func _sample(c: Vector3, radius: float, clearance: float, sec: String, placed: A
 	return Vector3.INF
 
 
+## Armaduras de resistencia en maniquíes junto a algunas hogueras.
+func _make_armors() -> void:
+	for id in ARMOR_SPOTS.keys():
+		var near: Node3D = null
+		for b in bonfires:
+			if is_instance_valid(b) and String(b.title) == ARMOR_SPOTS[id]:
+				near = b
+		if near == null:
+			continue
+		var g := Vector3.INF
+		for k in 8:
+			var a := TAU * k / 8.0 + 0.6
+			g = _free_near(near.global_position + Vector3(cos(a), 0, sin(a)) * 4.0, 3.0, 0.6)
+			if g != Vector3.INF:
+				break
+		if g == Vector3.INF:
+			continue
+		var info: Dictionary = PCLASSES.RESIST_ARMORS[id]
+		var n := Node3D.new()
+		n.name = "Armadura_" + id
+		n.set_meta("armor_id", id)
+		n.position = g
+		add_child(n)
+		var d := {"meshes": [], "J": {}, "eyes": []}
+		var wood := M.mat(Color(0.3, 0.2, 0.12), 0.8)
+		var col: Color = info["color"]
+		var plate := M.mat(col.darkened(0.25), 0.35, 0.7, col, 0.5)
+		M.cyl(d, n, 0.04, 1.3, Vector3(0, 0.65, 0), wood)
+		M.cyl(d, n, 0.3, 0.05, Vector3(0, 0.03, 0), wood)
+		M.box(d, n, Vector3(0.5, 0.5, 0.32), Vector3(0, 1.25, 0), plate)
+		for sx: float in [-1.0, 1.0]:
+			M.sph(d, n, Vector3(0.24, 0.16, 0.26), Vector3(sx * 0.3, 1.47, 0), plate)
+		M.sph(d, n, Vector3(0.28, 0.32, 0.3), Vector3(0, 1.72, 0), plate)
+		var l := OmniLight3D.new()
+		l.light_color = col
+		l.light_energy = 1.2
+		l.omni_range = 4.0
+		l.position = Vector3(0, 1.5, 0)
+		n.add_child(l)
+		var beam := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.03
+		cm.bottom_radius = 0.35
+		cm.height = 5.0
+		cm.material = LFX.emissive(col, 0.7, 0.1)
+		beam.mesh = cm
+		beam.position = Vector3(0, 2.5, 0)
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		n.add_child(beam)
+		_armor_nodes.append(n)
+
+
+func _update_armors() -> void:
+	for n in _armor_nodes:
+		if not is_instance_valid(n):
+			continue
+		var d := Vector2(n.global_position.x - player.global_position.x, n.global_position.z - player.global_position.z).length()
+		if d < 1.8:
+			var id: String = n.get_meta("armor_id")
+			armors_found.append(id)
+			var info: Dictionary = PCLASSES.RESIST_ARMORS[id]
+			LFX.puff(self, n.global_position + Vector3(0, 1.3, 0), Color(info["color"].r * 2.5, info["color"].g * 2.5, info["color"].b * 2.5, 1), 40, 0.2, 4.0, -2.0)
+			n.queue_free()
+			if hud:
+				hud.show_banner(String(info["name"]).to_upper(), info["color"], "%s\nEquípala descansando en una hoguera." % info["desc"], 3.5)
+	if _menu_open and (_menu_bonfire == null or not is_instance_valid(_menu_bonfire) or _menu_bonfire.global_position.distance_to(player.global_position) > 3.5 or player.is_dead):
+		_close_menu()
+
+
+func _open_menu(b: Node3D) -> void:
+	if armors_found.is_empty() or hud == null or not hud.has_method("show_menu"):
+		return
+	_menu_open = true
+	_menu_bonfire = b
+	_refresh_menu()
+
+
+func _refresh_menu() -> void:
+	var cur: String = player.kit.resist_id if "kit" in player and player.kit else ""
+	var lines := ["ARMADURA DE RESISTENCIA  (teclas)", ""]
+	lines.append("[0]  Ninguna" + ("   ◀" if cur == "" else ""))
+	var i := 1
+	for id in PCLASSES.RESIST_ARMORS.keys():
+		var info: Dictionary = PCLASSES.RESIST_ARMORS[id]
+		if armors_found.has(id):
+			lines.append("[%d]  %s%s" % [i, info["name"], "   ◀" if cur == id else ""])
+		else:
+			lines.append("[%d]  ???" % i)
+		i += 1
+	lines.append("")
+	lines.append("Aléjate para cerrar")
+	hud.show_menu("\n".join(lines))
+
+
+func _close_menu() -> void:
+	_menu_open = false
+	if hud and hud.has_method("show_menu"):
+		hud.show_menu("")
+
+
+func _equip_from_key(n: int) -> void:
+	if not ("kit" in player) or player.kit == null:
+		return
+	if n == 0:
+		player.kit.set_resist_armor("")
+	else:
+		var ids := PCLASSES.RESIST_ARMORS.keys()
+		if n - 1 < ids.size() and armors_found.has(ids[n - 1]):
+			player.kit.set_resist_armor(ids[n - 1])
+			LFX.puff(self, player.global_position + Vector3(0, 1.2, 0), Color(2.0, 2.0, 2.0, 1), 20, 0.15, 2.0, 0.0)
+	_refresh_menu()
+
+
 ## Cada jefe suelta una pieza de la llave donde cae.
 func _connect_key_drops() -> void:
 	var scene := get_tree().current_scene
@@ -498,6 +626,7 @@ func _physics_process(delta: float) -> void:
 	_update_lake(delta)
 	_update_pickups()
 	_update_key_pieces()
+	_update_armors()
 	_update_prompt()
 	_tick -= delta
 	if _tick > 0.0:
@@ -580,6 +709,7 @@ func _on_interact() -> void:
 	checkpoint = b
 	if player.has_method("rest"):
 		player.rest()
+	_open_menu(b)
 	respawn_enemies()
 	if hud and hud.has_method("toast"):
 		if first:
@@ -682,6 +812,12 @@ func _on_player_died() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _menu_open and event is InputEventKey and event.pressed and not event.echo:
+		var k: int = event.keycode
+		if k >= KEY_0 and k <= KEY_4:
+			_equip_from_key(k - KEY_0)
+			get_viewport().set_input_as_handled()
+			return
 	if _dead and _respawn_ok and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
 		_respawn()
 

@@ -12,6 +12,8 @@ extends CharacterBody3D
 ## Controles: WASD mover · Shift correr · Espacio rodar · Clic izq. atacar
 ##            Clic medio / Tab fijar objetivo · R beber café (curar) · E interactuar
 ##            (hogueras) · Esc soltar mouse
+## Clases (jugador/player_classes.gd + jugador/class_kit.gd): Clic der. habilidad
+## de la clase · Q cambiar hechizo / IA · G bebida energética (maná, solo Frontend).
 
 signal died
 signal health_changed(hp: float, max_hp: float)
@@ -25,6 +27,9 @@ const BUILDUP := {
 }
 
 const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
+const CLASSES := preload("res://jugador/player_classes.gd")
+const KIT := preload("res://jugador/class_kit.gd")
+
 
 @export var max_hp := 100.0
 @export var max_stamina := 100.0
@@ -66,17 +71,21 @@ var _m_body: StandardMaterial3D
 var _status := {}
 var _burn_tick := 0.0
 var _max_flasks := 4
-var _m_shock: StandardMaterial3D
-var _m_burn: StandardMaterial3D
 var _fx_shock: GPUParticles3D
 var _fx_burn: GPUParticles3D
 var _fx_poison: GPUParticles3D
-var _m_poison: StandardMaterial3D
-var _m_amoeba: StandardMaterial3D
 var _buildup := {}
 var _buildup_wait := {}
 var _poison_tick := 0.0
 var _amoeba_tick := 0.0
+
+# Clase
+var class_id := "cyber"
+var kit: KIT
+var _cfg: Dictionary
+var _cast_t := 0.0
+var _atk := {}
+var _rim := {}
 
 
 func _ready() -> void:
@@ -93,7 +102,14 @@ func _ready() -> void:
 		cs.position = Vector3(0, 0.9, 0)
 		add_child(cs)
 	_max_flasks = flasks
+	class_id = CLASSES.current()
+	_cfg = CLASSES.data(class_id)
+	max_hp = _cfg["hp"]
+	hp = max_hp
 	_build_visual()
+	kit = KIT.new()
+	add_child(kit)
+	kit.setup(self, class_id)
 	_build_status_fx()
 	_build_camera()
 	_yaw = rotation.y
@@ -169,6 +185,9 @@ func _build_camera() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if input_locked and not (event is InputEventMouseMotion):
 		return
+	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		kit.secondary_released()
+		return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			_toggle_focus()
@@ -180,6 +199,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			_try_attack()
+		elif event.button_index == MOUSE_BUTTON_RIGHT and not is_dead:
+			kit.secondary_pressed()
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if not _locked:
 			_yaw -= event.relative.x * 0.003
@@ -197,6 +218,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E:
 				if not is_dead:
 					interact_pressed.emit()
+			KEY_Q:
+				if not is_dead:
+					kit.cycle()
+			KEY_G:
+				kit.drink()
 
 
 ## Objetivo más cercano (jefe o enemigo) a menos de `max_dist` metros.
@@ -265,28 +291,33 @@ func _input_dir() -> Vector3:
 
 
 func _busy() -> bool:
-	return _roll_t > 0.0 or _attack_t > 0.0 or _heal_t > 0.0 or _stagger_t > 0.0 or is_dead or _stunned()
+	return _roll_t > 0.0 or _attack_t > 0.0 or _cast_t > 0.0 or _stagger_t > 0.0 or is_dead or _stunned()
 
 
 func _try_roll() -> void:
-	if is_dead or _roll_t > 0.0 or _stagger_t > 0.0 or stamina < 18.0 or _stunned():
+	var cost: float = _cfg["roll_cost"]
+	if is_dead or _roll_t > 0.0 or _stagger_t > 0.0 or stamina < cost * 0.9 or _stunned():
 		return
 	_attack_t = 0.0
-	_heal_t = 0.0
+	_cast_t = 0.0
 	var d := _input_dir()
 	_roll_dir = d if d != Vector3.ZERO else -_face_dir
 	_face_dir = _roll_dir
-	_roll_t = 0.6
-	_iframes = 0.42
-	_use_stamina(20.0)
+	_roll_t = _cfg["roll_time"]
+	_iframes = _cfg["roll_iframes"]
+	_use_stamina(cost)
 
 
 func _try_attack() -> void:
-	if _busy() or stamina < 10.0:
+	if _busy() or stamina < 8.0 or kit.is_blocking():
 		return
-	_attack_t = 0.55
-	_attack_hit = false
-	_use_stamina(14.0)
+	var atk: Dictionary = kit.primary()
+	if atk.is_empty() or float(atk.get("dur", 0.0)) <= 0.0:
+		return
+	_atk = atk
+	_attack_t = atk["dur"]
+	_attack_hit = atk.get("no_hit", false)
+	_use_stamina(atk.get("stamina", 12.0))
 	var b := _focus_target if _locked and _focus_target else _find_boss(7.0)
 	if b and global_position.distance_to(b.global_position) < 7.0:
 		var to := b.global_position - global_position
@@ -311,6 +342,9 @@ func _use_stamina(a: float) -> void:
 func take_damage(amount: float, from: Variant = null) -> void:
 	if is_dead or _iframes > 0.0:
 		return
+	amount *= kit.damage_mult(from)
+	if _status.has("atrapado"):
+		amount *= kit.resist("atrapado", "grab")
 	hp = maxf(0.0, hp - amount)
 	health_changed.emit(hp, max_hp)
 	_m_body.emission_energy_multiplier = 2.0
@@ -318,8 +352,8 @@ func take_damage(amount: float, from: Variant = null) -> void:
 		mesh.material_overlay = _m_body
 	add_camera_shake(0.45)
 	_attack_t = 0.0
-	_heal_t = 0.0
-	_stagger_t = 0.35
+	_cast_t = 0.0
+	_stagger_t = 0.35 if not kit.is_blocking() else 0.15
 	_iframes = 0.5
 	if from is Vector3:
 		var away: Vector3 = global_position - from
@@ -351,20 +385,21 @@ func _physics_process(delta: float) -> void:
 		stamina = minf(max_stamina, stamina + 38.0 * delta)
 	_m_body.emission_energy_multiplier = maxf(0.0, _m_body.emission_energy_multiplier - delta * 6.0)
 	_update_statuses(delta)
+	kit.process(delta)
 	if _m_body.emission_energy_multiplier == 0.0:
+		# Solo un contorno de color: el jugador se sigue viendo
 		var overlay: Material = null
-		if _status.has("electrocutado"):
-			_m_shock.emission_energy_multiplier = randf_range(0.5, 4.0)
-			overlay = _m_shock
-		elif _status.has("quemadura"):
-			_m_burn.emission_energy_multiplier = 1.2 + sin(Time.get_ticks_msec() * 0.012) * 0.8
-			overlay = _m_burn
-		elif _status.has("ameba"):
-			_m_amoeba.emission_energy_multiplier = 1.0 + sin(Time.get_ticks_msec() * 0.02) * 0.9
-			overlay = _m_amoeba
-		elif _status.has("veneno"):
-			_m_poison.emission_energy_multiplier = 0.8 + sin(Time.get_ticks_msec() * 0.008) * 0.5
-			overlay = _m_poison
+		var tms := Time.get_ticks_msec()
+		for eff in ["electrocutado", "quemadura", "ameba", "veneno", "atrapado"]:
+			if _status.has(eff):
+				overlay = _rim[eff]
+				# Tinte tenue que late: el jugador se sigue viendo debajo
+				var a := 0.16 + 0.08 * sin(tms * 0.008)
+				if eff == "electrocutado":
+					a = randf_range(0.08, 0.3)
+				(overlay as StandardMaterial3D).albedo_color.a = a
+				break
+		# Solo sobre el cuerpo (en las piezas de armadura cuadradas el contorno se ve como bloque)
 		for mesh in _model_meshes:
 			mesh.material_overlay = overlay
 
@@ -388,8 +423,9 @@ func _physics_process(delta: float) -> void:
 		pass
 	elif _roll_t > 0.0:
 		_roll_t -= delta
-		vel = _roll_dir * (10.5 if _roll_t > 0.15 else 3.0)
-		_visual.rotation_degrees.x = -(1.0 - _roll_t / 0.6) * 360.0
+		var rt: float = _cfg["roll_time"]
+		vel = _roll_dir * (float(_cfg["roll_speed"]) if _roll_t > 0.15 else 3.0)
+		_visual.rotation_degrees.x = -(1.0 - _roll_t / rt) * 360.0
 	elif _stagger_t > 0.0:
 		pass
 	elif _stunned():
@@ -400,27 +436,29 @@ func _physics_process(delta: float) -> void:
 		_visual.rotation_degrees.z = 0.0
 		_visual.rotation_degrees.x = 0.0
 		var d := _input_dir()
-		var speed := 5.2
-		if _heal_t > 0.0:
-			speed = 1.5
-			_heal_t -= delta
-			if _heal_t <= 0.0:
-				hp = minf(max_hp, hp + 45.0)
-				health_changed.emit(hp, max_hp)
+		var speed: float = _cfg["walk"]
+		if _cast_t > 0.0:
+			speed = 2.0
+			_cast_t -= delta
+		if kit.is_blocking():
+			speed = 2.2
 		if _attack_t > 0.0:
 			speed = 0.0
 			_attack_t -= delta
-			var k := 1.0 - _attack_t / 0.55
-			_sword_pivot.rotation_degrees = Vector3(lerpf(110.0, -70.0, clampf((k - 0.15) * 3.0, 0, 1)), 0, 0)
-			if k < 0.35:
-				vel = _face_dir * 3.0
-			if not _attack_hit and k > 0.35:
+			var dur: float = _atk.get("dur", 0.55)
+			var k := 1.0 - _attack_t / dur
+			var hit_k: float = _atk.get("hit_k", 0.35)
+			if not _atk.get("no_hit", false):
+				kit.animate_attack(k)
+				if k < hit_k:
+					vel = _face_dir * 3.0
+			if not _attack_hit and k > hit_k:
 				_attack_hit = true
 				_deal_damage()
 		else:
-			_sword_pivot.rotation_degrees = _sword_pivot.rotation_degrees.lerp(Vector3.ZERO, 1.0 - exp(-10.0 * delta))
-		if Input.is_key_pressed(KEY_SHIFT) and d != Vector3.ZERO and stamina > 1.0 and speed > 2.0:
-			speed = 8.0
+			kit.rest_pose(delta)
+		if Input.is_key_pressed(KEY_SHIFT) and d != Vector3.ZERO and stamina > 1.0 and speed > 2.5:
+			speed = _cfg["run"]
 			stamina = maxf(0.0, stamina - 18.0 * delta)
 			_st_delay = 0.3
 		vel += d * speed
@@ -463,6 +501,10 @@ func _physics_process(delta: float) -> void:
 func apply_status(effect: String, duration: float) -> void:
 	if is_dead:
 		return
+	# Armadura de resistencia
+	if effect == "electrocutado" and kit.resist_id == "aislante" and randf() < 0.5:
+		return
+	duration *= kit.resist(effect, "dur")
 	_status[effect] = maxf(duration, float(_status.get(effect, 0.0)))
 	if effect == "electrocutado" or effect == "atrapado":
 		_roll_t = 0.0
@@ -520,12 +562,12 @@ func _update_statuses(delta: float) -> void:
 		_poison_tick -= delta
 		if _poison_tick <= 0.0:
 			_poison_tick = 0.6
-			_status_damage(1.0)
+			_status_damage(1.0 * kit.resist("veneno", "tick"))
 	if _status.has("ameba") and not is_dead:
 		_amoeba_tick -= delta
 		if _amoeba_tick <= 0.0:
 			_amoeba_tick = 0.3
-			_status_damage(3.0)
+			_status_damage(3.0 * kit.resist("ameba", "tick"))
 			_trauma = maxf(_trauma, 0.2)
 	for k in _status.keys():
 		_status[k] = float(_status[k]) - delta
@@ -537,7 +579,7 @@ func _update_statuses(delta: float) -> void:
 		_burn_tick -= delta
 		if _burn_tick <= 0.0:
 			_burn_tick = 0.5
-			_status_damage(1.0)
+			_status_damage(1.0 * kit.resist("quemadura", "tick"))
 
 
 func _status_damage(amount: float) -> void:
@@ -555,7 +597,7 @@ func add_buildup(effect: String, amount: float) -> void:
 	if is_dead or not BUILDUP.has(effect):
 		return
 	_buildup_wait[effect] = 1.5
-	var v := float(_buildup.get(effect, 0.0)) + amount
+	var v := float(_buildup.get(effect, 0.0)) + amount * kit.resist(effect, "buildup")
 	if v >= 100.0:
 		_buildup.erase(effect)
 		apply_status(effect, float(BUILDUP[effect]["duration"]))
@@ -589,6 +631,7 @@ func rest() -> void:
 	hp = max_hp
 	stamina = max_stamina
 	flasks = _max_flasks
+	kit.refill()
 	health_changed.emit(hp, max_hp)
 
 
@@ -603,29 +646,17 @@ func get_max_flasks() -> int:
 
 
 func _build_status_fx() -> void:
-	_m_shock = StandardMaterial3D.new()
-	_m_shock.albedo_color = Color(0.4, 0.7, 1.0, 0.35)
-	_m_shock.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_m_shock.emission_enabled = true
-	_m_shock.emission = Color(0.45, 0.75, 1.0)
-	_m_burn = StandardMaterial3D.new()
-	_m_burn.albedo_color = Color(1.0, 0.4, 0.1, 0.3)
-	_m_burn.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_m_burn.emission_enabled = true
-	_m_burn.emission = Color(1.0, 0.4, 0.08)
-	_m_poison = StandardMaterial3D.new()
-	_m_poison.albedo_color = Color(0.4, 0.9, 0.2, 0.3)
-	_m_poison.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_m_poison.emission_enabled = true
-	_m_poison.emission = Color(0.35, 0.85, 0.1)
-	_m_amoeba = StandardMaterial3D.new()
-	_m_amoeba.albedo_color = Color(0.95, 0.4, 0.7, 0.32)
-	_m_amoeba.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_m_amoeba.emission_enabled = true
-	_m_amoeba.emission = Color(0.95, 0.3, 0.65)
-	_fx_shock = _status_particles(Color(0.55, 0.85, 1.0), 40, 0.25, 0.05, 2.5)
-	_fx_burn = _status_particles(Color(1.0, 0.45, 0.1), 28, 0.6, 0.18, 1.2)
-	_fx_poison = _status_particles(Color(0.3, 0.85, 0.15), 22, 0.9, 0.09, 0.8)
+	for e in [["electrocutado", Color(0.5, 0.8, 1.0)], ["quemadura", Color(1.0, 0.45, 0.1)], ["veneno", Color(0.4, 1.0, 0.2)], ["ameba", Color(1.0, 0.4, 0.75)], ["atrapado", Color(1.0, 0.25, 0.2)]]:
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var c: Color = e[1]
+		m.albedo_color = Color(c.r * 0.9, c.g * 0.9, c.b * 0.9, 0.2)
+		_rim[e[0]] = m
+	# Partículas pequeñas que no tapan al jugador
+	_fx_shock = _status_particles(Color(0.55, 0.85, 1.0), 16, 0.2, 0.035, 2.0)
+	_fx_burn = _status_particles(Color(1.0, 0.45, 0.1), 10, 0.5, 0.06, 1.0)
+	_fx_poison = _status_particles(Color(0.3, 0.85, 0.15), 8, 0.8, 0.05, 0.6)
 
 
 func _status_particles(col: Color, amount: int, life: float, size: float, up: float) -> GPUParticles3D:
@@ -636,24 +667,30 @@ func _status_particles(col: Color, amount: int, life: float, size: float, up: fl
 	p.position = Vector3(0, 0.9, 0)
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var pm := ParticleProcessMaterial.new()
-	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(0.35, 0.85, 0.35)
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	pm.emission_ring_axis = Vector3(0, 1, 0)
+	pm.emission_ring_radius = 0.45
+	pm.emission_ring_inner_radius = 0.4
+	pm.emission_ring_height = 1.6
 	pm.direction = Vector3(0, 1, 0)
 	pm.spread = 180.0 if up > 2.0 else 25.0
 	pm.initial_velocity_min = up * 0.4
 	pm.initial_velocity_max = up
 	pm.gravity = Vector3(0, 0.5, 0)
-	pm.scale_min = size * 0.6
-	pm.scale_max = size
+	pm.scale_min = 0.6
+	pm.scale_max = 1.0
 	p.process_material = pm
+	# El tamaño va en la malla (la escala de partícula no se respeta con billboard)
 	var q := QuadMesh.new()
-	q.size = Vector2(1, 1)
+	q.size = Vector2(size, size) * 1.6
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	m.albedo_color = Color(col.r * 3.0, col.g * 3.0, col.b * 3.0, 1.0)
+	m.albedo_texture = preload("res://boss_bibliotecario/library_fx.gd").soft_tex()
+	# Sin brillo excesivo: el resplandor de la cámara las convertía en una mancha
+	m.albedo_color = Color(col.r * 0.9, col.g * 0.9, col.b * 0.9, 0.85)
 	q.material = m
 	p.draw_pass_1 = q
 	add_child(p)
@@ -668,9 +705,10 @@ func revive(pos: Vector3, yaw: float = 0.0) -> void:
 	hp = max_hp
 	stamina = max_stamina
 	flasks = _max_flasks
+	kit.refill()
 	_roll_t = 0.0
 	_attack_t = 0.0
-	_heal_t = 0.0
+	_cast_t = 0.0
 	_stagger_t = 0.0
 	_iframes = 1.0
 	_knock = Vector3.ZERO
@@ -689,8 +727,33 @@ func _deal_damage() -> void:
 			continue
 		var to: Vector3 = b.global_position - global_position
 		to.y = 0.0
-		# Jefes: alcance fijo; enemigos: según su tamaño (hit_radius)
-		var reach := 3.4 if b.is_in_group("boss") else 2.3 + float(b.get("hit_radius") if "hit_radius" in b else 0.5)
-		if to.length() < reach and _face_dir.dot(to.normalized()) > 0.3:
-			b.take_damage(attack_damage, global_position)
-			add_camera_shake(0.12)
+		# Alcance del arma + tamaño del objetivo
+		var base_reach: float = _atk.get("reach", 3.0)
+		var reach := base_reach + (0.4 if b.is_in_group("boss") else float(b.get("hit_radius") if "hit_radius" in b else 0.5) - 0.7)
+		var arc: float = _atk.get("arc", 0.3)
+		if to.length() < reach and (to.length() < 1.0 or _face_dir.dot(to.normalized()) > arc):
+			b.take_damage(_atk.get("damage", attack_damage), global_position)
+			add_camera_shake(float(_atk.get("shake", 0.12)))
+		elif _atk.has("aoe") and to.length() < base_reach + float(_atk["aoe"]) * 0.5:
+			# Mazo: la onda del golpe alcanza un poco alrededor
+			b.take_damage(float(_atk.get("damage", attack_damage)) * 0.5, global_position)
+
+
+func _status_meshes() -> Array:
+	var out: Array = _model_meshes.duplicate()
+	if kit:
+		out.append_array(kit.meshes)
+	return out
+
+
+## Maná para el HUD: [actual, máximo, bebidas]. Máximo 0 = la clase no usa maná.
+func get_mana() -> Array:
+	return [kit.mana, kit.max_mana, kit.drinks]
+
+
+func get_ability_text() -> String:
+	return kit.ability_text()
+
+
+func get_class_name() -> String:
+	return "%s · %s" % [_cfg["name"], _cfg["role"]]
