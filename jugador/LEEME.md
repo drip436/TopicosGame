@@ -58,3 +58,33 @@ chispas pequeñas a su alrededor.
 - `class_kit.gd`: armaduras, armas y ataques de cada clase (lo crea `test_player.gd`).
 - `player_projectile.gd`: flechas, flecha matemática, bola de fuego y veneno del jugador.
 - `stand.gd`: las IAs del AI Dev.
+
+## Esqueleto y animaciones (`player_rig.gd`)
+
+El modelo del jugador era una malla estática en pose T. Al aparecer se le construye un
+**esqueleto de 17 huesos** y cada vértice se pesa automáticamente a sus huesos según la zona
+del cuerpo (con mezcla suave en hombros, codos, muñecas, cuello, cadera y rodillas).
+Las armas y la armadura van pegadas a los huesos (`BoneAttachment3D`).
+
+Animaciones (procedurales, por capas):
+
+- **Locomoción:** quieto con respiración, caminar y correr (zancada, rodillas, balanceo de brazos,
+  inclinación del torso al correr).
+- **Rodada:** voltereta encogida alrededor del centro del cuerpo (ya no gira desde los pies,
+  así que no atraviesa el suelo).
+- **Curar:** se lleva la taza de café a la boca (lata azul con la bebida energética); guarda el arma
+  mientras bebe y puede seguir moviéndose.
+- **Combos por arma** (clic izquierdo repetido; el clic se guarda si lo presionas a media animación):
+
+| Clase | Arma | Combo |
+|---|---|---|
+| Ciberseguridad | Espada | Tajo derecho (38) → revés (40) → golpe vertical (55) |
+| Frontend | Estoque | Estocada (22) → estocada (24) → estocada a fondo con zancada (34) |
+| Backend | Mazo | Mazazo vertical (52) → barrido horizontal (60) |
+| Data Scientist | Lanza | Estocada (30) → estocada (32) → barrido giratorio (42) |
+| AI Dev | Brazo | Señala con el brazo para que su IA ataque |
+
+- **Habilidades:** cubrirse con el escudo, lanzar hechizo con el bastón en alto, tensar el arco,
+  golpe sísmico con ambos brazos, invocar con los brazos en alto.
+- **Reacciones:** retroceso al recibir golpe, temblor al estar electrocutado, forcejeo al estar
+  atrapado y caída al morir.

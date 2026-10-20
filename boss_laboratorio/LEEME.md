@@ -21,12 +21,12 @@ No hay que tocar `main.tscn`: `CampusWorld` crea `LabFight.tscn` al jugar
 
 | Ataque | Notas |
 |---|---|
-| Frascos de veneno (1–3) | Caen sobre un círculo de aviso: daño en área + **charco** que llena la barra de VENENO |
+| Frascos de veneno (1–2) | Caen sobre un círculo de aviso: daño en área + **charco** que llena la barra de VENENO |
 | Pistola láser | Ráfagas de 4 disparos verdes |
 | Tubo radiactivo | Dos golpes; también acumulan veneno |
-| Invocar mutantes | Saca 3 mutantes pequeños sin dejar de trabajar |
+| Invocar mutantes | Saca 2 mutantes pequeños sin dejar de trabajar (máximo 4 a la vez) |
 | Experimento | Se queda trabajando 3.5 s: **si no lo interrumpes, se cura** (un golpe lo interrumpe) |
-| Horda | Bomba de humo, **6–8 mutantes** y se esconde: se vuelve casi invisible hasta que la horda cae |
+| Horda | Bomba de humo, **3–4 mutantes** y se esconde unos segundos: se vuelve casi invisible |
 | Escape | Si te le pegas, salta hacia atrás con humo (a veces deja un frasco de trampa) |
 
 ## Fase 2 (al 50 %): el mutante

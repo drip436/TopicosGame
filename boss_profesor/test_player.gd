@@ -29,6 +29,7 @@ const BUILDUP := {
 const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
 const CLASSES := preload("res://jugador/player_classes.gd")
 const KIT := preload("res://jugador/class_kit.gd")
+const RIG := preload("res://jugador/player_rig.gd")
 
 
 @export var max_hp := 100.0
@@ -85,6 +86,13 @@ var kit: KIT
 var _cfg: Dictionary
 var _cast_t := 0.0
 var _atk := {}
+# Esqueleto, combos y animaciones
+var rig: RIG
+var _combo_step := 0
+var _combo_queued := false
+var _combo_window := 0.0
+var _drink_t := 0.0
+var _running := false
 var _rim := {}
 
 
@@ -107,9 +115,12 @@ func _ready() -> void:
 	max_hp = _cfg["hp"]
 	hp = max_hp
 	_build_visual()
+	_build_rig()
 	kit = KIT.new()
 	add_child(kit)
 	kit.setup(self, class_id)
+	if rig:
+		kit.attach_to_rig(rig)
 	_build_status_fx()
 	_build_camera()
 	_yaw = rotation.y
@@ -159,6 +170,18 @@ func _build_visual() -> void:
 	swm.roughness = 0.2
 	sword.material_override = swm
 	_sword_pivot.add_child(sword)
+
+
+## Esqueleto procedural sobre el modelo estático (jugador/player_rig.gd).
+func _build_rig() -> void:
+	var model := _visual.get_node_or_null("ModeloJugador") as Node3D
+	if model == null:
+		return
+	rig = RIG.new()
+	add_child(rig)
+	var body: MeshInstance3D = rig.build(_visual, model)
+	_model_meshes.clear()
+	_model_meshes.append(body)
 
 
 func _build_camera() -> void:
@@ -309,9 +332,21 @@ func _try_roll() -> void:
 
 
 func _try_attack() -> void:
+	# Durante un ataque, el clic se guarda para encadenar el combo
+	if _attack_t > 0.0 and not _atk.is_empty():
+		var k := 1.0 - _attack_t / float(_atk.get("dur", 0.5))
+		if k > 0.3:
+			_combo_queued = true
+		return
 	if _busy() or stamina < 8.0 or kit.is_blocking():
 		return
-	var atk: Dictionary = kit.primary()
+	if _combo_window <= 0.0:
+		_combo_step = 0
+	_start_attack()
+
+
+func _start_attack() -> void:
+	var atk: Dictionary = kit.primary(_combo_step)
 	if atk.is_empty() or float(atk.get("dur", 0.0)) <= 0.0:
 		return
 	_atk = atk
@@ -330,8 +365,16 @@ func _try_heal() -> void:
 	if is_dead or _stunned() or flasks <= 0 or hp >= max_hp:
 		return
 	flasks -= 1
+	play_drink("taza")
 	hp = minf(max_hp, hp + 45.0)
 	health_changed.emit(hp, max_hp)
+
+
+## Animación de beber (café o bebida energética): no detiene al jugador.
+func play_drink(kind: String) -> void:
+	_drink_t = 0.85
+	if rig:
+		rig.show_held(kind, 0.85)
 
 
 func _use_stamina(a: float) -> void:
@@ -423,14 +466,15 @@ func _physics_process(delta: float) -> void:
 		pass
 	elif _roll_t > 0.0:
 		_roll_t -= delta
-		var rt: float = _cfg["roll_time"]
 		vel = _roll_dir * (float(_cfg["roll_speed"]) if _roll_t > 0.15 else 3.0)
-		_visual.rotation_degrees.x = -(1.0 - _roll_t / rt) * 360.0
+		if rig == null:
+			var rt: float = _cfg["roll_time"]
+			_visual.rotation_degrees.x = -(1.0 - _roll_t / rt) * 360.0
 	elif _stagger_t > 0.0:
 		pass
 	elif _stunned():
 		_visual.rotation_degrees.x = 0.0
-		if _status.has("electrocutado"):
+		if _status.has("electrocutado") and rig == null:
 			_visual.rotation_degrees.z = randf_range(-7, 7)
 	else:
 		_visual.rotation_degrees.z = 0.0
@@ -455,9 +499,21 @@ func _physics_process(delta: float) -> void:
 			if not _attack_hit and k > hit_k:
 				_attack_hit = true
 				_deal_damage()
+			if _attack_t <= 0.0:
+				_combo_step += 1
+				_combo_window = 0.45
+				if _combo_step >= kit.combo_length():
+					_combo_step = 0
+					_combo_window = 0.0
+				if _combo_queued and _combo_window > 0.0 and stamina >= 8.0:
+					_combo_queued = false
+					_start_attack()
+				_combo_queued = false
 		else:
 			kit.rest_pose(delta)
+		_running = false
 		if Input.is_key_pressed(KEY_SHIFT) and d != Vector3.ZERO and stamina > 1.0 and speed > 2.5:
+			_running = true
 			speed = _cfg["run"]
 			stamina = maxf(0.0, stamina - 18.0 * delta)
 			_st_delay = 0.3
@@ -479,6 +535,13 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -0.5
 	move_and_slide()
 	_visual.rotation.y = atan2(-_face_dir.x, -_face_dir.z)
+	_combo_window -= delta
+	_drink_t -= delta
+	# Guarda el arma de la mano derecha mientras bebe
+	if kit.right_pivot:
+		kit.right_pivot.visible = _drink_t <= 0.0
+	if rig:
+		rig.animate(delta, _rig_state())
 
 	# Cámara
 	_cam_yaw_node.global_position = global_position + Vector3(0, 1.7, 0)
@@ -757,3 +820,34 @@ func get_ability_text() -> String:
 
 func get_class_name() -> String:
 	return "%s · %s" % [_cfg["name"], _cfg["role"]]
+
+
+## Estado que necesita el esqueleto para elegir la animación.
+func _rig_state() -> Dictionary:
+	var st := {}
+	var hv := Vector2(velocity.x - _knock.x, velocity.z - _knock.z).length()
+	st["speed"] = hv if _attack_t <= 0.0 and _roll_t <= 0.0 else 0.0
+	st["run"] = _running and hv > 4.0
+	st["hold"] = class_id != "ai"
+	st["dead"] = is_dead
+	if is_dead:
+		return st
+	if _roll_t > 0.0:
+		st["roll"] = 1.0 - _roll_t / float(_cfg["roll_time"])
+	st["stagger"] = _stagger_t > 0.0 and _roll_t <= 0.0
+	st["shock"] = _status.has("electrocutado")
+	st["grabbed"] = _status.has("atrapado")
+	if _attack_t > 0.0 and _atk.has("anim"):
+		st["action"] = _atk["anim"]
+		st["k"] = 1.0 - _attack_t / float(_atk.get("dur", 0.5))
+		st["hit_k"] = minf(float(_atk.get("hit_k", 0.4)), 0.9)
+	elif _drink_t > 0.0:
+		st["action"] = "curar"
+		st["w"] = sin(clampf(_drink_t / 0.85, 0.0, 1.0) * PI) * 1.4
+	elif kit.is_blocking():
+		st["action"] = "bloquear"
+		st["w"] = 1.0
+	elif kit.action != "":
+		st["action"] = kit.action
+		st["w"] = clampf(minf(kit.action_t, kit.action_dur - kit.action_t) * 8.0, 0.0, 1.0)
+	return st

@@ -60,6 +60,21 @@ var right_pivot: Node3D
 var left_pivot: Node3D
 var _attack_kind := "swing"
 var _rmb_held := false
+## true cuando el jugador tiene esqueleto: las armas van pegadas a las manos y
+## las animaciones las hace jugador/player_rig.gd.
+var rigged := false
+## Acción que el rig debe mostrar (hechizo, arco, sísmico…) y cuánto dura.
+var action := ""
+var action_t := 0.0
+var action_dur := 0.0
+
+## Combos por arma: [animación del rig, daño, duración, momento del golpe, arco].
+const COMBOS := {
+	"frontend": [["estoque_1", 22.0, 0.4, 0.4, 0.5], ["estoque_2", 24.0, 0.4, 0.4, 0.5], ["estoque_3", 34.0, 0.6, 0.5, 0.45]],
+	"backend": [["mazo_1", 52.0, 0.95, 0.55, -0.1], ["mazo_2", 60.0, 1.0, 0.5, -0.5]],
+	"data": [["lanza_1", 30.0, 0.5, 0.4, 0.6], ["lanza_2", 32.0, 0.5, 0.4, 0.6], ["lanza_3", 42.0, 0.7, 0.5, -0.6]],
+	"cyber": [["espada_1", 38.0, 0.55, 0.4, 0.3], ["espada_2", 40.0, 0.55, 0.4, 0.3], ["espada_3", 55.0, 0.75, 0.5, 0.35]],
+}
 
 
 func setup(p: CharacterBody3D, id: String) -> void:
@@ -84,7 +99,32 @@ func setup(p: CharacterBody3D, id: String) -> void:
 
 ## Ataque principal (clic izq.). Devuelve los datos del golpe cuerpo a cuerpo
 ## para que el jugador lo ejecute, o {} si la clase lo maneja sola.
-func primary() -> Dictionary:
+## Largo del combo de la clase (1 = sin combo).
+func combo_length() -> int:
+	return (COMBOS[class_id] as Array).size() if COMBOS.has(class_id) else 1
+
+
+## Ataque principal con combos: `step` es el paso del combo (0, 1, 2…).
+func primary(step: int = 0) -> Dictionary:
+	if rigged and COMBOS.has(class_id):
+		var c: Array = COMBOS[class_id][step % combo_length()]
+		var base := _primary_base()
+		base["anim"] = c[0]
+		base["damage"] = c[1]
+		base["dur"] = c[2]
+		base["hit_k"] = c[3]
+		base["arc"] = c[4]
+		if step % combo_length() == combo_length() - 1:
+			base["shake"] = 0.3
+			base["stamina"] = float(base.get("stamina", 12.0)) * 1.3
+		return base
+	var b := _primary_base()
+	if class_id == "ai" and not b.is_empty():
+		b["anim"] = "brazo_1"
+	return b
+
+
+func _primary_base() -> Dictionary:
 	match class_id:
 		"frontend":
 			_attack_kind = "thrust"
@@ -107,7 +147,7 @@ func primary() -> Dictionary:
 
 ## Animación del arma durante el ataque cuerpo a cuerpo (k de 0 a 1).
 func animate_attack(k: float) -> void:
-	if right_pivot == null:
+	if right_pivot == null or rigged:
 		return
 	if _attack_kind == "thrust":
 		var t := clampf((k - 0.15) * 3.0, 0.0, 1.0)
@@ -118,7 +158,7 @@ func animate_attack(k: float) -> void:
 
 
 func rest_pose(delta: float) -> void:
-	if right_pivot == null:
+	if right_pivot == null or rigged:
 		return
 	var rest := Vector3(-90, 0, 0) if class_id in ["frontend", "data"] else Vector3(-15, 0, 0)
 	right_pivot.rotation_degrees = right_pivot.rotation_degrees.lerp(rest, 1.0 - exp(-10.0 * delta))
@@ -166,6 +206,8 @@ func drink() -> void:
 		return
 	drinks -= 1
 	mana = minf(max_mana, mana + 60.0)
+	if player.has_method("play_drink"):
+		player.play_drink("lata")
 	LFX.puff(player, player.global_position + Vector3(0, 1.2, 0), Color(0.5, 1.2, 3.0, 1), 20, 0.12, 2.0, 2.0)
 
 
@@ -194,11 +236,16 @@ func ability_text() -> String:
 func process(delta: float) -> void:
 	_bow_cd -= delta
 	_special_cd -= delta
+	action_t -= delta
+	if action_t <= 0.0:
+		action = ""
 	if class_id == "cyber" and _shield:
 		blocking = _rmb_held and not player.is_dead and player.stamina > 1.0 and not player.call("_stunned")
+		if rigged:
+			return
 		var want := Transform3D(Basis(Vector3.UP, 0.0), Vector3(-0.1, 1.15, -0.42)) if blocking else _shield_rest
 		_shield.transform = _shield.transform.interpolate_with(want, 1.0 - exp(-16.0 * delta))
-	if class_id == "frontend" and left_pivot:
+	if class_id == "frontend" and left_pivot and not rigged:
 		left_pivot.rotation_degrees.z = lerpf(left_pivot.rotation_degrees.z, 0.0, 1.0 - exp(-6.0 * delta))
 
 
@@ -218,6 +265,13 @@ func damage_mult(from: Variant) -> float:
 				blocking = false
 				player.set("_stagger_t", 0.9)
 	return m
+
+
+## Muestra una acción en el rig durante `t` segundos.
+func play(a: String, t: float) -> void:
+	action = a
+	action_t = t
+	action_dur = t
 
 
 func is_blocking() -> bool:
@@ -296,7 +350,10 @@ func _cast() -> void:
 	_face_towards(aim)
 	player.set("_attack_t", 0.0)
 	player.set("_cast_t", 0.65)       # ocupado lanzando (no se puede atacar)
-	left_pivot.rotation_degrees.z = -60.0
+	if rigged:
+		play("hechizo", 0.7)
+	else:
+		left_pivot.rotation_degrees.z = -60.0
 	var lines: Array = (s["code"] as Array).duplicate()
 	var formula := ""
 	if s["id"] == "flecha_mat":
@@ -502,10 +559,16 @@ func _seismic() -> void:
 	player.stamina -= 35.0
 	player.set("_st_delay", 1.0)
 	player.set("_cast_t", 1.1)
-	right_pivot.rotation_degrees = Vector3(60, 0, 0)
-	var tw := right_pivot.create_tween()
-	tw.tween_property(right_pivot, "rotation_degrees:x", -120.0, 0.25).set_delay(0.45)
-	await get_tree().create_timer(0.7, false).timeout
+	if rigged:
+		play("sismico", 0.62)
+	else:
+		right_pivot.rotation_degrees = Vector3(60, 0, 0)
+		var tw := right_pivot.create_tween()
+		tw.tween_property(right_pivot, "rotation_degrees:x", -120.0, 0.25).set_delay(0.45)
+	await get_tree().create_timer(0.62, false).timeout
+	if rigged:
+		play("sismico_golpe", 0.5)
+	await get_tree().create_timer(0.08, false).timeout
 	if player.is_dead:
 		return
 	var c: Vector3 = player.global_position + player.get("_face_dir") * 1.2
@@ -532,6 +595,7 @@ func _stand_special() -> void:
 	_special_cd = 2.5
 	var busy: float = stand.special(_aim_target(), _aim_point())
 	player.set("_cast_t", busy)
+	play("ordenar_especial", maxf(busy, 0.4))
 
 
 func _shoot_arrow() -> void:
@@ -555,7 +619,9 @@ func _shoot_arrow() -> void:
 	p.turn_rate = 1.5
 	player.get_parent().add_child(p)
 	p.global_position = from
-	if left_pivot:
+	if rigged:
+		play("arco", 0.38)
+	elif left_pivot:
 		left_pivot.rotation_degrees.x = 15.0
 		var tw := left_pivot.create_tween()
 		tw.tween_property(left_pivot, "rotation_degrees:x", 0.0, 0.2)
@@ -771,6 +837,46 @@ func _build_weapons() -> void:
 	player.set("_sword_pivot", right_pivot)
 	for mi in meshes:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+
+## Monta armadura y armas sobre los huesos del esqueleto del jugador.
+func attach_to_rig(rig: Node) -> void:
+	rigged = true
+	var v: Node3D = player.get("_visual")
+	var armor := v.get_node_or_null("Armadura")
+	if armor:
+		for c in armor.get_children():
+			if c is Node3D:
+				rig.attach_by_position(c)
+	var ready: Dictionary = rig.READY
+	var fwd_up := Vector3(0, 0.6, -0.8)
+	if right_pivot:
+		right_pivot.rotation = Vector3.ZERO
+		right_pivot.position = Vector3.ZERO
+		match class_id:
+			"frontend":
+				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, -0.15, -1), ready, Vector3(0.07, 0, 0))
+			"data":
+				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 0.05, -1), ready, Vector3(0.07, 0, 0))
+			"backend":
+				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), Vector3(0, 0.5, -0.85), ready, Vector3(0.07, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0))
+			"cyber":
+				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), fwd_up, ready, Vector3(0.07, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0))
+			_:
+				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 0, -1), ready, Vector3(0.07, 0, 0))
+	if left_pivot:
+		left_pivot.rotation = Vector3.ZERO
+		left_pivot.position = Vector3.ZERO
+		match class_id:
+			"frontend":
+				rig.attach_weapon(left_pivot, "hand_l", Vector3(0, 1, 0), Vector3(0, 1, -0.15), ready, Vector3(-0.07, 0, 0))
+			"data":
+				rig.attach_weapon(left_pivot, "hand_l", Vector3(0, 1, 0), Vector3(0, 1, 0), ready, Vector3(-0.07, 0, 0), Vector3(0, 0, 1), Vector3(1, 0, 0))
+			_:
+				rig.attach_weapon(left_pivot, "hand_l", Vector3(0, 1, 0), Vector3(0, 0.6, -0.8), ready, Vector3(-0.07, 0, 0))
+	if _shield:
+		_shield.transform = Transform3D.IDENTITY
+		rig.attach_weapon(_shield, "fore_l", Vector3(0, 1, 0), Vector3(0, 1, 0), ready, Vector3(-0.13, 0, 0), Vector3(0, 0, -1), Vector3(-1, 0, 0))
 
 
 ## Equipa una armadura de resistencia ("" = ninguna): cambia los ribetes de color.

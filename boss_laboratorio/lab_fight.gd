@@ -37,7 +37,7 @@ void fragment() {
 """
 
 @export var boss_name: String = "Doctor Viktor Kessler, el Paciente Cero"
-@export var boss_max_health: float = 1900.0
+@export var boss_max_health: float = 1450.0
 
 var world: Node
 var boss: CharacterBody3D

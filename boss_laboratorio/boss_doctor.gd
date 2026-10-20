@@ -29,12 +29,12 @@ const BOLT := preload("res://mundo/enemy_bolt.gd")
 enum State { DORMANT, INTRO, FIGHT, BUSY, TRANSITION, DEAD }
 
 @export var boss_name: String = "Doctor Viktor Kessler, el Paciente Cero"
-@export var max_health: float = 1900.0
+@export var max_health: float = 1450.0
 @export_range(0.1, 0.9) var phase2_threshold: float = 0.5
 @export var move_speed: float = 3.3
 @export var damage_multiplier: float = 1.0
 ## Máximo de mutantes invocados vivos al mismo tiempo.
-@export var max_minions: int = 10
+@export var max_minions: int = 4
 
 var state: int = State.DORMANT
 var phase := 1
@@ -82,8 +82,8 @@ var _kinematic := false
 var _flash := 0.0
 var _last: Array[String] = []
 var _close_t := 0.0
-var _escape_cd := 2.0
-var _horde_cd := 6.0
+var _escape_cd := 4.0
+var _horde_cd := 14.0
 var _summon_cd := 3.0
 var _experiment_cd := 8.0
 var _grab_cd := 3.0
@@ -385,7 +385,7 @@ func _x(id: int) -> bool:
 
 ## Lanza 1–3 frascos de veneno en arco.
 func _atk_flasks(id: int) -> void:
-	var n := _rng.randi_range(1, 3)
+	var n := _rng.randi_range(1, 2)
 	for i in n:
 		_tracking = 1.0
 		_pose("throw_wind", 0.25)
@@ -397,7 +397,7 @@ func _atk_flasks(id: int) -> void:
 		await _w(0.3)
 		if _x(id): return
 	await _w(0.5)
-	_end(id, 0.8)
+	_end(id, 1.4)
 
 
 ## Ráfaga de la pistola láser.
@@ -407,10 +407,10 @@ func _atk_laser(id: int) -> void:
 	await _w(0.55)
 	for i in 4:
 		if _x(id) or not _valid_target(): return
-		_shoot_bolt(10.0, 26.0, 1.0)
+		_shoot_bolt(8.0, 26.0, 1.0)
 		await _w(0.2)
 	await _w(0.5)
-	_end(id, 0.8)
+	_end(id, 1.3)
 
 
 ## Golpes con el tubo radiactivo.
@@ -425,7 +425,7 @@ func _atk_tube(id: int) -> void:
 		_lunge = -global_basis.z * 5.0
 		await _w(0.1)
 		if _x(id): return
-		_melee(2.9, 0.2, 14.0, 15.0)
+		_melee(2.9, 0.2, 11.0, 5.0)
 		LFX.puff(fx_parent, (J["wr_r"] as Node3D).global_position + (-global_basis.z) * 0.8, Color(0.6, 2.0, 0.4, 1), 12, 0.15, 3.0, 0.0)
 		await _w(0.3)
 	await _w(0.5)
@@ -434,12 +434,12 @@ func _atk_tube(id: int) -> void:
 
 ## Invoca 3 mutantes pequeños sin dejar de trabajar.
 func _atk_summon(id: int) -> void:
-	_summon_cd = _rng.randf_range(9.0, 12.0)
+	_summon_cd = _rng.randf_range(14.0, 18.0)
 	_tracking = 0.3
 	_pose("summon", 0.35)
 	await _w(0.5)
 	if _x(id): return
-	for i in 3:
+	for i in 2:
 		var a := _rng.randf() * TAU
 		_spawn_minion(global_position + Vector3(cos(a), 0, sin(a)) * _rng.randf_range(2.5, 4.0))
 		await _w(0.15)
@@ -449,11 +449,11 @@ func _atk_summon(id: int) -> void:
 
 ## Experimenta en su mesa: si no lo interrumpes en 3.5 s, se cura.
 func _atk_experiment(id: int) -> void:
-	_experiment_cd = _rng.randf_range(12.0, 16.0)
+	_experiment_cd = _rng.randf_range(18.0, 24.0)
 	_kinematic = true
 	_channeling = true
 	_pose("experiment", 0.4)
-	var heal := max_health * 0.06
+	var heal := max_health * 0.03
 	var t := 0.0
 	while t < 3.5:
 		await _w(0.25)
@@ -474,7 +474,7 @@ func _atk_experiment(id: int) -> void:
 
 ## Bomba de humo, horda de 6+ mutantes y se esconde (casi invisible).
 func _atk_horde(id: int) -> void:
-	_horde_cd = _rng.randf_range(18.0, 24.0) * (1.4 if phase == 2 else 1.0)
+	_horde_cd = _rng.randf_range(26.0, 32.0) * (1.4 if phase == 2 else 1.0)
 	_tracking = 0.0
 	_pose("summon", 0.3)
 	_jitter = 0.4
@@ -482,7 +482,7 @@ func _atk_horde(id: int) -> void:
 	if _x(id): return
 	_jitter = 0.0
 	_smoke(global_position, 2.5)
-	var n := _rng.randi_range(6, 8)
+	var n := _rng.randi_range(3, 4)
 	var c := target.global_position if _valid_target() else global_position
 	for i in n:
 		if _minions.size() >= max_minions:
@@ -494,14 +494,14 @@ func _atk_horde(id: int) -> void:
 		await _dash_away(id, 14.0)
 		if _x(id): return
 		_set_hidden(true)
-		_hide_t = 14.0
+		_hide_t = 8.0
 	await _w(0.6)
 	_end(id, 0.8)
 
 
 ## Escapa con un salto hacia atrás y humo; a veces deja un frasco de trampa.
 func _atk_escape(id: int) -> void:
-	_escape_cd = _rng.randf_range(4.0, 6.0)
+	_escape_cd = _rng.randf_range(6.0, 9.0)
 	_close_t = 0.0
 	if _rng.randf() < 0.5:
 		_lob("frasco", global_position + Vector3(0, 1.2, 0), global_position, 0.3)
@@ -716,7 +716,7 @@ func _atk_grab(id: int) -> void:
 		if target.has_method("clear_status"):
 			target.clear_status("atrapado")
 		target.global_position = land
-		_hit(28.0, wall, true)
+		_hit(18.0, wall, true)
 		FX.burst(fx_parent, wall, false, 50, 1.6)
 		FX.burst(fx_parent, wall, true, 30, 1.0)
 		if target.has_method("add_camera_shake"):
@@ -738,7 +738,7 @@ func _atk_smash(id: int) -> void:
 	if _x(id): return
 	var p := global_position + (-global_basis.z) * 3.5
 	p.y = global_position.y
-	_aoe(p, 4.2, 26.0, 20.0)
+	_aoe(p, 4.2, 20.0, 12.0)
 	FX.shockwave(fx_parent, p, 4.2, Color(0.45, 1.0, 0.2), 0.45)
 	FX.burst(fx_parent, p, false, 40, 1.6)
 	LFX.puff(fx_parent, p + Vector3(0, 0.4, 0), Color(0.6, 2.0, 0.4, 1), 20, 0.3, 4.0, 1.0)
@@ -757,7 +757,7 @@ func _atk_sweep(id: int) -> void:
 	_pose("sweep", 0.15)
 	await _w(0.12)
 	if _x(id): return
-	_melee(6.0, -0.4, 20.0, 15.0)
+	_melee(6.0, -0.4, 16.0, 8.0)
 	FX.shockwave(fx_parent, global_position, 6.0, Color(0.45, 1.0, 0.2), 0.35)
 	_shake(0.35)
 	await _w(0.9)
@@ -833,9 +833,9 @@ func _atk_beam(id: int) -> void:
 			var ap := c - from
 			var along := clampf(ap.dot(dir), 0.0, length)
 			if (from + dir * along).distance_to(c) < 1.0:
-				_hit(14.0, from, false)
+				_hit(9.0, from, false)
 				if target.has_method("add_buildup"):
-					target.add_buildup("veneno", 12.0)
+					target.add_buildup("veneno", 6.0)
 	beam.queue_free()
 	await _w(0.6)
 	_end(id, 1.0)
@@ -913,8 +913,8 @@ func _land(kind: String, p: Vector3) -> void:
 		_shake(0.45)
 	else:
 		LFX.puff(fx_parent, p + Vector3(0, 0.2, 0), Color(1.4, 1.6, 1.5, 0.8), 12, 0.08, 3.0, -8.0)
-	_aoe(p, r, 18.0 if big else 9.0, 40.0 if big else 32.0)
-	_puddle(p, r * (0.9 if big else 0.8), 7.0 if big else 4.5)
+	_aoe(p, r, 14.0 if big else 7.0, 20.0 if big else 10.0)
+	_puddle(p, r * (0.85 if big else 0.75), 5.0 if big else 3.0)
 
 
 func _puddle(p: Vector3, r: float, dur: float) -> void:
@@ -959,9 +959,9 @@ func _update_puddles(delta: float) -> void:
 				var to := target.global_position - (pd["pos"] as Vector3)
 				if absf(to.y) < 1.0 and Vector2(to.x, to.z).length() < float(pd["r"]):
 					if target.has_method("add_buildup"):
-						target.add_buildup("veneno", 7.0)
+						target.add_buildup("veneno", 2.5)
 					if "hp" in target and target.has_method("take_damage") and float(target.get("_iframes")) <= 0.0:
-						target.set("hp", maxf(1.0, float(target.get("hp")) - 0.5))
+						target.set("hp", maxf(1.0, float(target.get("hp")) - 0.25))
 
 
 func _spawn_minion(p: Vector3) -> void:
