@@ -4,7 +4,8 @@ extends CharacterBody3D
 ##   Fase 1: ataques con la maza (golpe vertical, barrido giratorio, lanzamiento de cadena, salto).
 ##   Fase 2 (al 50 % de vida): invoca la tormenta, la maza se carga de electricidad,
 ##            sus golpes sueltan ondas eléctricas y hace caer rayos sobre la arena.
-## El modelo es procedural (primitivas articuladas); no necesita archivos .glb.
+## El modelo se anima con primitivas articuladas; si existe modelos/jefes/catedratico.glb
+## (hecho en Blender) se ve ese modelo, que sigue a las articulaciones (boss_skin.gd).
 ## Busca su objetivo en el grupo "player"; el objetivo debe tener take_damage(cantidad, desde).
 
 signal health_changed(current: float, maximum: float)
@@ -16,6 +17,9 @@ signal defeated
 
 const FX := preload("boss_fx.gd")
 const STRIKE := preload("lightning_strike.gd")
+const BOSS_SKIN := preload("boss_skin.gd")
+## Modelo de Blender (arte/blender/jefe_catedratico.py). Si no existe se usan las primitivas.
+const SKIN_PATH := "res://modelos/jefes/catedratico.glb"
 
 @export var boss_name: String = "Catedrático de Hierro, Heraldo de la Tormenta"
 @export var max_health: float = 1400.0
@@ -39,6 +43,7 @@ var fx_parent: Node = null
 var model: Node3D
 var pelvis: Node3D
 var joints := {}
+var skin: Node
 var tip: Marker3D
 var cape: Node3D
 var m_steel: StandardMaterial3D
@@ -915,6 +920,7 @@ func _build_model() -> void:
 	fill.light_energy = 0.7
 	fill.omni_range = 5.5
 	model.add_child(fill)
+	skin = BOSS_SKIN.apply(self, model, joints, SKIN_PATH, {"ojos": m_eye})
 
 
 func _set_eyes(c: Color, energy: float) -> void:
@@ -1191,6 +1197,8 @@ func _update_effects(delta: float) -> void:
 	if _hit_flash > 0.0:
 		_hit_flash = maxf(0.0, _hit_flash - delta * 7.0)
 		m_steel.emission_energy_multiplier = _hit_flash * 0.6
+		if skin:
+			skin.flash(_hit_flash)
 	if electrified:
 		_arc_t -= delta
 		if _arc_t <= 0.0:

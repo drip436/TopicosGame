@@ -5,8 +5,8 @@ extends Node3D
 ##   - Tazas de café repartidas por el mapa (+1 taza en el inventario cada una).
 ##   - Enemigos: 4-5 por zona (también dentro de los edificios de conexión).
 ##     Robots pequeños y medianos (hacha, espada o pistola láser), mechas que
-##     merodean las zonas abiertas, y especímenes mutantes en el sector del
-##     Laboratorio (dejan veneno). Solo existen cerca del jugador (rendimiento).
+##     merodean las zonas abiertas, androides (mini ADA-7) en el sector del
+##     Centro de Cómputo y especímenes mutantes en el del Laboratorio (veneno). Solo existen cerca del jugador (rendimiento).
 ##   - Lago: meterse al agua contagia la ameba come-cerebros.
 ##   - Si mueres fuera de una pelea de jefe: R para volver a la última hoguera.
 ## CampusWorld lo crea al iniciar el juego (opción spawn_world_life); no hace
@@ -60,7 +60,7 @@ const ENEMY_ZONES := [
 	[Vector2(-155, -160), 26.0, "Filosofía y Letras"],
 	[Vector2(-219, -180), 26.0, "Facultad de Derecho"],
 	[Vector2(-80, -150), 32.0, "Estadio Universitario"],
-	# Sector oriente (Cómputo)
+	# Sector oriente (Cómputo): androides
 	[Vector2(205, 60), 30.0, "Residencias Oriente"],
 	[Vector2(178, -13), 26.0, "Facultad de Ciencias"],
 	[Vector2(222, -18), 16.0, "Mercadito"],
@@ -318,7 +318,12 @@ func _make_cups() -> void:
 
 
 func _pool(sector: String) -> String:
-	return "mutantes" if sector == "noreste" else "robots"
+	match sector:
+		"noreste":
+			return "mutantes"
+		"oriente":
+			return "androides"
+	return "robots"
 
 
 func _pick_type(pool: String, big_used: bool) -> String:
@@ -329,6 +334,12 @@ func _pick_type(pool: String, big_used: bool) -> String:
 		if r < 0.88 or big_used:
 			return "mutante_med"
 		return "mutante_grande"
+	if pool == "androides":
+		if r < 0.45:
+			return "androide_espadas"
+		if r < 0.75:
+			return "androide_cables"
+		return "androide_script"
 	if r < 0.7:
 		return "robot"
 	return ["robot_hacha", "robot_espada", "robot_laser"][_rng.randi() % 3]
@@ -396,7 +407,7 @@ func _make_enemy_records() -> void:
 			var n := 5 if L > 100.0 else 4
 			for i in n:
 				var t := _pick_type(pool, true)
-				if t != "robot" and t != "mutante_peq" and _rng.randf() < 0.5:
+				if pool != "androides" and t != "robot" and t != "mutante_peq" and _rng.randf() < 0.5:
 					t = "robot" if pool == "robots" else "mutante_peq"
 				for tries in 12:
 					var x := lerpf(-L * 0.5 + 6.0, L * 0.5 - 6.0, (i + 0.5) / n) + _rng.randf_range(-3.0, 3.0)

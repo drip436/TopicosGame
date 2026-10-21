@@ -24,6 +24,11 @@ signal defeated
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const FX := preload("res://boss_profesor/boss_fx.gd")
 const ENEMY := preload("res://mundo/enemy.gd")
+const BOSS_SKIN := preload("res://boss_profesor/boss_skin.gd")
+## Modelos de Blender (arte/blender/jefe_kessler.py): el científico y el mutante de la
+## fase 2. Si no existen se usan las primitivas.
+const SKIN_PATH := "res://modelos/jefes/kessler.glb"
+const SKIN_MUT_PATH := "res://modelos/jefes/kessler_mutante.glb"
 const BOLT := preload("res://mundo/enemy_bolt.gd")
 
 enum State { DORMANT, INTRO, FIGHT, BUSY, TRANSITION, DEAD }
@@ -52,6 +57,8 @@ var J := {}
 var _meshes: Array[MeshInstance3D] = []
 var _mut_parts: Array[Node3D] = []
 var _coat: Array[Node3D] = []
+var _skin: Node
+var _skin_mut: Node
 var m_skin: StandardMaterial3D
 var m_eye: StandardMaterial3D
 var m_flash: StandardMaterial3D
@@ -595,6 +602,9 @@ func _start_phase2() -> void:
 				p.visible = true
 			for c in _coat:
 				c.visible = false
+			if _skin and _skin_mut:
+				_skin.set_visible(false)
+				_skin_mut.set_visible(true)
 			LFX.puff(fx_parent, global_position + Vector3(0, 2.5, 0), Color(0.95, 0.95, 0.95, 0.9), 30, 0.25, 4.0, -6.0)
 	var cs := get_node_or_null("CollisionShape3D") as CollisionShape3D
 	if cs:
@@ -1374,6 +1384,15 @@ func _build_model() -> void:
 		_cone(mjaw, 0.018, 0.08, Vector3(-0.12 + k * 0.06, 0.06, -0.12), bone)
 	for mi in _meshes:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var mats := {"ojos": m_eye, "tubo": m_tube}
+	_skin = BOSS_SKIN.apply(self, model, J, SKIN_PATH, mats)
+	_skin_mut = BOSS_SKIN.apply(self, model, J, SKIN_MUT_PATH, mats)
+	for sk in [_skin, _skin_mut]:
+		if sk:
+			for mi in sk.meshes:
+				_meshes.append(mi)
+	if _skin_mut:
+		_skin_mut.set_visible(false)
 
 
 # =====================================================================

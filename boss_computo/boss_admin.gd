@@ -29,6 +29,9 @@ signal leg_changed(ratio: float)
 
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const FX := preload("res://boss_profesor/boss_fx.gd")
+const BOSS_SKIN := preload("res://boss_profesor/boss_skin.gd")
+## Modelo de Blender (arte/blender/jefe_ada.py). Si no existe se usan las primitivas.
+const SKIN_PATH := "res://modelos/jefes/ada7.glb"
 
 enum State { DORMANT, INTRO, FIGHT, BUSY, TRANSITION, DEAD }
 
@@ -55,6 +58,7 @@ var arena_half := Vector2(18, 16)
 # Modelo
 var model: Node3D
 var J := {}
+var _skin: Node
 var _meshes: Array[MeshInstance3D] = []
 var m_flash: StandardMaterial3D
 var m_eye: StandardMaterial3D
@@ -1023,6 +1027,8 @@ func _drop_leg_part() -> void:
 			tw.tween_property(copy, "global_position", land + Vector3(_rng.randf_range(-0.6, 0.6), 0, _rng.randf_range(-0.6, 0.6)), 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 			tw.parallel().tween_property(copy, "rotation", copy.rotation + Vector3(_rng.randf_range(-1.4, 1.4), 0, _rng.randf_range(-1.4, 1.4)), 0.6)
 		n.visible = false
+	if _skin:
+		_skin.hide_bones(["kn_l"])
 
 
 ## Se levanta sobre los brazos y golpea el suelo con ambos puños.
@@ -1481,6 +1487,14 @@ func _build_model() -> void:
 		cables.append({"root": root, "segs": segs, "ph": k * 1.3})
 	for mi in _meshes:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# Modelo de Blender: las espadas y los cables del rack siguen siendo los del código
+	var keep: Array = [weapon_l, weapon_r]
+	for c in cables:
+		keep.append(c["root"])
+	_skin = BOSS_SKIN.apply(self, model, J, SKIN_PATH, {"ojos": m_eye, "nucleo": m_core, "debil": m_weak}, keep)
+	if _skin:
+		for mi in _skin.meshes:
+			_meshes.append(mi)
 
 
 func _make_weapon(kind: String) -> Node3D:

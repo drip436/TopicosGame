@@ -8,7 +8,9 @@ extends CharacterBody3D
 ##   Fase 2 (al 50 %): la biblioteca arde, flotan hojas sobre él; se agarra la
 ##           cabeza de dolor y las hojas disparan flechas que te persiguen. Las
 ##           fórmulas ahora son de fuego y dejan quemadura.
-## El modelo es procedural. Los pizarrones los entrega el controlador (library_fight.gd).
+## Se anima con primitivas articuladas; si existe modelos/jefes/bibliofilo.glb (Blender)
+## se ve ese modelo, que sigue a las articulaciones (boss_skin.gd).
+## Los pizarrones los entrega el controlador (library_fight.gd).
 
 signal health_changed(current: float, maximum: float)
 signal damaged(amount: float)
@@ -19,6 +21,9 @@ signal defeated
 const PROJ := preload("library_projectile.gd")
 const LFX := preload("library_fx.gd")
 const FX := preload("res://boss_profesor/boss_fx.gd")
+const BOSS_SKIN := preload("res://boss_profesor/boss_skin.gd")
+## Modelo de Blender (arte/blender/jefe_bibliofilo.py). Si no existe se usan las primitivas.
+const SKIN_PATH := "res://modelos/jefes/bibliofilo.glb"
 
 @export var boss_name: String = "Doctor Euclides Barrabás, el Bibliófilo Demente"
 @export var max_health: float = 1600.0
@@ -42,6 +47,7 @@ var arena_half := Vector2(26, 18)
 # --- modelo
 var model: Node3D
 var J := {}
+var skin: Node
 var _meshes: Array[MeshInstance3D] = []
 var m_skin: StandardMaterial3D
 var m_eye: StandardMaterial3D
@@ -927,6 +933,10 @@ func _build_model() -> void:
 			var fx := -0.03 + f * 0.02
 			_part(wr, box, m_skin, Vector3(fx, -0.22, -0.02), Vector3(0.016, 0.16, 0.018), Vector3(-15, 0, 0))
 			_part(wr, box, nails, Vector3(fx, -0.31, -0.045), Vector3(0.014, 0.05, 0.012), Vector3(-35, 0, 0))
+	skin = BOSS_SKIN.apply(self, model, J, SKIN_PATH, {"ojos": m_eye})
+	if skin:
+		for mi in skin.meshes:
+			_meshes.append(mi)
 	# Hojas que flotan sobre él en la fase 2
 	paper_holder = Node3D.new()
 	paper_holder.position = Vector3(0, 4.2, 0)

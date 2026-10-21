@@ -24,6 +24,11 @@ signal said(text: String, time: float)
 
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const FX := preload("res://boss_profesor/boss_fx.gd")
+const BOSS_SKIN := preload("res://boss_profesor/boss_skin.gd")
+## Modelos de Blender (arte/blender/jefe_rector.py): con toga (fase 1) y sin ella (fase 2).
+## Si no existen se usan las primitivas.
+const SKIN_PATH := "res://modelos/jefes/rector.glb"
+const SKIN_F2_PATH := "res://modelos/jefes/rector_sin_toga.glb"
 const BOLT := preload("res://mundo/enemy_bolt.gd")
 const ENEMY := preload("res://mundo/enemy.gd")
 
@@ -49,6 +54,8 @@ var model: Node3D
 var J := {}
 var _meshes: Array[MeshInstance3D] = []
 var _robe: Array[Node3D] = []
+var _skin: Node
+var _skin2: Node
 var m_skin: StandardMaterial3D
 var m_blade: StandardMaterial3D
 var m_eye: StandardMaterial3D
@@ -686,6 +693,9 @@ func _shed_robe() -> void:
 			tw.tween_property(copy, "global_position", land, 0.8).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 			tw.parallel().tween_property(copy, "rotation", copy.rotation + Vector3(_rng.randf_range(-1.5, 1.5), _rng.randf_range(-1, 1), _rng.randf_range(-1.5, 1.5)), 0.8)
 		n.visible = false
+	if _skin and _skin2:
+		_skin.set_visible(false)
+		_skin2.set_visible(true)
 	LFX.puff(fx_parent, global_position + Vector3(0, 1.4, 0), Color(0.2, 0.2, 0.25, 0.8), 30, 0.4, 3.0, -2.0)
 
 
@@ -1421,6 +1431,17 @@ func _build_model() -> void:
 		_cyl(sl2, 0.245, 0.25, 0.04, Vector3(0, -0.34, 0), gold)
 	for mi in _meshes:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# Modelo de Blender: espada, vaina, revólver y funda siguen siendo los del código
+	var keep: Array = [sword_hand, sword_sheathed, revolver_holster, revolver_hand]
+	var mats := {"ojos": m_eye, "circuito": m_circuit}
+	_skin = BOSS_SKIN.apply(self, model, J, SKIN_PATH, mats, keep)
+	_skin2 = BOSS_SKIN.apply(self, model, J, SKIN_F2_PATH, mats, keep)
+	for sk in [_skin, _skin2]:
+		if sk:
+			for mi in sk.meshes:
+				_meshes.append(mi)
+	if _skin2:
+		_skin2.set_visible(false)
 
 
 # =====================================================================
