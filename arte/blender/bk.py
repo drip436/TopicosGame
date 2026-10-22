@@ -420,7 +420,7 @@ def _plaid(nt, tc, plaid):
     return _mix(nt, col, tuple(line) + (1,), lw.outputs[0])
 
 
-def worn_material(name, base, metal=0.0, rough=0.55, rust=0.5, wear=0.6, dirt=0.5, emissive=None, scratches=True, bare=(0.16, 0.16, 0.17), streaks=0.0, soot=0.0, plaid=None):
+def worn_material(name, base, metal=0.0, rough=0.55, rust=0.5, wear=0.6, dirt=0.5, emissive=None, scratches=True, bare=(0.16, 0.16, 0.17), streaks=0.0, soot=0.0, plaid=None, engrave=0.0, chain=0.0, engrave_scale=9.0):
     """Material procedural (solo Cycles, para hornear): pintura/metal con desgaste en
     bordes, óxido en cavidades y manchas, suciedad abajo y rayones."""
     m = bpy.data.materials.new(name)
@@ -537,6 +537,36 @@ def worn_material(name, base, metal=0.0, rough=0.55, rust=0.5, wear=0.6, dirt=0.
         nt.links.new(tc.outputs["Object"], nso.inputs["Vector"])
         sm = _ramp(nt, nso.outputs["Fac"], [(0.58, (0, 0, 0, 1)), (0.72, (soot, 0, 0, 1))])
         col = _mix(nt, col, (0.03, 0.025, 0.02, 1), sm)
+    height_extra = None
+    if engrave > 0.0:
+        # Grabado ornamental (volutas y líneas) hundido y con mugre en el fondo
+        ev = nt.nodes.new("ShaderNodeTexWave")
+        ev.wave_type = "RINGS"
+        ev.inputs["Scale"].default_value = engrave_scale
+        ev.inputs["Distortion"].default_value = 9.0
+        ev.inputs["Detail"].default_value = 3.0
+        ev.inputs["Detail Scale"].default_value = 1.5
+        nt.links.new(tc.outputs["Object"], ev.inputs["Vector"])
+        ln = _ramp(nt, ev.outputs["Fac"], [(0.0, (engrave, engrave, engrave, 1)), (0.07, (0, 0, 0, 1))])
+        col = _mix(nt, col, (0.03, 0.025, 0.02, 1), ln)
+        inv = nt.nodes.new("ShaderNodeMath")
+        inv.operation = "MULTIPLY"
+        inv.inputs[1].default_value = -0.6
+        nt.links.new(ln, inv.inputs[0])
+        height_extra = inv.outputs[0]
+    if chain > 0.0:
+        # Cota de malla: anillos pequeños
+        vo = nt.nodes.new("ShaderNodeTexVoronoi")
+        vo.inputs["Scale"].default_value = 260.0
+        vo.feature = "F1"
+        nt.links.new(tc.outputs["Object"], vo.inputs["Vector"])
+        rings = _ramp(nt, vo.outputs["Distance"], [(0.15, (0, 0, 0, 1)), (0.3, (1, 1, 1, 1)), (0.45, (0, 0, 0, 1))])
+        col = _mix(nt, (0.01, 0.01, 0.01, 1), col, rings)
+        cm = nt.nodes.new("ShaderNodeMath")
+        cm.operation = "MULTIPLY"
+        cm.inputs[1].default_value = chain
+        nt.links.new(rings, cm.inputs[0])
+        height_extra = cm.outputs[0] if height_extra is None else height_extra
     col = _mix(nt, col, (0.12, 0.09, 0.06, 1), dirt_g)
     nt.links.new(col, bsdf.inputs["Base Color"])
     # Rugosidad / metalicidad
@@ -548,8 +578,16 @@ def worn_material(name, base, metal=0.0, rough=0.55, rust=0.5, wear=0.6, dirt=0.
     nt.links.new(mt2, bsdf.inputs["Metallic"])
     # Relieve: abolladuras y rayones
     bump = nt.nodes.new("ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 0.25
-    nt.links.new(n3.outputs["Fac"], bump.inputs["Height"])
+    bump.inputs["Strength"].default_value = 0.25 if height_extra is None else 0.5
+    if height_extra is None:
+        nt.links.new(n3.outputs["Fac"], bump.inputs["Height"])
+    else:
+        hs = nt.nodes.new("ShaderNodeMath")
+        hs.operation = "MULTIPLY_ADD"
+        hs.inputs[1].default_value = 0.3
+        nt.links.new(n3.outputs["Fac"], hs.inputs[0])
+        nt.links.new(height_extra, hs.inputs[2])
+        nt.links.new(hs.outputs[0], bump.inputs["Height"])
     nt.links.new(bev.outputs[0], bump.inputs["Normal"])
     nt.links.new(bump.outputs[0], bsdf.inputs["Normal"])
     if emissive:
@@ -560,7 +598,7 @@ def worn_material(name, base, metal=0.0, rough=0.55, rust=0.5, wear=0.6, dirt=0.
 
 
 def skin_material(name, base, veins=0.6, vein_col=(0.18, 0.05, 0.12), blotch=0.5, blotch_col=(0.35, 0.12, 0.1),
-                  rough=0.5, wet=0.4, dirt=0.4, scale=1.0, sheen_col=None):
+                  rough=0.5, wet=0.4, dirt=0.4, scale=1.0, sheen_col=None, tint_attr=None):
     """Piel orgánica (mutantes, rostros, la piel sintética de los androides): venas
     (Voronoi distorsionado), manchas, cavidades oscuras, partes húmedas y relieve."""
     m = bpy.data.materials.new(name)
@@ -621,6 +659,17 @@ def skin_material(name, base, veins=0.6, vein_col=(0.18, 0.05, 0.12), blotch=0.5
     col = _mix(nt, col, tuple(vein_col) + (1,), vmask)
     col = _mix(nt, col, (0.05, 0.03, 0.03, 1), cav)
     col = _mix(nt, col, (0.1, 0.08, 0.05, 1), dirt_g)
+    if tint_attr:
+        # Tinte por zonas pintado en el cuerpo (labios, mejillas, ojeras, sombra de barba)
+        at = nt.nodes.new("ShaderNodeAttribute")
+        at.attribute_name = tint_attr
+        mul = nt.nodes.new("ShaderNodeMix")
+        mul.data_type = "RGBA"
+        mul.blend_type = "MULTIPLY"
+        mul.inputs[0].default_value = 1.0
+        nt.links.new(col, mul.inputs[6])
+        nt.links.new(at.outputs["Color"], mul.inputs[7])
+        col = mul.outputs[2]
     nt.links.new(col, bsdf.inputs["Base Color"])
     # Partes húmedas (brillan)
     nw = nt.nodes.new("ShaderNodeTexNoise")
@@ -647,10 +696,62 @@ def skin_material(name, base, veins=0.6, vein_col=(0.18, 0.05, 0.12), blotch=0.5
     return m
 
 
+def hair_material(name, base, tip=None, rough=0.55, scale=1.0, gray=0.0):
+    """Pelo y barba esculpidos: mechones estirados en vertical, raíces más oscuras,
+    canas (`gray`) y relieve de hebras."""
+    tip = tip or tuple(min(1.0, c * 1.6) for c in base)
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    nt.links.new(bsdf.outputs[0], out.inputs[0])
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    mp = nt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Scale"].default_value = (140.0 * scale, 140.0 * scale, 9.0 * scale)
+    nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+    ns = nt.nodes.new("ShaderNodeTexNoise")
+    ns.inputs["Scale"].default_value = 1.0
+    ns.inputs["Detail"].default_value = 6.0
+    nt.links.new(mp.outputs[0], ns.inputs["Vector"])
+    strands = _ramp(nt, ns.outputs["Fac"], [(0.3, (0, 0, 0, 1)), (0.7, (1, 1, 1, 1))])
+    col = _mix(nt, tuple(base) + (1,), tuple(tip) + (1,), strands)
+    if gray > 0:
+        ng = nt.nodes.new("ShaderNodeTexNoise")
+        ng.inputs["Scale"].default_value = 1.7
+        ng.inputs["Detail"].default_value = 2.0
+        nt.links.new(mp.outputs[0], ng.inputs["Vector"])
+        gm = _ramp(nt, ng.outputs["Fac"], [(0.62 - gray * 0.25, (0, 0, 0, 1)), (0.66 - gray * 0.25, (gray * 2, gray * 2, gray * 2, 1))])
+        col = _mix(nt, col, (0.32, 0.31, 0.3, 1), gm)
+    # Raíces oscuras en las cavidades
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+    ao.inputs["Distance"].default_value = 0.02
+    cav = _ramp(nt, ao.outputs["AO"], [(0.4, (0.4, 0.4, 0.4, 1)), (0.9, (0, 0, 0, 1))])
+    col = _mix(nt, col, (0.01, 0.008, 0.006, 1), cav)
+    nt.links.new(col, bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = rough
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.6
+    nt.links.new(strands, bump.inputs["Height"])
+    nt.links.new(bump.outputs[0], bsdf.inputs["Normal"])
+    m["metal_val"] = 0.0
+    return m
+
+
 def define_materials(spec):
     """spec: nombre lógico -> kwargs de worn_material (o {'emit': color})."""
     for k, v in spec.items():
-        if "emit" in v:
+        if "flat" in v:
+            # Material liso que no se hornea (zonas diminutas como el iris)
+            m = bpy.data.materials.new(k)
+            m.use_nodes = True
+            b = m.node_tree.nodes["Principled BSDF"]
+            b.inputs["Base Color"].default_value = tuple(v["flat"]) + (1,)
+            b.inputs["Roughness"].default_value = v.get("rough", 0.3)
+            m["no_bake"] = True
+            MATS[k] = m
+        elif "emit" in v:
             m = bpy.data.materials.new(k)
             m.use_nodes = True
             b = m.node_tree.nodes["Principled BSDF"]
@@ -663,6 +764,10 @@ def define_materials(spec):
             kw = dict(v)
             kw.pop("skin")
             MATS[k] = skin_material(k, **kw)
+        elif v.get("hair"):
+            kw = dict(v)
+            kw.pop("hair")
+            MATS[k] = hair_material(k, **kw)
         else:
             MATS[k] = worn_material(k, **v)
 
@@ -703,6 +808,22 @@ def finish(name, tex_size=2048, bake=True, out_dir=None):
                 bpy.ops.object.modifier_apply(modifier=mod.name)
             except Exception as e:
                 print("modificador", ob.name, e)
+        for vg in list(ob.vertex_groups):
+            if vg.name.startswith("R_"):
+                ob.vertex_groups.remove(vg)
+        if ob.get("skinned"):
+            # Pieza con pesos propios (cuerpo humano, ropa ajustada): se conservan
+            # (sin clear(): borrar los materiales reinicia el índice de material de cada cara)
+            slots = list(ob["slots"]) if "slots" in ob else [ob["mat"]]
+            mats = ob.data.materials
+            for i, slot in enumerate(slots):
+                if i < len(mats):
+                    mats[i] = MATS[slot]
+                else:
+                    mats.append(MATS[slot])
+            while len(mats) > len(slots):
+                mats.pop()
+            continue
         bone = ob["bone"]
         vg = ob.vertex_groups.new(name=bone)
         if "bone2" in ob and ob["bone2"] != bone:
@@ -720,6 +841,20 @@ def finish(name, tex_size=2048, bake=True, out_dir=None):
         mat = MATS[ob["mat"]]
         ob.data.materials.clear()
         ob.data.materials.append(mat)
+    # Atributos de color (p. ej. "tinte" de la piel): las piezas que no lo tienen lo reciben
+    # en blanco, si no al unir quedarían en negro
+    names = set()
+    for ob in PARTS:
+        if ob.type == "MESH":
+            names |= {a.name for a in ob.data.color_attributes}
+    for ob in PARTS:
+        if ob.type != "MESH":
+            continue
+        for n in names:
+            if ob.data.color_attributes.get(n) is None:
+                ca = ob.data.color_attributes.new(n, "FLOAT_COLOR", "POINT")
+                for d in ca.data:
+                    d.color = (1, 1, 1, 1)
     bpy.ops.object.select_all(action="DESELECT")
     for ob in PARTS:
         ob.select_set(True)

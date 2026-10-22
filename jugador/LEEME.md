@@ -59,6 +59,33 @@ chispas pequeñas a su alrededor.
 - `player_projectile.gd`: flechas, flecha matemática, bola de fuego y veneno del jugador.
 - `stand.gd`: las IAs del AI Dev.
 
+## Modelos de Blender (cuerpo, armadura y armas)
+
+Si existen, el jugador usa los modelos hechos en Blender (`arte/blender/jugador.py` y
+`arte/blender/armas_jugador.py`):
+
+- `modelos/jugador/jugador_<clase>.glb`: cuerpo humano realista parecido a la foto de
+  referencia (piel morena, pelo negro rizado y voluminoso, lentes redondos de armazón
+  metálico, complexión robusta, playera blanca, pantalón oscuro y botas) y la armadura de la
+  clase, ya pesado a los mismos 17 huesos de `player_rig.gd` (en pose T y con las
+  articulaciones en `BONES`). `player_rig.build()` lo monta en su esqueleto y
+  `class_kit.gd` ya no arma la armadura de primitivas. El material `ribete` toma el color
+  de la armadura de resistencia equipada.
+  - Caballero: placas acanaladas con costuras cian, tabardo verde con candado, yelmo con
+    visor encendido y capa corta.
+  - Tanque: acero oscuro pesadísimo, hombreras enormes, yelmo con rejilla, luces naranjas y
+    módulo de servidor a la espalda.
+  - Mago: túnica azul larga con runas, capucha, manto de láminas y brazales.
+  - AI Dev: bata blanca abierta, arnés con núcleo de IA, visor y botas tecnológicas.
+  - Arquero: brigantina de cuero con remaches, capa verde (sin capucha), carcaj y bolsas.
+  El AI Dev, el arquero y el mago muestran la cara con los lentes; el caballero y el tanque
+  la llevan dentro del yelmo.
+- `modelos/armas_jugador/*.glb`: espada, escudo, estoque, bastón (el orbe es del código),
+  mazo, tableta, lanza y arco, modelados en el espacio de su pivote; reemplazan a las
+  primitivas sin cambiar cómo se sostienen.
+
+Si se borra un modelo, vuelve la versión anterior (malla de la skin + primitivas).
+
 ## Esqueleto y animaciones (`player_rig.gd`)
 
 El modelo del jugador era una malla estática en pose T. Al aparecer se le construye un
@@ -74,7 +101,11 @@ Animaciones (procedurales, por capas):
   así que no atraviesa el suelo).
 - **Curar:** se lleva la taza de café a la boca (lata azul con la bebida energética); guarda el arma
   mientras bebe y puede seguir moviéndose.
-- **Combos por arma** (clic izquierdo repetido; el clic se guarda si lo presionas a media animación):
+- **Combos por arma** (clic izquierdo repetido; el clic se guarda si lo presionas a media animación).
+  Cada golpe es una secuencia de cuadros clave (`ATTACKS`): guardia → anticipación (el arma
+  atrás, el torso gira y el peso pasa al pie de atrás) → golpe que acelera, con paso al
+  frente, giro de cadera y el cuerpo que baja → inercia del arma → recuperación. El impacto
+  cae justo en el momento de daño de cada paso del combo.
 
 | Clase | Arma | Combo |
 |---|---|---|

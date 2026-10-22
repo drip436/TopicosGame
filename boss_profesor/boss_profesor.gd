@@ -44,6 +44,7 @@ var model: Node3D
 var pelvis: Node3D
 var joints := {}
 var skin: Node
+var _mace_hand: Node3D
 var tip: Marker3D
 var cape: Node3D
 var m_steel: StandardMaterial3D
@@ -876,6 +877,7 @@ func _build_model() -> void:
 			# Mango de la maza
 			var hand := Node3D.new()
 			hand.position = Vector3(0, -0.33, 0)
+			_mace_hand = hand
 			el.add_child(hand)
 			_part(hand, _cyl(0.032, 0.035, 0.62, 8), m_dark, Vector3(0, -0.22, 0))
 			_part(hand, _sph(0.05, 0.1, 8), m_trim, Vector3(0, 0.1, 0))
@@ -920,7 +922,7 @@ func _build_model() -> void:
 	fill.light_energy = 0.7
 	fill.omni_range = 5.5
 	model.add_child(fill)
-	skin = BOSS_SKIN.apply(self, model, joints, SKIN_PATH, {"ojos": m_eye})
+	skin = BOSS_SKIN.apply(self, model, joints, SKIN_PATH, {"ojos": m_eye}, [], true, {_mace_hand: "hand_r"})
 
 
 func _set_eyes(c: Color, energy: float) -> void:

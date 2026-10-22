@@ -10,6 +10,10 @@ extends Node
 ##   skin = BOSS_SKIN.apply(self, model, joints, "res://modelos/jefes/x.glb", {"ojos": m_eye}, [nodos_que_no_se_esconden])
 ## `mats` cambia los materiales del modelo por los del jefe (por nombre), para que los
 ## brillos que el código anima (ojos, núcleo, punto débil...) sigan funcionando.
+## `fit` (por defecto sí) mueve las articulaciones del código a donde quedaron los huesos
+## del modelo (los cuerpos realistas tienen otras proporciones que las primitivas), y
+## `attach` = {nodo: "hueso"} pone otros nodos (p. ej. la mano que sostiene el arma) en la
+## cabeza de ese hueso.
 
 const SELF := "res://boss_profesor/boss_skin.gd"
 
@@ -25,17 +29,17 @@ var _hidden_bones := {}
 
 ## Carga el modelo bajo `model_root` (el mismo nodo del que cuelgan las articulaciones)
 ## y devuelve el nodo PielBlender, o null si no hay modelo.
-static func apply(boss: Node, model_root: Node3D, joints: Dictionary, path: String, mats: Dictionary = {}, keep: Array = []) -> Node:
+static func apply(boss: Node, model_root: Node3D, joints: Dictionary, path: String, mats: Dictionary = {}, keep: Array = [], fit := true, attach: Dictionary = {}) -> Node:
 	if not ResourceLoader.exists(path):
 		return null
 	var s: Node = (load(SELF) as GDScript).new()
 	s.name = "PielBlender"
 	boss.add_child(s)
-	s.setup(model_root, joints, path, mats, keep)
+	s.setup(model_root, joints, path, mats, keep, fit, attach)
 	return s
 
 
-func setup(model_root: Node3D, joints: Dictionary, path: String, mats: Dictionary, keep: Array) -> void:
+func setup(model_root: Node3D, joints: Dictionary, path: String, mats: Dictionary, keep: Array, fit := false, attach: Dictionary = {}) -> void:
 	process_priority = 100
 	_mats = mats
 	# Primitivas del modelo procedural: no se ven ni dan sombra (se quedan para la lógica)
@@ -65,6 +69,8 @@ func setup(model_root: Node3D, joints: Dictionary, path: String, mats: Dictionar
 			var m := mi.mesh.surface_get_material(si)
 			if m and _mats.has(m.resource_name):
 				mi.set_surface_override_material(si, _mats[m.resource_name])
+	if fit:
+		_fit_joints(joints, attach)
 	# Desfase de cada hueso respecto a su articulación, medido en reposo
 	var inv := skeleton.global_transform.affine_inverse()
 	var order: Array = []
@@ -84,6 +90,28 @@ func setup(model_root: Node3D, joints: Dictionary, path: String, mats: Dictionar
 			off = (inv * j.global_transform).affine_inverse() * skeleton.get_bone_global_rest(b)
 		_bones.append([b, j, off, skeleton.get_bone_parent(b), skeleton.get_bone_rest(b)])
 	sync()
+
+
+## Lleva cada articulación (y los nodos de `attach`) a la cabeza de su hueso, de padres a hijos.
+func _fit_joints(joints: Dictionary, attach: Dictionary) -> void:
+	var order: Array = []
+	for b in skeleton.get_bone_count():
+		var depth := 0
+		var p := skeleton.get_bone_parent(b)
+		while p >= 0:
+			depth += 1
+			p = skeleton.get_bone_parent(p)
+		order.append([depth, b])
+	order.sort()
+	for o in order:
+		var b: int = o[1]
+		var j: Node3D = joints.get(skeleton.get_bone_name(b))
+		if j:
+			j.global_position = skeleton.global_transform * skeleton.get_bone_global_rest(b).origin
+	for node in attach:
+		var b := skeleton.find_bone(String(attach[node]))
+		if b >= 0 and node is Node3D:
+			(node as Node3D).global_position = skeleton.global_transform * skeleton.get_bone_global_rest(b).origin
 
 
 func _process(_delta: float) -> void:

@@ -179,7 +179,7 @@ func _build_rig() -> void:
 		return
 	rig = RIG.new()
 	add_child(rig)
-	var body: MeshInstance3D = rig.build(_visual, model)
+	var body: MeshInstance3D = rig.build(_visual, model, class_id)
 	_model_meshes.clear()
 	_model_meshes.append(body)
 

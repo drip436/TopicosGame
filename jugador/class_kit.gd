@@ -682,7 +682,11 @@ func _build_armor() -> void:
 	root.name = "Armadura"
 	v.add_child(root)
 	_trim_mat = _mat(Color(0.75, 0.62, 0.35), 0.35, 0.8)
-	match class_id:
+	var rig = player.get("rig")
+	# Con el modelo de Blender la armadura ya viene puesta: solo quedan el emblema de la
+	# armadura de resistencia y el halo del AI Dev
+	var outfit: bool = rig != null and rig.has_outfit
+	match ("" if outfit and class_id != "ai" else class_id):
 		"backend":
 			var steel := _mat(Color(0.32, 0.34, 0.38), 0.35, 0.85)
 			var dark := _mat(Color(0.14, 0.14, 0.16), 0.5, 0.6)
@@ -711,14 +715,15 @@ func _build_armor() -> void:
 		"ai":
 			var coat := _mat(Color(0.62, 0.65, 0.7), 0.7)
 			var glow := LFX.emissive(Color(0.6, 0.9, 1.0), 1.6)
-			_box(root, Vector3(0.46, 0.44, 0.34), Vector3(0, 1.12, 0), coat)
-			# Faldones de la bata abiertos por delante
-			for sx: float in [-1.0, 1.0]:
-				_box(root, Vector3(0.18, 0.55, 0.04), Vector3(sx * 0.15, 0.66, -0.16), coat, Vector3(0, 0, sx * 4))
-				_box(root, Vector3(0.04, 0.55, 0.3), Vector3(sx * 0.23, 0.66, 0.0), coat)
-			_box(root, Vector3(0.46, 0.55, 0.04), Vector3(0, 0.66, 0.16), coat)
-			_box(root, Vector3(0.3, 0.04, 0.02), Vector3(0, 1.25, -0.175), glow)
-			_box(root, Vector3(0.26, 0.05, 0.05), Vector3(0, 1.58, -0.14), _mat(Color(0.05, 0.05, 0.08), 0.2, 0.5))
+			if not outfit:
+				_box(root, Vector3(0.46, 0.44, 0.34), Vector3(0, 1.12, 0), coat)
+				# Faldones de la bata abiertos por delante
+				for sx: float in [-1.0, 1.0]:
+					_box(root, Vector3(0.18, 0.55, 0.04), Vector3(sx * 0.15, 0.66, -0.16), coat, Vector3(0, 0, sx * 4))
+					_box(root, Vector3(0.04, 0.55, 0.3), Vector3(sx * 0.23, 0.66, 0.0), coat)
+				_box(root, Vector3(0.46, 0.55, 0.04), Vector3(0, 0.66, 0.16), coat)
+				_box(root, Vector3(0.3, 0.04, 0.02), Vector3(0, 1.25, -0.175), glow)
+				_box(root, Vector3(0.26, 0.05, 0.05), Vector3(0, 1.58, -0.14), _mat(Color(0.05, 0.05, 0.08), 0.2, 0.5))
 			# Halo de datos sobre la cabeza
 			var t := TorusMesh.new()
 			t.inner_radius = 0.17
@@ -739,6 +744,8 @@ func _build_armor() -> void:
 			_sph(root, Vector3(0.3, 0.34, 0.32), Vector3(0, 1.56, 0), steel)
 			_box(root, Vector3(0.22, 0.03, 0.02), Vector3(0, 1.57, -0.16), _mat(Color(0.05, 0.05, 0.05)))
 			_box(root, Vector3(0.03, 0.14, 0.3), Vector3(0, 1.74, 0), cloth)
+		"":
+			pass   # armadura del modelo de Blender
 		_:
 			var leather := _mat(Color(0.35, 0.24, 0.14), 0.75)
 			var cloth := _mat(Color(0.2, 0.3, 0.2), 0.75)
@@ -834,14 +841,46 @@ func _build_weapons() -> void:
 				var a := deg_to_rad(-60.0 + k * 20.0)
 				_box(left_pivot, Vector3(0.04, 0.22, 0.04), Vector3(0, sin(a) * 0.6, -cos(a) * 0.25 + 0.15), grip, Vector3(rad_to_deg(a), 0, 0))
 			_cyl(left_pivot, 0.004, 0.004, 1.15, Vector3(0, 0, 0.17), _mat(Color(0.9, 0.9, 0.85)))
+	# Armas modeladas en Blender (arte/blender/armas_jugador.py), si existen
+	match class_id:
+		"frontend":
+			_dress_weapon(right_pivot, "estoque")
+			_dress_weapon(left_pivot, "baston")
+		"backend":
+			_dress_weapon(right_pivot, "mazo")
+		"ai":
+			_dress_weapon(left_pivot, "tableta")
+		"cyber":
+			_dress_weapon(right_pivot, "espada")
+			_dress_weapon(_shield, "escudo")
+		_:
+			_dress_weapon(right_pivot, "lanza")
+			_dress_weapon(left_pivot, "arco")
 	player.set("_sword_pivot", right_pivot)
 	for mi in meshes:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 
+## Cambia las primitivas de un arma por su modelo de Blender (mismo espacio del pivote).
+## El orbe del bastón y las luces se quedan.
+func _dress_weapon(pivot: Node3D, weapon: String) -> void:
+	var path := "res://modelos/armas_jugador/%s.glb" % weapon
+	if pivot == null or not ResourceLoader.exists(path):
+		return
+	for c in pivot.get_children():
+		if c is MeshInstance3D and c.name != "Orbe":
+			(c as MeshInstance3D).visible = false
+	var w: Node3D = (load(path) as PackedScene).instantiate()
+	w.name = "Modelo_" + weapon
+	pivot.add_child(w)
+	for mi in w.find_children("*", "MeshInstance3D", true, false):
+		meshes.append(mi as MeshInstance3D)
+
+
 ## Monta armadura y armas sobre los huesos del esqueleto del jugador.
 func attach_to_rig(rig: Node) -> void:
 	rigged = true
+	rig.override_material("ribete", _trim_mat)
 	var v: Node3D = player.get("_visual")
 	var armor := v.get_node_or_null("Armadura")
 	if armor:

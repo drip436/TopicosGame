@@ -1,24 +1,26 @@
 """Jefe final: "El Rector Eterno" (boss_final/boss_rector.gd).
-Hombre calvo con barba de candado, del tamaño de una persona normal. Dos modelos con el
-mismo esqueleto:
-  rector.glb             fase 1: toga académica negra muy vieja (polvo, polillas, dobladillo
-                         deshilachado), ribetes dorados deslustrados, estola y capucha caída.
-  rector_sin_toga.glb    fase 2: se arranca la toga; debajo, un traje táctico oscuro con
-                         peto rayado y circuitos rojos (brillan), brazales de cuero y
-                         rodilleras.
-La espada, la vaina, el revólver y su funda siguen siendo los del código (aparecen y
-desaparecen en la pelea). Materiales que anima el código: "ojos" y "circuito".
+
+Hombre real de 2 m (malla base humana de Blender, ver humano.py): calvo, barba de candado
+canosa, cejas pobladas, piel con sombra de barba. Dos modelos con el mismo esqueleto:
+  rector.glb            fase 1: toga académica negra larga y gastada (dobladillo roto,
+                        polvo), ribetes dorados y estola roja con insignia, capucha caída.
+  rector_sin_toga.glb   fase 2: se arranca la toga; debajo lleva una armadura negra al
+                        estilo de Elden Ring con tecnología: peto acanalado y grabado,
+                        hombreras de láminas, gola, brazales, guanteletes, quijotes,
+                        rodilleras y grebas, todo con circuitos rojos que brillan.
+La espada, la vaina, el revólver y su funda siguen siendo los del código. Materiales que
+anima el código: "ojos" y "circuito".
 
 Uso:  blender -b --python arte/blender/jefe_rector.py -- <carpeta_salida> [preview] [toga|sin_toga]
 """
 import sys
 import os
 import math
-import random
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import bk
-from bk import box, cyl, sphere, panel, bolts, cable, label, cloth, blob, limb
+import humano
+from bk import box, cyl, sphere
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = os.path.abspath(argv[0]) if argv else os.path.abspath("modelos/jefes")
@@ -26,144 +28,106 @@ PREVIEW = "preview" in argv
 ONLY = [a for a in argv[1:] if a != "preview"]
 os.makedirs(OUT, exist_ok=True)
 
-
-def G(x, y, z):
-    """Godot (x, y, z) -> Blender (x, -z, y)."""
-    return (x, -z, y)
-
-
-def S(x, y, z):
-    """Tamaño de caja de Godot (ancho, alto, fondo) -> Blender (ancho, fondo, alto)."""
-    return (x, z, y)
-
-
 MATS = {
-    "toga": dict(base=(0.012, 0.012, 0.018), rough=0.85, rust=0.15, wear=0.75, dirt=1.2, bare=(0.09, 0.085, 0.08), scratches=False, soot=0.5, streaks=0.35),
-    "oro": dict(base=(0.38, 0.27, 0.07), metal=1.0, rough=0.4, rust=0.45, wear=0.6, dirt=1.0, bare=(0.6, 0.48, 0.22), soot=0.5, streaks=0.4),
-    "estola": dict(base=(0.08, 0.008, 0.012), rough=0.8, rust=0.2, wear=0.7, dirt=1.0, bare=(0.25, 0.1, 0.1), scratches=False, soot=0.4),
+    "piel": dict(skin=True, base=(0.38, 0.25, 0.19), veins=0.15, vein_col=(0.22, 0.1, 0.12), blotch=0.45, blotch_col=(0.3, 0.16, 0.12), rough=0.42, wet=0.12, dirt=0.1, scale=3.0, tint_attr="tinte"),
+    "labios": dict(skin=True, base=(0.3, 0.12, 0.1), veins=0.0, blotch=0.3, blotch_col=(0.22, 0.07, 0.06), rough=0.3, wet=0.4, dirt=0.0, scale=4.0),
+    "esclera": dict(base=(0.5, 0.46, 0.42), rough=0.15, rust=0.0, wear=0.0, dirt=0.0, scratches=False),
+    "barba": dict(hair=True, base=(0.02, 0.016, 0.014), tip=(0.05, 0.04, 0.035), gray=0.15, rough=0.65),
+    "toga": dict(base=(0.014, 0.014, 0.02), rough=0.85, rust=0.15, wear=0.75, dirt=1.2, bare=(0.09, 0.085, 0.08), scratches=False, soot=0.5, streaks=0.35),
+    "oro": dict(base=(0.55, 0.38, 0.1), metal=1.0, rough=0.35, rust=0.4, wear=0.6, dirt=0.9, bare=(0.7, 0.55, 0.25), soot=0.4, engrave=0.6, engrave_scale=30.0),
+    "estola": dict(base=(0.11, 0.01, 0.014), rough=0.8, rust=0.2, wear=0.7, dirt=1.0, bare=(0.22, 0.08, 0.08), scratches=False, soot=0.4, engrave=0.3, engrave_scale=20.0),
     "tela": dict(base=(0.025, 0.025, 0.03), rough=0.85, rust=0.15, wear=0.7, dirt=1.1, bare=(0.12, 0.12, 0.12), scratches=False, soot=0.5),
-    "armadura": dict(base=(0.09, 0.09, 0.1), metal=0.85, rough=0.38, rust=0.7, wear=0.75, dirt=0.9, bare=(0.55, 0.55, 0.58), streaks=0.6, soot=0.5),
-    "cuero": dict(base=(0.07, 0.04, 0.02), rough=0.65, rust=0.0, wear=0.9, dirt=1.0, bare=(0.2, 0.13, 0.08), soot=0.3),
-    "piel": dict(skin=True, base=(0.36, 0.24, 0.18), veins=0.2, vein_col=(0.2, 0.1, 0.1), blotch=0.5, blotch_col=(0.26, 0.14, 0.1), rough=0.45, wet=0.15, dirt=0.4),
-    "barba": dict(base=(0.03, 0.025, 0.022), rough=0.9, rust=0.0, wear=0.3, dirt=0.4, bare=(0.12, 0.11, 0.1), scratches=False),
+    "armadura": dict(base=(0.1, 0.1, 0.11), metal=0.9, rough=0.3, rust=0.5, wear=0.6, dirt=0.8, bare=(0.55, 0.55, 0.58), streaks=0.5, soot=0.5, engrave=0.9, engrave_scale=14.0),
+    "armadura_lisa": dict(base=(0.1, 0.1, 0.11), metal=0.9, rough=0.32, rust=0.5, wear=0.6, dirt=0.8, bare=(0.55, 0.55, 0.58), streaks=0.5, soot=0.5),
+    "cuero": dict(base=(0.06, 0.035, 0.02), rough=0.62, rust=0.0, wear=0.9, dirt=1.0, bare=(0.2, 0.13, 0.08), soot=0.3),
     "metal": dict(base=(0.42, 0.42, 0.44), metal=1.0, rough=0.35, rust=0.7, wear=0.5, dirt=0.7, bare=(0.75, 0.75, 0.77)),
     "ojos": {"emit": (1.0, 0.85, 0.6), "strength": 3.0},
     "circuito": {"emit": (1.0, 0.15, 0.08), "strength": 2.0},
 }
+NAMES = {"pelvis": "pelvis", "spine": "spine", "chest": "chest", "neck": "neck", "head": "head"}
+for s in ("r", "l"):
+    NAMES.update({"upper_arm_" + s: "sh_" + s, "forearm_" + s: "el_" + s, "hand_" + s: "wr_" + s,
+                  "thigh_" + s: "hip_" + s, "shin_" + s: "kn_" + s, "foot_" + s: "an_" + s})
 
 
 def build(robed):
     bk.reset(seed=505 if robed else 506)
     bk.define_materials(MATS)
-    rng = random.Random(5)
+    H = humano.Humano("male", seed=5)
+    T = humano.targets(scale=1.18, width=1.08, pelvis_z=1.12)
+    H.fit(T, girth={"chest": (1.08, 1.04), "upper_arm_r": 1.06, "upper_arm_l": 1.06}, names=NAMES)
+    H.skin_tint(shaved=0.85, bald=0.7)
+    H.lips_slot()
+    H.eye_mats(iris_size=0.6)
+    g, mu = H.region("goatee"), H.region("mustache")
+    H.hair("candado", {k: max(g.get(k, 0), mu.get(k, 0)) for k in set(g) | set(mu)}, mat="barba", offset=0.0035, noise=0.002)
+    H.hair("cejas", "brows", mat="barba", offset=0.0035, noise=0.0015)
 
-    # -------------------------------------------------------------- cuerpo (debajo de la toga)
-    blob("cadera", 0.25, G(0, 1.12, 0), (1.0, 0.6, 0.55), bone="pelvis", mat="tela", lumps=0.03)
-    cyl("cinturon", 0.25, 0.07, G(0, 1.22, 0), bone="pelvis", mat="cuero", verts=24, r2=0.25)
-    box("hebilla", (0.09, 0.025, 0.07), G(0, 1.22, -0.17), bone="pelvis", mat="oro", bevel=0.006)
-    # Torso en V: pecho ancho, cintura angosta
-    box("abdomen", S(0.4, 0.34, 0.26), G(0, 1.43, 0), bone="spine", mat="tela", taper=(1.12, 1.05), bevel=0.07, segs=3)
-    box("torax", S(0.46, 0.44, 0.3), G(0, 1.82, 0.01), bone="chest", mat="tela", taper=(1.2, 1.05), bevel=0.09, segs=3)
-    # Peto con circuitos rojos (se ve en la fase 2)
-    panel("peto", (0.46, 0.06, 0.36), G(0, 1.84, -0.15), (0, 0, 0), bone="chest", mat="armadura", taper=(1.1, 1.0), bevel=0.04)
-    panel("peto_bajo", (0.38, 0.05, 0.12), G(0, 1.62, -0.14), (-8, 0, 0), bone="chest", mat="armadura", bevel=0.03)
-    panel("placa_abdomen", (0.34, 0.05, 0.26), G(0, 1.43, -0.135), (0, 0, 0), bone="spine", mat="armadura", bevel=0.02)
-    panel("espaldar", (0.46, 0.05, 0.36), G(0, 1.84, 0.17), (0, 0, 180), bone="chest", mat="armadura", taper=(1.1, 1.0), bevel=0.04)
-    for k in range(3):
-        box("circuito_abdomen_%d" % k, (0.018, 0.012, 0.22), G(-0.1 + k * 0.1, 1.43, -0.163), bone="spine", mat="circuito", bevel=0.002)
-    box("circuito_pecho_h", (0.3, 0.012, 0.018), G(0, 1.94, -0.183), bone="chest", mat="circuito", bevel=0.002)
-    for s in (-1, 1):
-        box("circuito_pecho_%d" % s, (0.018, 0.012, 0.28), G(s * 0.15, 1.82, -0.183), bone="chest", mat="circuito", bevel=0.002)
-    for i in range(4):
-        box("rayon_peto_%d" % i, (0.12, 0.006, 0.006), G(rng.uniform(-0.2, 0.2), rng.uniform(1.7, 1.95), -0.181), (0, rng.uniform(-40, 40), 0), bone="chest", mat="metal", bevel=0)
-    # Piernas
-    for side, s in (("l", -1), ("r", 1)):
-        limb("muslo_" + side, [G(s * 0.13, 1.06, 0), G(s * 0.13, 0.8, -0.01), G(s * 0.13, 0.55, 0)], [0.1, 0.09, 0.075], bone="hip_" + side, mat="tela", lumps=0.05)
-        limb("pierna_" + side, [G(s * 0.13, 0.55, 0), G(s * 0.13, 0.3, 0.01), G(s * 0.13, 0.08, 0)], [0.075, 0.07, 0.065], bone="kn_" + side, mat="tela", lumps=0.05)
-        sphere("rodillera_" + side, 0.07, G(s * 0.13, 0.54, -0.06), (1.0, 0.7, 1.0), bone="kn_" + side, mat="armadura", segs=14)
-        cyl("bota_cana_" + side, 0.085, 0.24, G(s * 0.13, 0.16, 0), bone="kn_" + side, mat="cuero", verts=16, r2=0.08)
-        box("bota_" + side, S(0.15, 0.09, 0.3), G(s * 0.13, 0.03, -0.06), bone="an_" + side, mat="cuero", bevel=0.03)
-    # Brazos
-    for side, s in (("l", -1), ("r", 1)):
-        sh, el, wr = "sh_" + side, "el_" + side, "wr_" + side
-        panel("hombrera_" + side, (0.16, 0.2, 0.05), G(s * 0.42, 2.0, 0), (0, s * 28, 0), bone=sh, mat="armadura", taper=(1.0, 0.9), bevel=0.02)
-        panel("hombrera2_" + side, (0.13, 0.18, 0.04), G(s * 0.47, 1.93, 0), (0, s * 50, 0), bone=sh, mat="armadura", bevel=0.015)
-        limb("brazo_" + side, [G(s * 0.38, 1.96, 0), G(s * 0.38, 1.8, 0), G(s * 0.38, 1.63, 0)], [0.07, 0.065, 0.06], bone=sh, mat="tela", lumps=0.05)
-        box("circuito_brazo_" + side, (0.012, 0.012, 0.28), G(s * 0.447, 1.8, 0), bone=sh, mat="circuito", bevel=0.002)
-        limb("antebrazo_" + side, [G(s * 0.38, 1.62, 0), G(s * 0.38, 1.45, -0.005), G(s * 0.38, 1.29, 0)], [0.06, 0.058, 0.05], bone=el, mat="cuero", lumps=0.05)
-        for k in range(3):
-            cyl("correa_%s_%d" % (side, k), 0.063, 0.02, G(s * 0.38, 1.55 - k * 0.09, 0), bone=el, mat="metal", verts=14)
-        box("mano_" + side, S(0.09, 0.11, 0.1), G(s * 0.38, 1.23, 0), bone=wr, mat="piel", bevel=0.025)
-        for f in range(4):
-            limb("dedo_%s_%d" % (side, f), [G(s * 0.38 + (f - 1.5) * 0.02, 1.18, -0.02), G(s * 0.38 + (f - 1.5) * 0.02, 1.12, -0.035)], [0.011, 0.009], bone=wr, mat="piel", verts=6)
+    # Ropa de abajo: camisa y pantalón tácticos, botas altas
+    ropa = {}
+    for rg in ("torso", "arms", "legs", "neck"):
+        for k, v in H.region(rg).items():
+            p = H.base_co[k]
+            if p.z > 0.2 and not (abs(p.x) > 0.2 and p.z < 0.87):
+                ropa[k] = max(ropa.get(k, 0.0), v)
+    H.piece("ropa", ropa, offset=0.006, mat="tela", thresh=0.3, smooth=1)
+    H.piece("botas", H.band("legs", -0.1, 0.32), offset=0.012, mat="cuero", thresh=0.3, smooth=2)
+    H.piece("botas_pie", "feet", offset=0.012, mat="cuero", thresh=0.3, smooth=2)
+    H.plate("cinturon", H.band("torso", 0.93, 0.975), offset=0.022, thick=0.01, mat="cuero", trim=None, smooth=2)
 
-    # -------------------------------------------------------------- cabeza: calvo con barba de candado
-    limb("cuello", [G(0, 2.06, 0), G(0, 2.14, -0.005), G(0, 2.24, 0)], [0.075, 0.07, 0.07], bone="neck", mat="piel")
-    blob("craneo", 0.15, G(0, 2.38, 0.005), (0.92, 1.08, 1.0), bone="head", mat="piel", lumps=0.03, seed=3)
-    blob("quijada", 0.1, G(0, 2.27, -0.04), (1.15, 0.7, 1.0), bone="head", mat="piel", lumps=0.04, seed=4)
-    blob("nariz", 0.03, G(0, 2.36, -0.15), (0.7, 1.0, 1.15), bone="head", mat="piel", lumps=0.08)
-    for s in (-1, 1):
-        blob("oreja_%d" % s, 0.035, G(s * 0.14, 2.36, 0.0), (0.4, 1.3, 1.0), bone="head", mat="piel", lumps=0.1)
-        box("ceja_%d" % s, (0.075, 0.02, 0.018), G(s * 0.058, 2.425, -0.138), (0, s * 10, 0), bone="head", mat="barba", bevel=0.006)
-        sphere("ojos_%d" % s, 0.012, G(s * 0.055, 2.395, -0.135), bone="head", mat="ojos", segs=10)
-        box("arruga_%d" % s, (0.04, 0.004, 0.004), G(s * 0.1, 2.39, -0.115), (0, s * 25, 0), bone="head", mat="barba", bevel=0)
-    # Barba de candado: bigote + piocha unidos por las comisuras
-    blob("bigote", 0.05, G(0, 2.31, -0.14), (1.3, 0.35, 0.45), bone="head", mat="barba", lumps=0.15)
-    for s in (-1, 1):
-        limb("comisura_%d" % s, [G(s * 0.055, 2.31, -0.135), G(s * 0.057, 2.26, -0.13), G(s * 0.045, 2.22, -0.12)], [0.012, 0.012, 0.012], bone="head", mat="barba", verts=6)
-    blob("piocha", 0.05, G(0, 2.21, -0.11), (1.0, 0.9, 0.8), bone="head", mat="barba", lumps=0.15)
-    box("boca", (0.055, 0.008, 0.01), G(0, 2.29, -0.145), bone="head", mat="estola", bevel=0.003)
-
+    front = lambda p, n: p.y > -0.01
+    back = lambda p, n: p.y <= 0.01
     if robed:
-        # ---------------------------------------------------------- toga académica
-        blob("toga_pecho", 0.37, G(0, 1.84, 0), (1.0, 0.65, 0.6), bone="chest", mat="toga", lumps=0.03, seed=9)
-        blob("toga_vientre", 0.3, G(0, 1.46, 0), (1.0, 0.72, 0.65), bone="spine", mat="toga", lumps=0.03, seed=10)
-        cyl("toga_cuello", 0.24, 0.12, G(0, 2.04, 0.0), bone="chest", mat="toga", verts=24, r2=0.17)
-        for s in (-1, 1):
-            box("ribete_%d" % s, S(0.06, 0.55, 0.02), G(s * 0.1, 1.82, -0.215), bone="chest", mat="oro", bevel=0.006)
-            box("ribete_v_%d" % s, S(0.06, 0.42, 0.02), G(s * 0.1, 1.46, -0.2), bone="spine", mat="oro", bevel=0.006)
-        # Estola roja con insignia y capucha caída a la espalda
-        for s in (-1, 1):
-            box("estola_%d" % s, S(0.07, 0.7, 0.02), G(s * 0.16, 1.75, -0.22), (0, 0, s * -6), bone="chest", mat="estola", bevel=0.008)
-        cyl("insignia", 0.045, 0.012, G(-0.16, 1.95, -0.235), (90, 0, 0), bone="chest", mat="oro", verts=16)
-        blob("capucha", 0.18, G(0, 2.0, 0.25), (1.3, 0.8, 0.6), bone="chest", mat="toga", lumps=0.1, seed=11)
-        cloth("capucha_cola", 0.3, 0.4, G(0, 1.95, 0.32), (0, 0, 180), bone="chest", mat="toga", nx=8, ny=8, tatter=0.3, seed=12)
-        # Falda de la toga: paneles que siguen a cada pierna, dobladillo deshilachado
-        cloth("falda_fi", 0.36, 1.05, G(-0.14, 1.18, -0.22), (0, 0, 8), bone="pelvis", mat="toga", nx=10, ny=14, tatter=0.15, holes=0.03, flare=0.12, bone2="hip_l", blend=0.6, seed=13)
-        cloth("falda_fd", 0.36, 1.05, G(0.14, 1.18, -0.22), (0, 0, -8), bone="pelvis", mat="toga", nx=10, ny=14, tatter=0.15, holes=0.03, flare=0.12, bone2="hip_r", blend=0.6, seed=14)
-        cloth("falda_atras", 0.66, 1.1, G(0, 1.2, 0.2), (0, 0, 180), bone="pelvis", mat="toga", nx=16, ny=14, tatter=0.18, holes=0.03, flare=0.16, seed=15)
-        for s in (-1, 1):
-            cloth("falda_lado_%d" % s, 0.4, 1.05, G(s * 0.27, 1.18, 0.0), (0, 0, s * -90), bone="pelvis", mat="toga", nx=10, ny=14, tatter=0.18, holes=0.03, flare=0.14, bone2="hip_l" if s < 0 else "hip_r", blend=0.4, seed=16 + s)
+        # Toga larga: todo el torso y los brazos, con la falda hasta los tobillos
+        toga = {}
+        for rg in ("torso", "arms", "neck"):
+            for k, v in H.region(rg).items():
+                p = H.base_co[k]
+                if p.z > 0.86 and not (abs(p.x) > 0.2 and p.z < 0.98):
+                    toga[k] = max(toga.get(k, 0.0), v)
+        H.piece("toga", toga, offset=0.035, mat="toga", thresh=0.3, smooth=3, noise=0.004, extrude=(0.82, 0.32), tatter=(0.3, 0.18))
+        # Ribetes dorados y estola roja que bajan por el frente
+        for sg in (-1, 1):
+            H.strap("ribete_%d" % sg, (sg * 0.075, 0.1, 1.44), (sg * 0.06, 0.1, 0.86), 0.022, region="torso", offset=0.042, mat="oro", fn=front)
+            H.strap("estola_%d" % sg, (sg * 0.11, 0.1, 1.44), (sg * 0.1, 0.1, 0.9), 0.04, region="torso", offset=0.045, mat="estola", fn=front)
         # Mangas acampanadas con puño dorado
-        for side, s in (("l", -1), ("r", 1)):
-            cyl("manga_sup_" + side, 0.1, 0.4, G(s * 0.38, 1.8, 0), bone="sh_" + side, mat="toga", verts=18, r2=0.13)
-            cyl("manga_" + side, 0.24, 0.36, G(s * 0.38, 1.47, 0), bone="el_" + side, mat="toga", verts=22, r2=0.13)
-            cyl("puno_oro_" + side, 0.25, 0.04, G(s * 0.38, 1.28, 0), bone="el_" + side, mat="oro", verts=22, r2=0.245)
-            cloth("manga_jiron_" + side, 0.3, 0.12, G(s * 0.38, 1.3, -0.22), (0, 0, 0), bone="el_" + side, mat="toga", nx=8, ny=3, tatter=0.6, seed=20 + s)
+        for s, sg in (("r", 1), ("l", -1)):
+            w = T["wrist_" + s]
+            cyl("manga_" + s, 0.13, 0.3, (w.x, w.y, w.z + 0.17), bone="el_" + s, mat="toga", verts=24, r2=0.075)
+            cyl("puno_oro_" + s, 0.135, 0.035, (w.x, w.y, w.z + 0.03), bone="el_" + s, mat="oro", verts=24, r2=0.13)
+        # Capucha caída en la espalda e insignia en la estola
+        H.attach(bk.blob("capucha", 0.16, (0, -0.17, T["neck"].z - 0.06), (1.3, 0.7, 0.75), bone="chest", mat="toga", lumps=0.12))
+        H.attach(cyl("insignia", 0.04, 0.012, (-0.11, 0.17, 1.62), (90, 0, 0), bone="chest", mat="oro", verts=18))
+    else:
+        # Armadura negra grabada con circuitos rojos
+        peto = H.band("torso", 1.0, 1.42)
+        H.plate("peto", peto, offset=0.03, thick=0.012, mat="armadura", trim="metal", trim_r=0.005, glow="circuito", fn=front, flutes=(9.0, 0.004, 0), smooth=4)
+        H.plate("espaldar", peto, offset=0.028, thick=0.01, mat="armadura", trim="metal", trim_r=0.005, glow="circuito", fn=back, smooth=4)
+        H.lames("gola", H.band("neck", 1.36, 1.46), 1.36, 1.46, 2, offset=0.024, step=0.007, thick=0.007, mat="armadura_lisa", trim="metal", trim_r=0.004, smooth=3)
+        H.lames("escarcela", H.band("torso", 0.84, 1.0), 0.84, 1.0, 2, offset=0.035, step=0.009, thick=0.008, mat="armadura", trim="metal", trim_r=0.004, glow="circuito", smooth=3)
+        for s, sg in (("r", 1), ("l", -1)):
+            sh = H.zone((sg * 0.19, 0.0, 1.38), 0.15, fn=lambda p: p.z > 1.22)
+            H.lames("hombrera_" + s, sh, 1.22, 1.5, 3, rigid="upper_arm_" + s, offset=0.04, step=0.012, thick=0.01, mat="armadura", trim="metal", trim_r=0.005, glow="circuito", smooth=4)
+            arms = {k: v for k, v in H.region("arms").items() if H.base_co[k].x * sg > 0}
+            H.lames("brazal_" + s, H.band(arms, 0.88, 1.04), 0.88, 1.04, 3, offset=0.016, step=0.004, thick=0.007, mat="armadura", trim="metal", trim_r=0.0035, glow="circuito", smooth=3)
+            hands = {k: v for k, v in H.region("hands").items() if H.base_co[k].x * sg > 0}
+            H.plate("guantelete_" + s, hands, offset=0.01, thick=0.005, mat="armadura_lisa", trim=None, smooth=2)
+            legs = {k: v for k, v in H.region("legs").items() if H.base_co[k].x * sg > 0}
+            H.plate("quijote_" + s, H.band(legs, 0.56, 0.82), offset=0.02, thick=0.008, mat="armadura", trim="metal", trim_r=0.004, fn=lambda p, n: p.y > -0.02, smooth=3, glow="circuito")
+            H.plate("rodillera_" + s, H.zone((sg * 0.11, 0.07, 0.47), 0.07, fn=lambda p: p.y > -0.02), offset=0.03, thick=0.01, mat="armadura", trim="metal", trim_r=0.004, smooth=3)
+            H.plate("greba_" + s, H.band(legs, 0.14, 0.43), offset=0.03, thick=0.008, mat="armadura", trim="metal", trim_r=0.004, glow="circuito", fn=lambda p, n: p.y > -0.03, smooth=3)
+        # Bolsas y hebilla en el cinturón
+        cin = T["pelvis"].z - 0.0
+        for k, x in enumerate((-0.16, -0.08, 0.08)):
+            H.attach(bk.blob("bolsa_%d" % k, 0.04, (x, 0.16 - abs(x) * 0.4, cin - 0.04), (1.0, 0.6, 1.1), bone="pelvis", mat="cuero", lumps=0.05))
+        H.attach(box("hebilla", (0.08, 0.025, 0.06), (0, 0.17, cin), bone="pelvis", mat="metal", bevel=0.006))
 
-    # -------------------------------------------------------------- esqueleto (= articulaciones)
-    B = [
-        ("pelvis", "", G(0, 1.12, 0), G(0, 1.26, 0)),
-        ("spine", "pelvis", G(0, 1.26, 0), G(0, 1.62, 0)),
-        ("chest", "spine", G(0, 1.62, 0), G(0, 2.08, 0)),
-        ("neck", "chest", G(0, 2.08, 0), G(0, 2.22, 0)),
-        ("head", "neck", G(0, 2.22, 0), G(0, 2.55, 0)),
-    ]
-    for side, s in (("l", -1), ("r", 1)):
-        B += [
-            ("hip_" + side, "pelvis", G(s * 0.13, 1.04, 0), G(s * 0.13, 0.54, 0)),
-            ("kn_" + side, "hip_" + side, G(s * 0.13, 0.54, 0), G(s * 0.13, 0.06, 0)),
-            ("an_" + side, "kn_" + side, G(s * 0.13, 0.06, 0), G(s * 0.13, 0.0, -0.2)),
-            ("sh_" + side, "chest", G(s * 0.38, 1.98, 0), G(s * 0.38, 1.62, 0)),
-            ("el_" + side, "sh_" + side, G(s * 0.38, 1.62, 0), G(s * 0.38, 1.28, 0)),
-            ("wr_" + side, "el_" + side, G(s * 0.38, 1.28, 0), G(s * 0.38, 1.15, 0)),
-        ]
-    bk.armature(B)
     name = "rector" if robed else "rector_sin_toga"
-    bk.finish(name, tex_size=2048, bake=True, out_dir=OUT)
+    bk.finish(name, tex_size=4096, bake=True, out_dir=OUT)
     if PREVIEW:
-        bk.render_preview(os.path.join(OUT, "preview_%s.png" % name), (1.0, 3.0, 1.4), (0, 0, 1.1))
-        bk.render_preview(os.path.join(OUT, "preview_%s_cara.png" % name), (0.35, 0.9, 2.4), (0, 0, 2.33), size=(700, 700))
+        bk.set_pose({})
+        bk.render_preview(os.path.join(OUT, "preview_%s.png" % name), (1.5, 3.6, 1.6), (0, 0, 1.15), size=(800, 1100))
+        bk.render_preview(os.path.join(OUT, "preview_%s_cara.png" % name), (0.25, 0.8, 2.05), (0, 0.04, 1.97), size=(800, 800))
     bk.export(os.path.join(OUT, name + ".glb"), actions=False)
 
 

@@ -1471,7 +1471,8 @@ func _build_model() -> void:
 	# Cables de servidor que cuelgan del rack
 	for k in 5:
 		var root := Node3D.new()
-		root.position = Vector3(-0.3 + k * 0.15, 0.2, 0.82)
+		# (justo detrás del rack del modelo de Blender)
+		root.position = Vector3(-0.24 + k * 0.12, 0.05, 0.5)
 		chest.add_child(root)
 		var segs: Array = []
 		var parent := root
