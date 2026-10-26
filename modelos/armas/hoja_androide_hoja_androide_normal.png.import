@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://colnpk7gcnjph"
-path="res://.godot/imported/hoja_androide_hoja_androide_normal.png-5db2e81f49b59ba057f8feebd3a63524.ctex"
+path.s3tc="res://.godot/imported/hoja_androide_hoja_androide_normal.png-5db2e81f49b59ba057f8feebd3a63524.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "9f3d1fe99962f136ef77d6266bf451f4"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas/hoja_androide_hoja_androide_normal.png"
-dest_files=["res://.godot/imported/hoja_androide_hoja_androide_normal.png-5db2e81f49b59ba057f8feebd3a63524.ctex"]
+dest_files=["res://.godot/imported/hoja_androide_hoja_androide_normal.png-5db2e81f49b59ba057f8feebd3a63524.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

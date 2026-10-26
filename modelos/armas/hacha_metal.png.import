@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://6n68ct3ohxrh"
-path="res://.godot/imported/hacha_metal.png-9c1350f6366a38ce0f78466f2b6275c0.ctex"
+path.s3tc="res://.godot/imported/hacha_metal.png-9c1350f6366a38ce0f78466f2b6275c0.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/armas/hacha_metal.png"
-dest_files=["res://.godot/imported/hacha_metal.png-9c1350f6366a38ce0f78466f2b6275c0.ctex"]
+dest_files=["res://.godot/imported/hacha_metal.png-9c1350f6366a38ce0f78466f2b6275c0.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

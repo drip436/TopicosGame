@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cvfga1ondt057"
-path="res://.godot/imported/catedratico_catedratico_metal-catedratico_rough.png-cd5cff6ac51a1c8882790367cd35399b.ctex"
+path.s3tc="res://.godot/imported/catedratico_catedratico_metal-catedratico_rough.png-cd5cff6ac51a1c8882790367cd35399b.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "eea1ba1c4c19156dcc2169ef40320624"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jefes/catedratico_catedratico_metal-catedratico_rough.png"
-dest_files=["res://.godot/imported/catedratico_catedratico_metal-catedratico_rough.png-cd5cff6ac51a1c8882790367cd35399b.ctex"]
+dest_files=["res://.godot/imported/catedratico_catedratico_metal-catedratico_rough.png-cd5cff6ac51a1c8882790367cd35399b.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

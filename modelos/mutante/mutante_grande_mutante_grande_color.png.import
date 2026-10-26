@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bft0fhl214xky"
-path="res://.godot/imported/mutante_grande_mutante_grande_color.png-6ccba0bd7092c10789a47f9cae6c54e3.ctex"
+path.s3tc="res://.godot/imported/mutante_grande_mutante_grande_color.png-6ccba0bd7092c10789a47f9cae6c54e3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "0f7b15936ad1686da60d060b813c3097"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/mutante/mutante_grande_mutante_grande_color.png"
-dest_files=["res://.godot/imported/mutante_grande_mutante_grande_color.png-6ccba0bd7092c10789a47f9cae6c54e3.ctex"]
+dest_files=["res://.godot/imported/mutante_grande_mutante_grande_color.png-6ccba0bd7092c10789a47f9cae6c54e3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://djth83eav0wcs"
-path="res://.godot/imported/espada_metal.png-9c66230baff89d4a069aba125d5f2ecc.ctex"
+path.s3tc="res://.godot/imported/espada_metal.png-9c66230baff89d4a069aba125d5f2ecc.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/armas/espada_metal.png"
-dest_files=["res://.godot/imported/espada_metal.png-9c66230baff89d4a069aba125d5f2ecc.ctex"]
+dest_files=["res://.godot/imported/espada_metal.png-9c66230baff89d4a069aba125d5f2ecc.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

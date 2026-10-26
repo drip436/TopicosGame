@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cv5gg8acjqlya"
-path="res://.godot/imported/hacha_hacha_metal-hacha_rough.png-786e207797df1aa2f50d7a79bb79bbb3.ctex"
+path.s3tc="res://.godot/imported/hacha_hacha_metal-hacha_rough.png-786e207797df1aa2f50d7a79bb79bbb3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "6bb0e04f3447c10481969e0a24fec79b"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas/hacha_hacha_metal-hacha_rough.png"
-dest_files=["res://.godot/imported/hacha_hacha_metal-hacha_rough.png-786e207797df1aa2f50d7a79bb79bbb3.ctex"]
+dest_files=["res://.godot/imported/hacha_hacha_metal-hacha_rough.png-786e207797df1aa2f50d7a79bb79bbb3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://djkcc5xa820yg"
-path="res://.godot/imported/jugador_ai_rough.png-2961d83fbc8783cb88399c8203071891.ctex"
+path.s3tc="res://.godot/imported/jugador_ai_rough.png-2961d83fbc8783cb88399c8203071891.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jugador/jugador_ai_rough.png"
-dest_files=["res://.godot/imported/jugador_ai_rough.png-2961d83fbc8783cb88399c8203071891.ctex"]
+dest_files=["res://.godot/imported/jugador_ai_rough.png-2961d83fbc8783cb88399c8203071891.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

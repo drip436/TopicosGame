@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://clr6isqmigaom"
-path="res://.godot/imported/hacha_color.png-7ad2b7b814e741505ad9c8434be6920d.ctex"
+path.s3tc="res://.godot/imported/hacha_color.png-7ad2b7b814e741505ad9c8434be6920d.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/armas/hacha_color.png"
-dest_files=["res://.godot/imported/hacha_color.png-7ad2b7b814e741505ad9c8434be6920d.ctex"]
+dest_files=["res://.godot/imported/hacha_color.png-7ad2b7b814e741505ad9c8434be6920d.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

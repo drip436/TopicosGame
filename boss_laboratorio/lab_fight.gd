@@ -292,3 +292,12 @@ func _open_fog_gate() -> void:
 	tw.tween_method(func(v: float): m.set_shader_parameter("alpha", v), 0.85, 0.0, 2.0)
 	tw.parallel().tween_property(_fog.get_node("FogLight"), "light_energy", 0.0, 2.0)
 	tw.tween_callback(func(): _fog.visible = false)
+
+
+## Partida cargada: este jefe ya fue vencido. No aparece y su arena queda abierta.
+func restore_won() -> void:
+	_state = "won"
+	if boss and is_instance_valid(boss):
+		boss.queue_free()
+	boss = null
+	_open_fog_gate()

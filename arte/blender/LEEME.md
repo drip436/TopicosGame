@@ -88,3 +88,38 @@ scripts aceptan nombres para generar solo algunos modelos (`... -- modelos/jugad
   `hair_material` (mechones, raíces y canas). Los colores son lineales: valores bajos (≈0.1–0.4).
 - `finish` une todo, hace UV y hornea color/rugosidad/metal/normal; `action` crea
   animaciones; `export` saca el `.glb`.
+
+## Utilería de las arenas y vehículos (`utileria.py`)
+
+```
+blender -b --python arte/blender/utileria.py -- modelos/utileria [preview] [nombre ...]
+```
+
+Modelos estáticos con desgaste horneado, origen en el piso y frente hacia +Y (en Godot
+miran a −Z; los vehículos van a lo largo de X con el frente hacia +X):
+
+| Zona | Modelos |
+|---|---|
+| Laboratorio (Dr. Kessler) | `barril_toxico`, `barril_azul`, `barril_oxidado`, `tanque_quimico`, `caja_biopeligro`, `mesa_lab`, `camilla` |
+| Centro de Cómputo (ADA-7) | `rack_servidor`, `escritorio_pc`, `silla_oficina`, `pc_vieja`, `bobina_cable` |
+| Biblioteca (Bibliófilo) | `mesa_lectura`, `fichero`, `carrito_libros`, `globo`, `atril` |
+| Plaza (Catedrático) | `pupitre`, `pizarron` (y `atril`) |
+| Aula Magna (Rector) | `butacas`, `podio`, `estandarte`, `candelabro` |
+| Calles | `auto_rojo`, `auto_gris`, `auto_azul`, `auto_quemado`, `autobus_amarillo`, `autobus_quemado` |
+
+En el juego se colocan con `_prop(nombre, posición, giro, colisión, volcado)` de
+`scripts/arena_generator.gd` (se dibujan con MultiMesh). Después de exportar, borra los
+`*_color/_metal/_normal/_rough.png` sueltos que deja el horneado (el .glb ya los trae
+dentro); **no** borres los `<nombre>_<nombre>_*.png`, que son los que extrae Godot.
+
+## Texturas de relieve del escenario (`arte/texturas/gen_texturas.py`)
+
+```
+python3 arte/texturas/gen_texturas.py texturas
+```
+
+Genera `texturas/{concreto,ladrillo,metal,madera,yeso}_{n,d}.png` (sin costuras): normales,
+y en `_d` color (R), rugosidad (G) y juntas/mortero (B). Los shaders del mundo las
+proyectan en coordenadas de mundo (`shaders/detalle.gdshaderinc`) y los materiales las
+reciben con `_relieve(material, tipo, repeticiones_por_metro)`. Las fachadas usan además
+`_facade_mesh()`: ventanas hundidas, alféizar, dintel, moldura de entrepiso y pilastras.

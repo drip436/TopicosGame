@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cnpwkpq8o8aqn"
-path="res://.godot/imported/jugador_cyber_normal.png-4fcab9538e7094b357c56711e9b6a184.ctex"
+path.s3tc="res://.godot/imported/jugador_cyber_normal.png-4fcab9538e7094b357c56711e9b6a184.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jugador/jugador_cyber_normal.png"
-dest_files=["res://.godot/imported/jugador_cyber_normal.png-4fcab9538e7094b357c56711e9b6a184.ctex"]
+dest_files=["res://.godot/imported/jugador_cyber_normal.png-4fcab9538e7094b357c56711e9b6a184.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c77p5opnk84l7"
-path="res://.godot/imported/jugador_frontend_normal.png-3c33f74e0a7ee4a2eaab219db47af382.ctex"
+path.s3tc="res://.godot/imported/jugador_frontend_normal.png-3c33f74e0a7ee4a2eaab219db47af382.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jugador/jugador_frontend_normal.png"
-dest_files=["res://.godot/imported/jugador_frontend_normal.png-3c33f74e0a7ee4a2eaab219db47af382.ctex"]
+dest_files=["res://.godot/imported/jugador_frontend_normal.png-3c33f74e0a7ee4a2eaab219db47af382.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

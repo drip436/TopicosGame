@@ -98,7 +98,7 @@ func _setup() -> void:
 		player.rotation.y = yaw
 		_disable_other_cameras()
 	if player:
-		var hint := "WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar objetivo\nR beber café (curar) · E descansar en hoguera · Esc soltar mouse"
+		var hint := "WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar objetivo\nR beber café (curar) · E descansar en hoguera (guarda) · Esc pausa"
 		if player.has_method("get_class_name"):
 			var cls = preload("res://jugador/player_classes.gd").data(player.class_id)
 			hint = "Clase: %s\n%s\n%s" % [player.get_class_name(), cls["controls"], hint]
@@ -303,3 +303,17 @@ func _open_fog_gate() -> void:
 	tw.tween_method(func(v): m.set_shader_parameter("alpha", v), 0.85, 0.0, 2.0)
 	tw.parallel().tween_property(_fog.get_node("FogLight"), "light_energy", 0.0, 2.0)
 	tw.tween_callback(func(): _fog.visible = false)
+
+
+## Partida cargada: el primer jefe ya fue vencido. No aparece, se abre la niebla y el
+## cielo queda despejado.
+func restore_won() -> void:
+	_state = "won"
+	if boss and is_instance_valid(boss):
+		boss.queue_free()
+	boss = null
+	_open_fog_gate()
+	if hud and hud.has_method("hide_boss"):
+		hud.hide_boss(0.0)
+	if weather and clear_weather_on_victory and weather.has_method("calm"):
+		weather.calm(0.1, rain_after_victory)

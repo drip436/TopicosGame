@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://biqo5xg6ql2fv"
-path="res://.godot/imported/bibliofilo_normal.png-a8cbb475db471c5c2e8c14de67b5a9d4.ctex"
+path.s3tc="res://.godot/imported/bibliofilo_normal.png-a8cbb475db471c5c2e8c14de67b5a9d4.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jefes/bibliofilo_normal.png"
-dest_files=["res://.godot/imported/bibliofilo_normal.png-a8cbb475db471c5c2e8c14de67b5a9d4.ctex"]
+dest_files=["res://.godot/imported/bibliofilo_normal.png-a8cbb475db471c5c2e8c14de67b5a9d4.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

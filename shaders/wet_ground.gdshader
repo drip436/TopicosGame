@@ -9,6 +9,13 @@ uniform float road_z = 38.0;
 uniform float puddle_coverage : hint_range(0.0, 1.0) = 0.5;
 uniform float rain_intensity : hint_range(0.0, 2.0) = 1.0;
 uniform float wetness : hint_range(0.0, 1.0) = 0.85;
+// Relieve de concreto (texturas/concreto_*.png)
+uniform sampler2D det_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D det_d : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float det_scale = 0.45;
+uniform float det_strength = 1.0;
+
+#include "res://shaders/detalle.gdshaderinc"
 
 varying vec3 wpos;
 
@@ -91,6 +98,8 @@ void fragment() {
 
 	vec3 base = mix(grass, asph, road);
 	base = mix(base, tile_col, plaza);
+	vec4 dd = texture(det_d, p * det_scale);
+	base *= mix(1.0, 0.35 + dd.r * 1.3, max(plaza, road));
 
 	// --- Grietas y quemaduras de batalla ---
 	float cr1 = 1.0 - smoothstep(0.0, 0.012, abs(texture(noise_tex, p * 0.05).r - 0.5));
@@ -119,7 +128,12 @@ void fragment() {
 	rough = mix(rough, 0.03, puddle);
 
 	vec2 bump = vec2(n3 - 0.5) * 0.18 * (1.0 - puddle) + rip * 0.32 * puddle;
-	vec3 nw = normalize(vec3(-bump.x, 1.0, -bump.y));
+	vec3 nw = vec3(-bump.x, 1.0, -bump.y);
+	float seco = 1.0 - puddle;
+	nw += piso_n(det_n, p, det_scale, det_strength * max(plaza, road) * seco);
+	nw += bisel(tf, edge_d, 0.12, 0.55) * plaza * (1.0 - missing) * seco;
+	nw = normalize(nw);
+	rough = mix(rough, rough * (0.6 + dd.g * 0.6), seco);
 
 	ALBEDO = col;
 	ROUGHNESS = rough;

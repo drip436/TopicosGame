@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b4jbg8ao3wio2"
-path="res://.godot/imported/ada7_color.png-15c36a0269d1c16d59609aee850b96cb.ctex"
+path.s3tc="res://.godot/imported/ada7_color.png-15c36a0269d1c16d59609aee850b96cb.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jefes/ada7_color.png"
-dest_files=["res://.godot/imported/ada7_color.png-15c36a0269d1c16d59609aee850b96cb.ctex"]
+dest_files=["res://.godot/imported/ada7_color.png-15c36a0269d1c16d59609aee850b96cb.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

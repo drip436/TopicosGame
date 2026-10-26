@@ -22,6 +22,14 @@ uniform float broken : hint_range(0.0, 1.0) = 0.06;
 uniform float wetness : hint_range(0.0, 1.0) = 0.6;
 uniform float puddle_coverage : hint_range(0.0, 1.0) = 0.35;
 uniform float rain_intensity : hint_range(0.0, 2.0) = 1.0;
+// Relieve (texturas/concreto_*.png): poros, desgaste y bisel de cada baldosa
+uniform sampler2D det_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D det_d : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float det_scale = 0.5;
+uniform float det_strength = 0.8;
+uniform float bevel = 0.5;
+
+#include "res://shaders/detalle.gdshaderinc"
 
 varying vec3 wpos;
 
@@ -97,6 +105,8 @@ void fragment() {
 	tile = mix(tile, vec3(0.1, 0.085, 0.07) * (0.7 + 0.6 * n3), miss);
 	float grime = smoothstep(0.35, 0.8, n2) * dirt;
 	tile *= 1.0 - grime * 0.55;
+	vec4 dd = texture(det_d, p * det_scale);
+	tile *= 0.35 + dd.r * 1.3;
 	vec3 base = mix(tile, grout_color, grout * (1.0 - miss));
 
 	float crack = (1.0 - smoothstep(0.0, 0.012, abs(texture(noise_tex, p * 0.06 + vec2(9.0, 2.0)).r - 0.5))) * dirt;
@@ -116,7 +126,18 @@ void fragment() {
 	rough = mix(rough, 0.03, puddle);
 
 	vec2 bump = vec2(n3 - 0.5) * 0.14 * (1.0 - puddle) + rip * 0.3 * puddle;
-	vec3 nw = normalize(vec3(-bump.x, 1.0, -bump.y));
+	vec3 nw = vec3(-bump.x, 1.0, -bump.y);
+	float seco = 1.0 - puddle;
+	nw += piso_n(det_n, p, det_scale, det_strength * seco);
+	if (pattern != 3) {
+		vec2 ts = tf * tile_size;
+		float ed = min(min(ts.x, tile_size.x - ts.x), min(ts.y, tile_size.y - ts.y));
+		nw += bisel(tf, ed, 0.05, bevel) * (1.0 - miss) * seco;
+		// Cada baldosa queda un poco chueca
+		nw += vec3(hash12(tid + 9.1) - 0.5, 0.0, hash12(tid + 4.3) - 0.5) * 0.08 * seco;
+	}
+	nw = normalize(nw);
+	rough = mix(rough, rough * (0.6 + dd.g * 0.6), seco);
 
 	float pulse = 0.7 + 0.3 * sin(TIME * 1.7 + (p.x + p.y) * 0.15);
 	vec3 glow = glow_color * glow_energy * pulse * (grout * (1.0 - miss) * step(float(pattern), 2.5) + ring_glow);

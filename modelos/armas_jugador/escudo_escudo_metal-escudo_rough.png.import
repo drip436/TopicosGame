@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c3fu6eklyv1gg"
-path="res://.godot/imported/escudo_escudo_metal-escudo_rough.png-4d6d7d05a7b5605fe9dfd64302693f8c.ctex"
+path.s3tc="res://.godot/imported/escudo_escudo_metal-escudo_rough.png-4d6d7d05a7b5605fe9dfd64302693f8c.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "02d9e5147de12ea647872cf969f15f5b"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas_jugador/escudo_escudo_metal-escudo_rough.png"
-dest_files=["res://.godot/imported/escudo_escudo_metal-escudo_rough.png-4d6d7d05a7b5605fe9dfd64302693f8c.ctex"]
+dest_files=["res://.godot/imported/escudo_escudo_metal-escudo_rough.png-4d6d7d05a7b5605fe9dfd64302693f8c.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

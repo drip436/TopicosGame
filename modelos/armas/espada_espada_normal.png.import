@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://owjm8fsqrtj"
-path="res://.godot/imported/espada_espada_normal.png-a21fa774d0bf0d5686a17fc28070ff42.ctex"
+path.s3tc="res://.godot/imported/espada_espada_normal.png-a21fa774d0bf0d5686a17fc28070ff42.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "e9e9e498d6fe482555b27d254c0a8a68"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas/espada_espada_normal.png"
-dest_files=["res://.godot/imported/espada_espada_normal.png-a21fa774d0bf0d5686a17fc28070ff42.ctex"]
+dest_files=["res://.godot/imported/espada_espada_normal.png-a21fa774d0bf0d5686a17fc28070ff42.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

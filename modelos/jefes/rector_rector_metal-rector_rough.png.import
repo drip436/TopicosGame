@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cwe1iy35vlayq"
-path="res://.godot/imported/rector_rector_metal-rector_rough.png-c464e26f6a5f04104fa0d765714bd03a.ctex"
+path.s3tc="res://.godot/imported/rector_rector_metal-rector_rough.png-c464e26f6a5f04104fa0d765714bd03a.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "dc62d1e592f5c666655a7ac2d17f1272"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jefes/rector_rector_metal-rector_rough.png"
-dest_files=["res://.godot/imported/rector_rector_metal-rector_rough.png-c464e26f6a5f04104fa0d765714bd03a.ctex"]
+dest_files=["res://.godot/imported/rector_rector_metal-rector_rough.png-c464e26f6a5f04104fa0d765714bd03a.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

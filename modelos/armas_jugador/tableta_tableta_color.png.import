@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bpmcy0ps8f3f7"
-path="res://.godot/imported/tableta_tableta_color.png-7799b801680bcb5b578d6998426e182f.ctex"
+path.s3tc="res://.godot/imported/tableta_tableta_color.png-7799b801680bcb5b578d6998426e182f.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "29f4f7e5c0cb6facdc02e0c6a8d41120"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas_jugador/tableta_tableta_color.png"
-dest_files=["res://.godot/imported/tableta_tableta_color.png-7799b801680bcb5b578d6998426e182f.ctex"]
+dest_files=["res://.godot/imported/tableta_tableta_color.png-7799b801680bcb5b578d6998426e182f.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://byh0r3c5sxul3"
-path="res://.godot/imported/jugador_cyber_jugador_cyber_metal-jugador_cyber_rough.png-5fdaeae2f508163d99325614e53d3c7b.ctex"
+path.s3tc="res://.godot/imported/jugador_cyber_jugador_cyber_metal-jugador_cyber_rough.png-5fdaeae2f508163d99325614e53d3c7b.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "8f80d512aee3fd47888c9f17a2711c21"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jugador/jugador_cyber_jugador_cyber_metal-jugador_cyber_rough.png"
-dest_files=["res://.godot/imported/jugador_cyber_jugador_cyber_metal-jugador_cyber_rough.png-5fdaeae2f508163d99325614e53d3c7b.ctex"]
+dest_files=["res://.godot/imported/jugador_cyber_jugador_cyber_metal-jugador_cyber_rough.png-5fdaeae2f508163d99325614e53d3c7b.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

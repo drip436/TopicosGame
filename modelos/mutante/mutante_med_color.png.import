@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://baop6wkr2bte7"
-path="res://.godot/imported/mutante_med_color.png-e55f0bb5b3d45b512de763704ad3ca33.ctex"
+path.s3tc="res://.godot/imported/mutante_med_color.png-e55f0bb5b3d45b512de763704ad3ca33.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/mutante/mutante_med_color.png"
-dest_files=["res://.godot/imported/mutante_med_color.png-e55f0bb5b3d45b512de763704ad3ca33.ctex"]
+dest_files=["res://.godot/imported/mutante_med_color.png-e55f0bb5b3d45b512de763704ad3ca33.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

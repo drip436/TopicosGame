@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://4a3noevorh22"
-path="res://.godot/imported/estoque_estoque_metal-estoque_rough.png-a0fc7d481c6d81b9b9462456b30ff377.ctex"
+path.s3tc="res://.godot/imported/estoque_estoque_metal-estoque_rough.png-a0fc7d481c6d81b9b9462456b30ff377.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "9fbed53a0e275a2ee2e6ca98315159b3"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas_jugador/estoque_estoque_metal-estoque_rough.png"
-dest_files=["res://.godot/imported/estoque_estoque_metal-estoque_rough.png-a0fc7d481c6d81b9b9462456b30ff377.ctex"]
+dest_files=["res://.godot/imported/estoque_estoque_metal-estoque_rough.png-a0fc7d481c6d81b9b9462456b30ff377.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

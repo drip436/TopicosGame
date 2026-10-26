@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://0ej758fvav62"
-path="res://.godot/imported/baston_normal.png-83051526b1a5d8a42847ea21b2057c69.ctex"
+path.s3tc="res://.godot/imported/baston_normal.png-83051526b1a5d8a42847ea21b2057c69.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/armas_jugador/baston_normal.png"
-dest_files=["res://.godot/imported/baston_normal.png-83051526b1a5d8a42847ea21b2057c69.ctex"]
+dest_files=["res://.godot/imported/baston_normal.png-83051526b1a5d8a42847ea21b2057c69.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

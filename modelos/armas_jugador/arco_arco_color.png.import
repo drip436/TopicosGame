@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bbt0psb5124h2"
-path="res://.godot/imported/arco_arco_color.png-208994eea1c2dd4200af8ee94c72ae32.ctex"
+path.s3tc="res://.godot/imported/arco_arco_color.png-208994eea1c2dd4200af8ee94c72ae32.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "97c996f3b17e96fcd5efc3687dd2d6af"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas_jugador/arco_arco_color.png"
-dest_files=["res://.godot/imported/arco_arco_color.png-208994eea1c2dd4200af8ee94c72ae32.ctex"]
+dest_files=["res://.godot/imported/arco_arco_color.png-208994eea1c2dd4200af8ee94c72ae32.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

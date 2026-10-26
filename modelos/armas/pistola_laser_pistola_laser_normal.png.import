@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dg61iemmuq0gt"
-path="res://.godot/imported/pistola_laser_pistola_laser_normal.png-f9f5797eaed74156a277aca420484b85.ctex"
+path.s3tc="res://.godot/imported/pistola_laser_pistola_laser_normal.png-f9f5797eaed74156a277aca420484b85.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "d163666ae13ce125fbb5d5c3d7c38482"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas/pistola_laser_pistola_laser_normal.png"
-dest_files=["res://.godot/imported/pistola_laser_pistola_laser_normal.png-f9f5797eaed74156a277aca420484b85.ctex"]
+dest_files=["res://.godot/imported/pistola_laser_pistola_laser_normal.png-f9f5797eaed74156a277aca420484b85.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

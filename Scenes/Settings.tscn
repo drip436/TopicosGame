@@ -1,9 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://cvploqs1acwhm"]
+[gd_scene format=3 uid="uid://cvploqs1acwhm"]
 
 [ext_resource type="Script" uid="uid://dsb5wwraca5wv" path="res://Scenes/settings.gd" id="1_4hxq3"]
-[ext_resource type="FontFile" uid="uid://4k7eu2rvqp8w" path="res://Orbitron-VariableFont_wght.ttf" id="2_flfri"]
 
-[node name="Control2" type="Control"]
+[node name="Ajustes" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,85 +10,3 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_4hxq3")
-
-[node name="Panel" type="Panel" parent="."]
-layout_mode = 0
-offset_right = 1153.0
-offset_bottom = 649.0
-
-[node name="Volume" type="Label" parent="."]
-layout_mode = 0
-offset_left = 313.0
-offset_top = 173.0
-offset_right = 353.0
-offset_bottom = 196.0
-theme_override_fonts/font = ExtResource("2_flfri")
-theme_override_font_sizes/font_size = 40
-text = "Volume"
-
-[node name="Brightness" type="Label" parent="."]
-layout_mode = 0
-offset_left = 247.0
-offset_top = 244.0
-offset_right = 453.0
-offset_bottom = 299.0
-theme_override_fonts/font = ExtResource("2_flfri")
-theme_override_font_sizes/font_size = 40
-text = "Brightness"
-
-[node name="VolumeHSlider" type="HSlider" parent="."]
-layout_mode = 0
-offset_left = 495.0
-offset_top = 199.0
-offset_right = 854.0
-offset_bottom = 215.0
-
-[node name="BrightnessHSlider" type="HSlider" parent="."]
-layout_mode = 0
-offset_left = 495.0
-offset_top = 272.0
-offset_right = 854.0
-offset_bottom = 288.0
-
-[node name="FullScreenCheckBox" type="CheckBox" parent="."]
-layout_mode = 0
-offset_left = 605.0
-offset_top = 338.0
-offset_right = 629.0
-offset_bottom = 362.0
-scale = Vector2(3, 3)
-
-[node name="FullScreen" type="Label" parent="."]
-layout_mode = 0
-offset_left = 358.0
-offset_top = 344.0
-offset_right = 568.0
-offset_bottom = 399.0
-theme_override_fonts/font = ExtResource("2_flfri")
-theme_override_font_sizes/font_size = 40
-text = "Full Screen"
-
-[node name="Button" type="Button" parent="."]
-layout_mode = 0
-offset_left = 456.0
-offset_top = 479.0
-offset_right = 702.0
-offset_bottom = 537.0
-theme_override_fonts/font = ExtResource("2_flfri")
-theme_override_font_sizes/font_size = 36
-text = "Back to Menu"
-
-[node name="Brightness2" type="Label" parent="."]
-layout_mode = 0
-offset_left = 438.0
-offset_top = 30.0
-offset_right = 716.0
-offset_bottom = 85.0
-theme_override_fonts/font = ExtResource("2_flfri")
-theme_override_font_sizes/font_size = 40
-text = "Game Settings"
-
-[connection signal="value_changed" from="VolumeHSlider" to="." method="_on_volume_h_slider_value_changed"]
-[connection signal="value_changed" from="BrightnessHSlider" to="." method="_on_brightness_h_slider_value_changed"]
-[connection signal="toggled" from="FullScreenCheckBox" to="." method="_on_full_screen_check_box_toggled"]
-[connection signal="pressed" from="Button" to="." method="_on_button_pressed"]

@@ -132,7 +132,7 @@ var m_chalk: StandardMaterial3D
 var m_desk: StandardMaterial3D
 var m_jet: StandardMaterial3D
 var m_route := {}
-var mesh_panel_red: BoxMesh
+var mesh_panel_red: Mesh
 var _extra_zones: Array = []
 var _blocked_rects: Array = []
 
@@ -407,6 +407,13 @@ func _on_first_boss_defeated(bf: Node) -> void:
 		hud.show_hint("La tormenta amaina. Se abrió una puerta al oeste de la plaza:\nel Edificio de Aulas Poniente lleva a la Biblioteca Central.", 10.0)
 
 
+## Partida cargada con el primer jefe vencido: abre la plaza sin avisos.
+func restore_first_boss() -> void:
+	_explore = true
+	_open_plaza_west()
+	_calm_puddles()
+
+
 ## Para pruebas: abre la plaza, todos los sellos y el portón final.
 func _open_world() -> void:
 	_explore = true
@@ -573,7 +580,7 @@ func _make_world_materials() -> void:
 	m_fluid_amber.set_shader_parameter("opacity", 0.28)
 	m_fluid_amber.set_shader_parameter("glow", 0.9)
 
-	m_wood_dark = _std(Color(0.11, 0.065, 0.035), 0.65, 0.0)
+	m_wood_dark = _relieve(_std(Color(0.11, 0.065, 0.035), 0.65, 0.0), "madera", 1.5) as StandardMaterial3D
 	m_book = _std(Color(1, 1, 1), 0.8, 0.0)
 	m_book.vertex_color_use_as_albedo = true
 	m_paper = _std(Color(0.72, 0.69, 0.6), 0.9, 0.0)
@@ -633,11 +640,16 @@ func _tile(pattern: int, size: Vector2, a: Color, b: Color, grout: Color, gw: fl
 	m.set_shader_parameter("grout_width", gw)
 	m.set_shader_parameter("wetness", wet)
 	m.set_shader_parameter("puddle_coverage", puddles)
+	_relieve(m, "concreto", 0.5)
 	return m
 
 
 func _emit(c: Color, energy: float) -> StandardMaterial3D:
 	var m := _std(c * 0.4, 0.3, 0.0)
+	m.normal_enabled = false
+	m.roughness_texture = null
+	m.uv1_triplanar = false
+	m.roughness = 0.3
 	m.emission_enabled = true
 	m.emission = c
 	m.emission_energy_multiplier = energy
@@ -736,20 +748,7 @@ func _mmc_add(mesh: Mesh, xf: Transform3D, c: Color) -> void:
 func _flush_colors(parent: Node3D) -> void:
 	for k in _mmc:
 		var d: Dictionary = _mmc[k]
-		var xs: Array = d["xf"]
-		var cs: Array = d["c"]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = d["mesh"]
-		mm.instance_count = xs.size()
-		for i in xs.size():
-			mm.set_instance_transform(i, xs[i])
-			mm.set_instance_color(i, cs[i])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		parent.add_child(mmi)
+		_emit_multimesh(parent, d["mesh"], d["xf"], d["c"])
 	_mmc.clear()
 
 
@@ -1181,14 +1180,33 @@ func _make_library() -> void:
 		if tp.x > 0.0 and tp.z > 0.0:
 			_blk(tpos + Vector3(0, 0.8, 0), Vector3(5.0, 1.6, 0.08), m_wood_dark, Vector3(0, 12, 0), true)
 			continue
-		_blk(tpos + Vector3(0, 0.85, 0), Vector3(5.0, 0.08, 1.6), m_wood_dark, Vector3.ZERO)
-		for lx: float in [-2.2, 2.2]:
-			_blk(tpos + Vector3(lx, 0.42, 0), Vector3(0.12, 0.84, 1.4), m_wood_dark)
+		if _prop_mesh("mesa_lectura"):
+			for lx: float in [-1.25, 1.25]:
+				_prop("mesa_lectura", tpos + Vector3(lx, 0, 0), 0.0 if lx < 0.0 else 180.0)
+			# Luz cálida de las lámparas de banquero que siguen prendidas
+			_omni(zone, tpos + Vector3(0, 1.3, 0), Color(1.0, 0.78, 0.45), 1.2, 6.0, 0.03, 6.0)
+		else:
+			_blk(tpos + Vector3(0, 0.85, 0), Vector3(5.0, 0.08, 1.6), m_wood_dark, Vector3.ZERO)
+			for lx: float in [-2.2, 2.2]:
+				_blk(tpos + Vector3(lx, 0.42, 0), Vector3(0.12, 0.84, 1.4), m_wood_dark)
 		_wc(Vector3(5.0, 0.9, 1.6), Transform3D(Basis.IDENTITY, tpos + Vector3(0, 0.45, 0)))
 		for cxx in 3:
 			var cp := tpos + Vector3(-1.6 + cxx * 1.6, 0, 1.3 * (1.0 if rng.randf() < 0.5 else -1.0))
 			var fallen := rng.randf() < 0.35
 			_blk(cp + Vector3(0, 0.45 if not fallen else 0.25, 0), Vector3(0.5, 0.06, 0.5), m_wood_dark, Vector3(90 if fallen else 0, rng.randf_range(0, 360), 0))
+
+	# Ficheros, globos, carritos de libros y el atril del Bibliófilo
+	for fp in [Vector3(-14.0, 0, -20.6), Vector3(-12.9, 0, -20.6), Vector3(13.0, 0, -20.6), Vector3(-28.6, 0, 1.0), Vector3(-28.6, 0, 2.1)]:
+		var yaw := 0.0 if fp.z < -15.0 else 90.0
+		# El frente del modelo (-Z) mira hacia la sala
+		_prop("fichero", o + fp, yaw + 180.0 if fp.z < -15.0 else -90.0, Vector3(0.95, 1.3, 0.5))
+	for gp in [Vector3(-4.6, 0, -17.2), Vector3(18.0, 0, 18.5)]:
+		_prop("globo", o + gp, rng.randf_range(0, 360), Vector3(0.6, 1.0, 0.6))
+	for cp in [Vector3(-12.5, 0, -14.0), Vector3(12.0, 0, 16.6), Vector3(-17.5, 0, 13.0), Vector3(5.5, 0, 12.0)]:
+		var tip := rng.randf() < 0.3
+		_prop("carrito_libros", o + cp + Vector3(0, 0.21 if tip else 0.0, 0), rng.randf_range(0, 360), Vector3(0.9, 1.0, 0.45) if not tip else Vector3.ZERO, Vector3(0, 0, 90 if tip else 0))
+	_prop("atril", o + Vector3(0, 0, -17.5), 180.0, Vector3(0.6, 1.2, 0.5))
+	_omni(zone, o + Vector3(0, 1.8, -17.0), Color(1.0, 0.75, 0.4), 0.8, 5.0, 0.05, 4.0)
 
 	# Techo: losas con un gran hueco (cúpula derrumbada)
 	for i in 10:
@@ -1499,7 +1517,11 @@ func _make_computing() -> void:
 	for f in fallen:
 		var fp: Vector3 = o + f[0]
 		var b := _rb(Vector3(0, f[1], 90))
-		_mm_add(_ub(m_rack), Transform3D(b * Basis.from_scale(Vector3(0.8, 2.2, 1.1)), fp))
+		var rm := _prop_mesh("rack_servidor")
+		if rm:
+			_mm_add(rm, Transform3D(b, fp - b * Vector3(0, 1.1, 0)))
+		else:
+			_mm_add(_ub(m_rack), Transform3D(b * Basis.from_scale(Vector3(0.8, 2.2, 1.1)), fp))
 		_wc(Vector3(0.8, 2.2, 1.1), Transform3D(b, fp))
 	for sp in [Vector3(-7, 1.0, 6), Vector3(8, 1.0, -2), Vector3(-20.5, 2.3, 9.0), Vector3(12.0, 2.3, -15.5)]:
 		_sparks(zone, o + sp)
@@ -1531,6 +1553,9 @@ func _make_computing() -> void:
 	# Luz de emergencia tenue sobre los pasillos de racks
 	for lp in [Vector3(-22, 6, -6), Vector3(22, 6, -6), Vector3(-22, 6, 12), Vector3(22, 6, 12), Vector3(-12, 6, -17), Vector3(10, 6, -17)]:
 		_omni(zone, o + lp, Color(0.35, 0.55, 0.9), 0.9, 13.0)
+	# Resplandor de los LEDs en los pasillos de racks
+	for lp in [Vector3(-20, 1.4, -17.2), Vector3(-11, 1.4, -17.2), Vector3(11, 1.4, -17.2), Vector3(-22.2, 1.4, -2), Vector3(-22.2, 1.4, 10), Vector3(22.2, 1.4, -2), Vector3(22.2, 1.4, 10)]:
+		_omni(zone, o + lp, Color(0.25, 0.7, 1.0), 1.4, 7.0, 0.02, 1.5)
 
 	# Cables colgantes
 	for q in 60:
@@ -1552,32 +1577,46 @@ func _make_computing() -> void:
 				lit += 1
 				_omni(zone, p - Vector3(0, 0.6, 0), Color(0.75, 0.88, 1.0), 1.4, 12.0, 0.03, 14.0)
 
-	# Escritorios con monitores CRT junto al muro sur
-	var msgs := ["ACCESO DENEGADO", "ERROR 0x0000DEAD", "¿HAY ALGUIEN AHÍ?", "SISTEMA COMPROMETIDO", "C:\\> _", "RESPALDO 3%"]
+	# Puestos de trabajo junto al muro sur y en dos islas a los lados del núcleo
+	var msgs := ["ACCESO DENEGADO", "ERROR 0x0000DEAD", "¿HAY ALGUIEN AHÍ?", "SISTEMA COMPROMETIDO", "C:\\> _", "RESPALDO 3%", "ADA-7 ES LA ADMIN", "rm -rf /alumnos"]
 	var mi := 0
+	var desks: Array = []
 	for s: float in [-1.0, 1.0]:
 		var xx := 7.0
 		while xx < 25.0:
-			var dp := o + Vector3(s * xx, 0, hz - 2.0)
-			_blk(dp + Vector3(0, 0.75, 0), Vector3(2.4, 0.06, 1.0), m_metal_light)
-			for lx: float in [-1.1, 1.1]:
-				_blk(dp + Vector3(lx, 0.37, 0), Vector3(0.06, 0.74, 0.9), m_metal)
-			_wc(Vector3(2.4, 0.8, 1.0), Transform3D(Basis.IDENTITY, dp + Vector3(0, 0.4, 0)))
-			for mon: float in [-0.6, 0.6]:
-				var mp := dp + Vector3(mon, 1.03, 0.05)
-				_blk(mp, Vector3(0.55, 0.45, 0.5), m_concrete_dark)
-				var working := rng.randf() < 0.55
-				_blk(mp + Vector3(0, 0, -0.255), Vector3(0.45, 0.35, 0.02), m_screen if working else m_glass)
-				if working and rng.randf() < 0.6:
-					_lbl(zone, msgs[mi % msgs.size()], mp + Vector3(0, 0.02, -0.27), 180.0, 16, Color(0.6, 1.0, 0.7), false, 0.0035)
-					mi += 1
+			desks.append([o + Vector3(s * xx, 0, hz - 2.0), 0.0])
 			xx += 3.2
-	# Sillas de oficina y papeles
-	for q in 14:
+		for e: float in [-1.0, 1.0]:
+			desks.append([o + Vector3(s * 13.5 + e * 0.9, 0, -8.6 + (0.45 if e > 0 else -0.45)), 0.0 if e < 0.0 else 180.0])
+	for d in desks:
+		var dp: Vector3 = d[0]
+		var dy: float = d[1]
+		var db := Basis(Vector3.UP, deg_to_rad(dy))
+		_prop("escritorio_pc", dp, dy + rng.randf_range(-3, 3), Vector3(1.6, 0.8, 0.8))
+		if rng.randf() < 0.7:
+			_lbl(zone, msgs[mi % msgs.size()], dp + db * Vector3(-0.33, 1.1, 0.165), dy + 192.0, 16, Color(0.6, 0.9, 1.0), false, 0.003)
+			mi += 1
+		# Silla frente al escritorio (a veces volcada o lejos)
+		var cp := dp + db * Vector3(rng.randf_range(-0.3, 0.3), 0, -0.8 - rng.randf_range(0, 0.6))
+		if rng.randf() < 0.3:
+			_prop("silla_oficina", cp + Vector3(0, 0.3, 0), rng.randf_range(0, 360), Vector3.ZERO, Vector3(90, 0, 0))
+		else:
+			_prop("silla_oficina", cp, dy + 180.0 + rng.randf_range(-40, 40))
+	# Sillas sueltas, computadoras viejas apiladas y papeles
+	for q in 10:
 		var p := o + Vector3(rng.randf_range(-18, 18), 0, rng.randf_range(-10, 20))
-		var tip := rng.randf() < 0.4
-		_cy(p + Vector3(0, 0.25, 0), 0.3, 0.06, m_metal, Vector3(90 if tip else 0, 0, 0))
-		_blk(p + Vector3(0, 0.5 if not tip else 0.3, 0), Vector3(0.5, 0.08, 0.5), m_tire, Vector3(80 if tip else 0, rng.randf_range(0, 360), 0))
+		if rng.randf() < 0.4:
+			_prop("silla_oficina", p + Vector3(0, 0.3, 0), rng.randf_range(0, 360), Vector3.ZERO, Vector3(90, 0, rng.randf_range(-20, 20)))
+		else:
+			_prop("silla_oficina", p, rng.randf_range(0, 360))
+	for c in [Vector3(-26.0, 0, 19.5), Vector3(-18.0, 0, -12.0), Vector3(17.5, 0, -12.5), Vector3(26.0, 0, 19.0), Vector3(-6.5, 0, 19.8)]:
+		var base: Vector3 = o + c
+		for k in rng.randi_range(2, 4):
+			var off := Vector3(rng.randf_range(-0.8, 0.8), 0, rng.randf_range(-0.5, 0.5))
+			var y := 0.0 if k < 2 else 0.6
+			_prop("pc_vieja", base + off * (1.0 if k < 2 else 0.3) + Vector3(0, y, 0), rng.randf_range(0, 360), Vector3(0.45, 0.6, 0.45) if k < 2 else Vector3.ZERO, Vector3(0, 0, 0 if rng.randf() < 0.8 else 90))
+	for c in [Vector3(-5.6, 0, 18.2), Vector3(5.8, 0, 18.6), Vector3(-26.5, 0, -6.0)]:
+		_prop("bobina_cable", o + c, rng.randf_range(0, 360), Vector3(1.0, 1.0, 0.6))
 	for q in 120:
 		var p := o + Vector3(rng.randf_range(-hx + 1, hx - 1), 0.035, rng.randf_range(-hz + 1, hz - 1))
 		_mm_add(_ub(m_paper), Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(0.21, 0.004, 0.29)), p))
@@ -1589,21 +1628,20 @@ func _make_computing() -> void:
 	_lbl(zone, "CENTRO DE CÓMPUTO", fc + Vector3(0, 1.6, 9.08), 180.0, 52, Color(0.75, 0.85, 0.9))
 	_car(zone, fc + Vector3(-5, 0, 8), 70.0, 0.0, Color(0.15, 0.2, 0.22), false)
 	_car(zone, fc + Vector3(7, 0, -4), -20.0, 180.0, Color(0.5, 0.5, 0.5), true)
+	_prop("bobina_cable", fc + Vector3(-7.5, 0, -2.0), 30.0, Vector3(1.0, 1.0, 0.6))
+	_prop("bobina_cable", fc + Vector3(-6.4, 0, -3.4), 75.0, Vector3(1.0, 1.0, 0.6))
+	for k in 4:
+		_prop("pc_vieja", fc + Vector3(4.5 + k * 0.5, 0, 4.0 + rng.randf_range(-0.4, 0.4)), rng.randf_range(0, 360))
 	_end_zone()
 
 
 func _rack(pos: Vector3, yaw: float) -> void:
+	if _prop_mesh("rack_servidor"):
+		# El frente del modelo mira a -Z; el del rack de cajas miraba a +Z
+		_prop("rack_servidor", pos, yaw + 180.0)
+		return
 	var b := Basis(Vector3.UP, deg_to_rad(yaw))
 	_mm_add(_ub(m_rack), Transform3D(b * Basis.from_scale(Vector3(0.8, 2.2, 1.1)), pos + Vector3(0, 1.1, 0)))
-	_mm_add(_ub(m_metal), Transform3D(b * Basis.from_scale(Vector3(0.7, 2.0, 0.02)), pos + b * Vector3(0, 1.1, 0.56)))
-	var led := _ub(m_led)
-	var palette := [Color(0.1, 1.0, 0.3), Color(0.1, 1.0, 0.3), Color(0.1, 1.0, 0.3), Color(1.0, 0.6, 0.05), Color(1.0, 0.1, 0.05), Color(0.2, 0.6, 1.0)]
-	for row in 12:
-		for col in 2:
-			if rng.randf() < 0.2:
-				continue
-			var c: Color = palette[rng.randi() % palette.size()]
-			_mmc_add(led, Transform3D(b * Basis.from_scale(Vector3(0.035, 0.018, 0.012)), pos + b * Vector3(-0.27 + col * 0.07, 0.25 + row * 0.15, 0.575)), c)
 
 
 func _sparks(parent: Node3D, pos: Vector3) -> void:
@@ -1713,26 +1751,42 @@ func _make_lab() -> void:
 	# Cápsula gigante (vacía: lo que había adentro escapó)
 	_capsule(zone, o + Vector3(0, 0, -20.0), o, 2.0, true, -1, "ESPÉCIMEN Ω-01 · CONTENCIÓN FALLIDA", false)
 
-	# Mesas de laboratorio, camillas y monitores
+	# Mesas de laboratorio, camillas y cajas de muestras
 	for q in 7:
 		var a := rng.randf_range(0.5, TAU - 0.5)
 		var r := rng.randf_range(11.0, 14.5)
 		var p := o + Vector3(sin(a) * r, 0, cos(a) * r)
 		var yaw := rad_to_deg(a) + 90.0
-		if rng.randf() < 0.4:
-			_blk(p + Vector3(0, 0.6, 0), Vector3(3.0, 1.2, 0.08), m_metal_light, Vector3(0, yaw, rng.randf_range(-10, 10)), true)
-			_blk(p + Vector3(0, 0.45, 0.6), Vector3(3.0, 0.9, 0.06), m_white_lab, Vector3(80, yaw, 0))
+		if rng.randf() < 0.3:
+			# Mesa volcada (cobertura) con cajas tiradas
+			_prop("mesa_lab", p + Basis(Vector3.UP, deg_to_rad(yaw)) * Vector3(0, 0.39, 0.45), yaw, Vector3.ZERO, Vector3(-88, 0, 0))
+			_wc(Vector3(2.0, 1.0, 0.9), Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), p + Vector3(0, 0.5, 0)))
+			_prop("caja_biopeligro", p + Vector3(1.4, 0, 0.9), rng.randf_range(0, 360))
 		else:
-			_blk(p + Vector3(0, 0.92, 0), Vector3(3.0, 0.06, 1.2), m_white_lab, Vector3(0, yaw, 0))
-			_blk(p + Vector3(0, 0.45, 0), Vector3(2.8, 0.9, 1.0), m_metal_light, Vector3(0, yaw, 0), true)
-			for e in 3:
-				var bp := p + Basis(Vector3.UP, deg_to_rad(yaw)) * Vector3(-1.0 + e * 1.0, 1.08, 0)
-				_cy(bp, 0.08, 0.28, m_glass_clear, Vector3(0, 0, 0 if rng.randf() < 0.6 else 90))
+			_prop("mesa_lab", p, yaw, Vector3(2.0, 0.95, 0.8))
 	for q in 3:
 		var p := o + Vector3(rng.randf_range(-8, 8), 0, rng.randf_range(-6, 10))
+		_prop("camilla", p, rng.randf_range(0, 360), Vector3(1.95, 0.85, 0.7))
+	for q in 6:
+		var a := rng.randf_range(0.0, TAU)
+		var p := o + Vector3(sin(a), 0, cos(a)) * rng.randf_range(15.5, 18.5)
 		var yaw := rng.randf_range(0, 360)
-		_blk(p + Vector3(0, 0.75, 0), Vector3(0.8, 0.08, 2.0), m_metal_light, Vector3(0, yaw, rng.randf_range(-6, 6)))
-		_blk(p + Vector3(0, 0.82, 0), Vector3(0.7, 0.06, 1.8), m_paper, Vector3(0, yaw, 0))
+		_prop("caja_biopeligro", p, yaw, Vector3(0.62, 0.42, 0.44))
+		if rng.randf() < 0.6:
+			_prop("caja_biopeligro", p + Vector3(0, 0.42, 0), yaw + rng.randf_range(-20, 20))
+	# Tanques de mutágeno entre las cápsulas
+	for ad in [105.0, 255.0, 345.0]:
+		var a := deg_to_rad(ad)
+		var tp := o + Vector3(sin(a), 0, cos(a)) * 23.6
+		_prop("tanque_quimico", tp, _face(tp, o), Vector3(1.6, 3.4, 1.6))
+		_omni(zone, tp + Vector3(0, 1.6, 0) + (o - tp).normalized() * 1.1, Color(0.35, 1.0, 0.3), 0.6, 4.0)
+	# Barriles de toxinas: grupos junto al muro, algunos volcados y derramados
+	for ad in [15.0, 45.0, 75.0, 135.0, 165.0, 225.0, 285.0, 315.0]:
+		var a := deg_to_rad(ad + rng.randf_range(-4, 4))
+		_barrels(o + Vector3(sin(a), 0, cos(a)) * 23.8, rng.randi_range(3, 6), o)
+	for q in 3:
+		var a := rng.randf_range(0.0, TAU)
+		_barrels(o + Vector3(sin(a), 0, cos(a)) * rng.randf_range(9.0, 12.0), 2, o)
 	for q in 80:
 		var p := o + Vector3(rng.randf_range(-R, R), 0.04, rng.randf_range(-R, R))
 		if Vector2(p.x - o.x, p.z - o.z).length() > R - 1.0:
@@ -1763,10 +1817,41 @@ func _make_lab() -> void:
 	_cy(gp + Vector3(6.0, 1.5, 6.0), 0.08, 3.0, m_iron)
 	_blk(gp + Vector3(6.0, 3.1, 6.0), Vector3(0.9, 0.5, 0.3), m_iron, Vector3(-25, 200, 0))
 	_omni(zone, gp + Vector3(5.8, 2.8, 5.4), Color(0.95, 0.97, 1.0), 2.4, 14.0, 0.01)
-	for q in 6:
-		var cp := gp + Vector3(rng.randf_range(-9, 9), 0, rng.randf_range(-9, 9))
-		_cy(cp + Vector3(0, 0.45, 0), 0.32, 0.9, m_hazard_y if q % 2 == 0 else m_metal, Vector3(0 if rng.randf() < 0.6 else 90, 0, 0), 12, 1.0, true)
+	for c in [Vector3(-3.0, 0, -6.0), Vector3(7.5, 0, -1.5), Vector3(-9.0, 0, 3.0)]:
+		_barrels(gp + c, rng.randi_range(3, 5), gp + Vector3(0, 0, 20))
+	for k in 5:
+		var cp := tent + Vector3(-1.5 + (k % 3) * 0.7, (k / 3) * 0.42, 2.4)
+		_prop("caja_biopeligro", cp, rng.randf_range(-10, 10), Vector3(0.62, 0.42, 0.44) if k < 3 else Vector3.ZERO)
 	_end_zone()
+
+
+## Grupo de barriles (tóxicos, químicos y oxidados) alrededor de c; algunos volcados con
+## un charco que brilla. `look` = hacia dónde se ven las etiquetas.
+func _barrels(c: Vector3, n: int, look: Vector3) -> void:
+	var kinds := ["barril_toxico", "barril_toxico", "barril_azul", "barril_oxidado"]
+	var placed: Array = []
+	for i in n:
+		var p := c
+		for t in 8:
+			p = c + Vector3(rng.randf_range(-1.1, 1.1), 0, rng.randf_range(-1.1, 1.1))
+			var ok := true
+			for q in placed:
+				if (q as Vector3).distance_to(p) < 0.66:
+					ok = false
+			if ok:
+				break
+		placed.append(p)
+		var kind: String = kinds[rng.randi() % kinds.size()]
+		var yaw := _face(p, look) + rng.randf_range(-50, 50)
+		if kind != "barril_oxidado" and rng.randf() < 0.25:
+			# Volcado (la tapa queda hacia +z local) y escurre
+			_prop(kind, p + Vector3(0, 0.29, 0), yaw, Vector3.ZERO, Vector3(90, 0, 0))
+			var fwd := Basis(Vector3.UP, deg_to_rad(yaw)) * Vector3(0, 0, 1)
+			var spill := p + fwd * 1.2 + Vector3(0, 0.012, 0)
+			_mm_add(_uc(m_spill, 16), Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(rng.randf_range(0.9, 1.6), 0.01, rng.randf_range(0.7, 1.2))), spill))
+			_wc(Vector3(0.6, 0.6, 0.9), Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)), p + Vector3(0, 0.3, 0) + fwd * 0.45))
+		else:
+			_prop(kind, p, yaw, Vector3(0.6, 0.9, 0.6))
 
 
 func _sandbag_wall(c: Vector3, yaw: float, length: float) -> void:
@@ -2025,6 +2110,27 @@ func _make_final_arena() -> void:
 		_gate_seal.add_child(bar)
 	_lbl(_gate_seal, "Solo quien reúna las cuatro piezas de la llave\npodrá cruzar este umbral", Vector3(0, -3.0, 0.05), 0.0, 28, Color(1.0, 0.55, 0.3), false)
 	_omni(_gate_seal, Vector3(0, 0, 1.2), Color(1.0, 0.3, 0.1), 2.5, 10.0, 0.0, 2.0)
+
+	# Butacas de terciopelo sobre las gradas (muchas faltan o están rotas)
+	for k in 6:
+		var rm := R0 + dr * (float(k) + 0.5)
+		var top := dh * float(k + 1)
+		for i in N:
+			var a := TAU * (float(i) + 0.5) / N
+			if absf(wrapf(a, -PI, PI)) < gate_half + 0.12 or rng.randf() < 0.6:
+				continue
+			var dir := Vector3(sin(a), 0, cos(a))
+			_prop("butacas", o + dir * (rm - 0.2) + Vector3(0, top, 0), rad_to_deg(a) + rng.randf_range(-3, 3))
+	# Podio del rector, estandartes y candelabros al fondo
+	var pod := o + Vector3(0, 0, -27.0)
+	_prop("podio", pod, 180.0, Vector3(1.0, 1.3, 0.7))
+	for sx: float in [-1.0, 1.0]:
+		_prop("estandarte", pod + Vector3(sx * 4.5, 0, -0.8), 180.0, Vector3(0.5, 3.4, 0.5))
+		_prop("estandarte", o + Vector3(sx * 12.0, 0, -26.5), 180.0 - sx * 25.0, Vector3(0.5, 3.4, 0.5))
+		for e in 2:
+			var cp := pod + Vector3(sx * (2.0 + e * 5.0), 0, 0.6 + e * 0.8)
+			_prop("candelabro", cp, rng.randf_range(0, 360), Vector3(0.4, 1.7, 0.4))
+			_omni(zone, cp + Vector3(0, 1.75, 0), Color(1.0, 0.65, 0.3), 1.2, 7.0, 0.04, 9.0)
 
 	# Braseros
 	for i in 6:
@@ -2579,10 +2685,13 @@ func _make_district_materials() -> void:
 	m_brick.set_shader_parameter("wall_tint", Color(0.5, 0.21, 0.14))
 	m_brick.set_shader_parameter("band_tint", Color(0.3, 0.15, 0.1))
 	m_brick.set_shader_parameter("broken_ratio", 0.45)
-	mesh_panel_red = _bm(Vector3(BAY, FLOOR_H, 0.3), m_brick)
+	_relieve(m_brick, "ladrillo", 1.0 / 1.2)
+	m_brick.set_shader_parameter("wall_tint", Color(0.56, 0.24, 0.16))
+	mesh_panel_red = _facade_mesh(m_brick)
 	m_plaster = _concrete(Color(0.62, 0.6, 0.55), 0.15, 0.0)
+	_relieve(m_plaster, "yeso", 0.6, 0.7)
 	m_chalk = _std(Color(0.05, 0.13, 0.08), 0.85, 0.0)
-	m_desk = _std(Color(0.33, 0.23, 0.14), 0.6, 0.0)
+	m_desk = _relieve(_std(Color(0.33, 0.23, 0.14), 0.6, 0.0), "madera", 2.0) as StandardMaterial3D
 	m_jet = _std(Color(0.75, 0.85, 0.95, 0.55), 0.1, 0.0)
 	m_jet.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m_jet.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -4076,18 +4185,22 @@ func _make_fronton(c: Vector3) -> void:
 
 func _bus_upright(zone: Node3D, p: Vector3, yaw: float, burnt: bool) -> void:
 	var b := Basis(Vector3.UP, deg_to_rad(yaw))
-	var body: Material = m_burnt if burnt else [m_yellow, m_blue, m_line][rng.randi() % 3]
-	_lbox(p, b, Vector3(0, 1.75, 0), Vector3(11, 2.6, 2.6), body, true)
-	_lbox(p, b, Vector3(0.6, 2.25, 0), Vector3(9.6, 0.9, 2.64), m_glass)
-	_lbox(p, b, Vector3(5.52, 2.0, 0), Vector3(0.05, 1.4, 2.3), m_glass)
-	for wx: float in [-3.6, 3.6]:
-		for wz: float in [-1.15, 1.15]:
-			_mm_add(_uc(m_tire, 12), Transform3D(b * _rb(Vector3(90, 0, 0)) * Basis.from_scale(Vector3(1.0, 0.3, 1.0)), p + b * Vector3(wx, 0.5, wz)))
+	if _prop_mesh("autobus_amarillo"):
+		_prop("autobus_quemado" if burnt else "autobus_amarillo", p, yaw)
+		_wc(Vector3(11, 3.0, 2.6), Transform3D(b, p + b * Vector3(0, 1.75, 0)))
+	else:
+		var body: Material = m_burnt if burnt else [m_yellow, m_blue, m_line][rng.randi() % 3]
+		_lbox(p, b, Vector3(0, 1.75, 0), Vector3(11, 2.6, 2.6), body, true)
+		_lbox(p, b, Vector3(0.6, 2.25, 0), Vector3(9.6, 0.9, 2.64), m_glass)
+		_lbox(p, b, Vector3(5.52, 2.0, 0), Vector3(0.05, 1.4, 2.3), m_glass)
+		for wx: float in [-3.6, 3.6]:
+			for wz: float in [-1.15, 1.15]:
+				_mm_add(_uc(m_tire, 12), Transform3D(b * _rb(Vector3(90, 0, 0)) * Basis.from_scale(Vector3(1.0, 0.3, 1.0)), p + b * Vector3(wx, 0.5, wz)))
+		if not burnt:
+			_lbl(zone, "TRANSPORTE UNIVERSITARIO", p + b * Vector3(0, 1.0, 1.32), yaw, 40, Color(0.1, 0.1, 0.1))
 	if burnt:
 		_fire(zone, p + b * Vector3(-2.0, 3.2, 0), 0.9)
 		_smoke(zone, p + b * Vector3(-2.0, 4.0, 0), 0.6)
-	else:
-		_lbl(zone, "TRANSPORTE UNIVERSITARIO", p + b * Vector3(0, 1.0, 1.32), yaw, 40, Color(0.1, 0.1, 0.1))
 
 
 ## Terminal de autobuses del campus.

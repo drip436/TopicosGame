@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dw3yc2qrktj21"
-path="res://.godot/imported/estoque_color.png-f903baef6604616497c75a60aadbec16.ctex"
+path.s3tc="res://.godot/imported/estoque_color.png-f903baef6604616497c75a60aadbec16.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/armas_jugador/estoque_color.png"
-dest_files=["res://.godot/imported/estoque_color.png-f903baef6604616497c75a60aadbec16.ctex"]
+dest_files=["res://.godot/imported/estoque_color.png-f903baef6604616497c75a60aadbec16.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

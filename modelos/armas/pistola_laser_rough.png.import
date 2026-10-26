@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://oy8erye2kpqc"
-path="res://.godot/imported/pistola_laser_rough.png-f94c973b13e41447bd2a3373b3958e0a.ctex"
+path.s3tc="res://.godot/imported/pistola_laser_rough.png-f94c973b13e41447bd2a3373b3958e0a.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/armas/pistola_laser_rough.png"
-dest_files=["res://.godot/imported/pistola_laser_rough.png-f94c973b13e41447bd2a3373b3958e0a.ctex"]
+dest_files=["res://.godot/imported/pistola_laser_rough.png-f94c973b13e41447bd2a3373b3958e0a.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

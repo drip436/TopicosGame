@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c4pmnvg47mplw"
-path="res://.godot/imported/bibliofilo_color.png-6213c5a343b998f11d0618032a43fd15.ctex"
+path.s3tc="res://.godot/imported/bibliofilo_color.png-6213c5a343b998f11d0618032a43fd15.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jefes/bibliofilo_color.png"
-dest_files=["res://.godot/imported/bibliofilo_color.png-6213c5a343b998f11d0618032a43fd15.ctex"]
+dest_files=["res://.godot/imported/bibliofilo_color.png-6213c5a343b998f11d0618032a43fd15.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

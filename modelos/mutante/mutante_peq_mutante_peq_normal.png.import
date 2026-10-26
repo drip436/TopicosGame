@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bmrhgsga7extw"
-path="res://.godot/imported/mutante_peq_mutante_peq_normal.png-f493f91596a24595e44fb2de81e29672.ctex"
+path.s3tc="res://.godot/imported/mutante_peq_mutante_peq_normal.png-f493f91596a24595e44fb2de81e29672.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "fc413a932c33a65c8b523f541594cf1c"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/mutante/mutante_peq_mutante_peq_normal.png"
-dest_files=["res://.godot/imported/mutante_peq_mutante_peq_normal.png-f493f91596a24595e44fb2de81e29672.ctex"]
+dest_files=["res://.godot/imported/mutante_peq_mutante_peq_normal.png-f493f91596a24595e44fb2de81e29672.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

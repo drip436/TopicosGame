@@ -11,7 +11,7 @@ extends CharacterBody3D
 ##
 ## Controles: WASD mover · Shift correr · Espacio rodar · Clic izq. atacar
 ##            Clic medio / Tab fijar objetivo · R beber café (curar) · E interactuar
-##            (hogueras) · Esc soltar mouse
+##            (hogueras, guarda la partida) · Esc pausa
 ## Clases (jugador/player_classes.gd + jugador/class_kit.gd): Clic der. habilidad
 ## de la clase · Q cambiar hechizo / IA · G bebida energética (maná, solo Frontend).
 
@@ -123,6 +123,10 @@ func _ready() -> void:
 		kit.attach_to_rig(rig)
 	_build_status_fx()
 	_build_camera()
+	# Menú de pausa (Esc)
+	var pausa: CanvasLayer = load("res://ui/menu_pausa.gd").new()
+	pausa.player = self
+	add_child(pausa)
 	_yaw = rotation.y
 	rotation.y = 0.0
 	_face_dir = Vector3(-sin(_yaw), 0, -cos(_yaw))
@@ -199,7 +203,8 @@ func _build_camera() -> void:
 	_spring.shape = sphere
 	_cam_pitch_node.add_child(_spring)
 	camera = Camera3D.new()
-	camera.fov = 70.0
+	var aj := get_node_or_null("/root/Ajustes")
+	camera.fov = float(aj.get_valor("fov")) if aj else 70.0
 	camera.far = 600.0
 	_spring.add_child(camera)
 	camera.make_current.call_deferred()
@@ -225,13 +230,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_RIGHT and not is_dead:
 			kit.secondary_pressed()
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		var sens := 0.003 * _sensibilidad()
 		if not _locked:
-			_yaw -= event.relative.x * 0.003
-		_pitch = clampf(_pitch - event.relative.y * 0.003, -1.1, 0.5)
+			_yaw -= event.relative.x * sens
+		_pitch = clampf(_pitch - event.relative.y * sens, -1.1, 0.5)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
-			KEY_ESCAPE:
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			KEY_SPACE:
 				_try_roll()
 			KEY_TAB:
@@ -246,6 +250,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					kit.cycle()
 			KEY_G:
 				kit.drink()
+
+
+## Sensibilidad del mouse elegida en Ajustes (1 = normal).
+func _sensibilidad() -> float:
+	var aj := get_node_or_null("/root/Ajustes")
+	return float(aj.get_valor("sensibilidad")) if aj else 1.0
 
 
 ## Objetivo más cercano (jefe o enemigo) a menos de `max_dist` metros.

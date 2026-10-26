@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://datojwsrnqxjd"
-path="res://.godot/imported/mecha_normal.png-860443d0277e65c518abb7ed47c58f6d.ctex"
+path.s3tc="res://.godot/imported/mecha_normal.png-860443d0277e65c518abb7ed47c58f6d.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/mecha/mecha_normal.png"
-dest_files=["res://.godot/imported/mecha_normal.png-860443d0277e65c518abb7ed47c58f6d.ctex"]
+dest_files=["res://.godot/imported/mecha_normal.png-860443d0277e65c518abb7ed47c58f6d.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

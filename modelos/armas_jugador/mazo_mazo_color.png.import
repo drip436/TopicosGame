@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://chojvw213ldji"
-path="res://.godot/imported/mazo_mazo_color.png-f567c588fd712733eec8fe986a85a610.ctex"
+path.s3tc="res://.godot/imported/mazo_mazo_color.png-f567c588fd712733eec8fe986a85a610.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "dc214832cb83330693ce721876223012"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas_jugador/mazo_mazo_color.png"
-dest_files=["res://.godot/imported/mazo_mazo_color.png-f567c588fd712733eec8fe986a85a610.ctex"]
+dest_files=["res://.godot/imported/mazo_mazo_color.png-f567c588fd712733eec8fe986a85a610.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dnbf65dqo3vjq"
-path="res://.godot/imported/androide_androide_metal-androide_rough.png-479c1cc0d17c9789bdeae07dad0d93fb.ctex"
+path.s3tc="res://.godot/imported/androide_androide_metal-androide_rough.png-479c1cc0d17c9789bdeae07dad0d93fb.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "48854f5282ad3c428fd5d6c5cbffa972"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/androide/androide_androide_metal-androide_rough.png"
-dest_files=["res://.godot/imported/androide_androide_metal-androide_rough.png-479c1cc0d17c9789bdeae07dad0d93fb.ctex"]
+dest_files=["res://.godot/imported/androide_androide_metal-androide_rough.png-479c1cc0d17c9789bdeae07dad0d93fb.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

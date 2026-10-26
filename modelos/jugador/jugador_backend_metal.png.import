@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cuot81mqbr5bm"
-path="res://.godot/imported/jugador_backend_metal.png-96ab6d9c3157e7e0cde8373049303ccf.ctex"
+path.s3tc="res://.godot/imported/jugador_backend_metal.png-96ab6d9c3157e7e0cde8373049303ccf.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jugador/jugador_backend_metal.png"
-dest_files=["res://.godot/imported/jugador_backend_metal.png-96ab6d9c3157e7e0cde8373049303ccf.ctex"]
+dest_files=["res://.godot/imported/jugador_backend_metal.png-96ab6d9c3157e7e0cde8373049303ccf.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

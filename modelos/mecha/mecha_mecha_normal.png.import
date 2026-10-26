@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dom8ebqgyii23"
-path="res://.godot/imported/mecha_mecha_normal.png-185e7fdba7e997502cb7f662c9c1fa74.ctex"
+path.s3tc="res://.godot/imported/mecha_mecha_normal.png-185e7fdba7e997502cb7f662c9c1fa74.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "0f29c9ea6651f0edbcf83cfd0778d2e9"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/mecha/mecha_mecha_normal.png"
-dest_files=["res://.godot/imported/mecha_mecha_normal.png-185e7fdba7e997502cb7f662c9c1fa74.ctex"]
+dest_files=["res://.godot/imported/mecha_mecha_normal.png-185e7fdba7e997502cb7f662c9c1fa74.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

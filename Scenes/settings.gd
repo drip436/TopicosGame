@@ -1,41 +1,39 @@
 extends Control
+## Pantalla de Ajustes del menú principal: fondo de metal con neón y el panel de ajustes
+## compartido con el menú de pausa (ui/panel_ajustes.gd). Todo se guarda solo.
 
-#Llama al slider del volumen
-@onready var volume_slider: HSlider = $VolumeHSlider
-#Llama al checkbox
-@onready var fullscreen_checkbox: CheckBox = $FullScreenCheckBox
+const E := preload("res://ui/estilo.gd")
+const AJUSTES := preload("res://ui/panel_ajustes.gd")
 
-# Called when the node enters the scene tree for the first time.
+
 func _ready() -> void:
-# Cargar valores actuales al abrir el menú
-	var bus_index = AudioServer.get_bus_index("Master")
-	volume_slider.value = db_to_linear(AudioServer.get_bus_volume_db(bus_index))
-	
-	# Verificar si la ventana está en modo pantalla completa
-	var current_mode = DisplayServer.window_get_mode()
-	fullscreen_checkbox.button_pressed = (current_mode == DisplayServer.WINDOW_MODE_FULLSCREEN)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	E.fondo(self)
+	var c := CenterContainer.new()
+	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(c)
+	var p := E.panel(0.9)
+	p.custom_minimum_size = Vector2(820, 0)
+	c.add_child(p)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 16)
+	p.add_child(v)
+	v.add_child(E.titulo("AJUSTES", 40))
+	v.add_child(E.linea())
+	v.add_child(AJUSTES.new())
+	var volver := E.boton("Volver al menú", 20, 260, 48)
+	volver.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	volver.pressed.connect(_on_button_pressed)
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_child(volver)
+	v.add_child(h)
+	volver.grab_focus.call_deferred()
 
 
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
-
-
-func _on_volume_h_slider_value_changed(value: float) -> void:
-	var bus_index = AudioServer.get_bus_index("Master")
-	# Convertimos el valor lineal (0.0 a 1.0) a decibelios (dB)
-	AudioServer.set_bus_volume_db(bus_index, linear_to_db(value))
-
-
-func _on_brightness_h_slider_value_changed(_value: float) -> void:
-	pass
-
-
-func _on_full_screen_check_box_toggled(toggled_on: bool) -> void:
-	if toggled_on:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_on_button_pressed()
 
 
 func _on_button_pressed() -> void:

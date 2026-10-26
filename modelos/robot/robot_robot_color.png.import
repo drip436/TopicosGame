@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dqpg5dsqcrgoi"
-path="res://.godot/imported/robot_robot_color.png-987f84c43c2c6fbe557e604c101538ff.ctex"
+path.s3tc="res://.godot/imported/robot_robot_color.png-987f84c43c2c6fbe557e604c101538ff.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "53b50b0829e2dc6c8cc0a007f98c7a45"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/robot/robot_robot_color.png"
-dest_files=["res://.godot/imported/robot_robot_color.png-987f84c43c2c6fbe557e604c101538ff.ctex"]
+dest_files=["res://.godot/imported/robot_robot_color.png-987f84c43c2c6fbe557e604c101538ff.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

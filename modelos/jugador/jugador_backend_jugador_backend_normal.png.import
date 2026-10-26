@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://drgvkq7nbq111"
-path="res://.godot/imported/jugador_backend_jugador_backend_normal.png-94572145aa95dbb5011216f8d8908315.ctex"
+path.s3tc="res://.godot/imported/jugador_backend_jugador_backend_normal.png-94572145aa95dbb5011216f8d8908315.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "c07264be2ec098abb5fe2c3c3f76a0ea"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jugador/jugador_backend_jugador_backend_normal.png"
-dest_files=["res://.godot/imported/jugador_backend_jugador_backend_normal.png-94572145aa95dbb5011216f8d8908315.ctex"]
+dest_files=["res://.godot/imported/jugador_backend_jugador_backend_normal.png-94572145aa95dbb5011216f8d8908315.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

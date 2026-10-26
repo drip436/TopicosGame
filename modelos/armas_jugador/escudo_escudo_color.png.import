@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dbeuunvfmgvdx"
-path="res://.godot/imported/escudo_escudo_color.png-f760964a1b8e4829c3a656e99d3b658a.ctex"
+path.s3tc="res://.godot/imported/escudo_escudo_color.png-f760964a1b8e4829c3a656e99d3b658a.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "128cdd0e64113ee239749a40f92f2ae6"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/armas_jugador/escudo_escudo_color.png"
-dest_files=["res://.godot/imported/escudo_escudo_color.png-f760964a1b8e4829c3a656e99d3b658a.ctex"]
+dest_files=["res://.godot/imported/escudo_escudo_color.png-f760964a1b8e4829c3a656e99d3b658a.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -10,17 +10,28 @@ uniform vec3 band_tint : source_color = vec3(0.34, 0.32, 0.30);
 uniform float wetness : hint_range(0.0, 1.0) = 0.75;
 uniform float broken_ratio : hint_range(0.0, 1.0) = 0.55;
 uniform float lit_ratio : hint_range(0.0, 1.0) = 0.04;
+// Relieve del muro (concreto o ladrillo) y color del mortero (canal B de det_d)
+uniform sampler2D det_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D det_d : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec2 det_scale = vec2(0.5);
+uniform float det_strength = 1.0;
+uniform vec3 joint_color : source_color = vec3(0.42, 0.4, 0.37);
+uniform float joint_mix = 0.0;
+
+#include "res://shaders/detalle.gdshaderinc"
 
 varying vec3 lpos;
 varying vec3 lnrm;
 varying vec3 wpos;
 varying vec3 origin;
+varying vec3 wnrm;
 
 void vertex() {
 	lpos = VERTEX;
 	lnrm = NORMAL;
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	origin = MODEL_MATRIX[3].xyz;
+	wnrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
 float hash13(vec3 p3) {
@@ -95,7 +106,15 @@ void fragment() {
 		}
 	}
 
+	vec3 nn = normalize(wnrm);
+	vec3 tw = tri_pesos(nn);
+	vec3 nw = nn;
 	if (concrete) {
+		vec4 dd = tri_d(det_d, wpos, tw, det_scale);
+		col *= 0.55 + dd.r * 0.9;
+		col = mix(col, joint_color * (0.75 + 0.5 * n), clamp(dd.b * 1.4, 0.0, 1.0) * joint_mix);
+		rough = clamp(rough * (0.55 + dd.g * 0.7), 0.05, 1.0);
+		nw = tri_n(det_n, wpos, nn, tw, det_scale, det_strength);
 		col *= mix(1.0, 0.68, smoothstep(0.5, 0.75, streak));
 		col *= mix(0.6, 1.0, smoothstep(0.0, 3.0, wpos.y));
 		float wet = wetness * (0.55 + 0.45 * smoothstep(0.3, 0.7, streak));
@@ -107,4 +126,5 @@ void fragment() {
 	ROUGHNESS = rough;
 	METALLIC = metal;
 	EMISSION = emit;
+	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
 }

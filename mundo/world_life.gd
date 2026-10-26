@@ -128,6 +128,8 @@ var _water_fx_t := 0.0
 var _amoeba_warned := false
 var _excl_rects: Array = []
 var _pieces: Array = []
+## Índices (en _cups) de las tazas recogidas: se guardan con la partida.
+var cups_taken: Array = []
 var _armor_nodes: Array = []
 var armors_found: Array = []
 var _menu_open := false
@@ -177,6 +179,10 @@ func _setup() -> void:
 		_make_enemy_records()
 	_ready_done = true
 	print("VidaDelCampus: %d hogueras, %d tazas, %d enemigos" % [bonfires.size(), _cups.size(), _records.size()])
+	# Partida guardada (Continuar en el menú principal)
+	var partida := get_node_or_null("/root/Partida")
+	if partida:
+		partida.aplicar(self)
 
 
 # ======================================================================
@@ -551,6 +557,64 @@ func _equip_from_key(n: int) -> void:
 	_refresh_menu()
 
 
+# ======================================================================
+#  Partida guardada
+# ======================================================================
+
+## Deja hogueras, tazas y armaduras como en el guardado y pone al jugador en su hoguera.
+func restore_state(d: Dictionary) -> void:
+	var lit: Array = d.get("hogueras", [])
+	var spot := String(d.get("hoguera", ""))
+	for b in bonfires:
+		if not is_instance_valid(b):
+			continue
+		if lit.has(String(b.title)):
+			b.light(true)
+		if String(b.title) == spot:
+			checkpoint = b
+	for i in d.get("tazas_tomadas", []):
+		var k := int(i)
+		if k >= 0 and k < _cups.size() and is_instance_valid(_cups[k]):
+			cups_taken.append(k)
+			_cups[k].taken = true
+			_cups[k].queue_free()
+	for id in d.get("armaduras", []):
+		if not armors_found.has(id):
+			armors_found.append(id)
+	for n in _armor_nodes:
+		if is_instance_valid(n) and armors_found.has(String(n.get_meta("armor_id"))):
+			n.queue_free()
+	if checkpoint and is_instance_valid(checkpoint) and player:
+		var pos: Vector3 = checkpoint.respawn_point()
+		var to: Vector3 = checkpoint.global_position - pos
+		if player.has_method("revive"):
+			player.revive(pos, atan2(-to.x, -to.z))
+		else:
+			player.global_position = pos
+
+
+## Jefe vencido cuya pieza no se recogió antes de guardar: la pieza espera en su arena.
+func restore_key_drop(fight_name: String) -> void:
+	if not KEY_DROPS.has(fight_name):
+		return
+	var f := get_tree().current_scene.find_child(fight_name, true, false)
+	var pos := Vector3.ZERO
+	if f:
+		var c = f.get("_center")
+		if c is Vector3 and c != Vector3.ZERO:
+			pos = c
+		elif f.get("arena_center") is Vector3:
+			pos = f.get("arena_center")
+	var info: Array = KEY_DROPS[fight_name]
+	var k := KEY.new()
+	k.piece_id = info[0]
+	k.title = info[1]
+	k.gem_color = info[2]
+	k.position = pos + Vector3(0, 0.05, 2.0)
+	add_child(k)
+	_pieces.append(k)
+
+
 ## Cada jefe suelta una pieza de la llave donde cae.
 func _connect_key_drops() -> void:
 	var scene := get_tree().current_scene
@@ -729,6 +793,12 @@ func _on_interact() -> void:
 			hud.toast("Descansaste. Los enemigos han vuelto.", 3.5)
 	if hud and hud.has_method("show_banner") and first:
 		hud.show_banner("HOGUERA ENCENDIDA", Color(0.95, 0.65, 0.3), "", 2.0)
+	# Solo se guarda la partida al descansar en una hoguera
+	var partida := get_node_or_null("/root/Partida")
+	if partida:
+		partida.guardar(self)
+		if hud and hud.has_method("toast"):
+			get_tree().create_timer(1.2).timeout.connect(func(): hud.toast("Partida guardada", 2.5))
 
 
 func _update_pickups() -> void:
@@ -739,6 +809,7 @@ func _update_pickups() -> void:
 			continue
 		var d := Vector2(cup.global_position.x - player.global_position.x, cup.global_position.z - player.global_position.z).length()
 		if d < 1.3 and absf(cup.global_position.y - player.global_position.y) < 2.0:
+			cups_taken.append(_cups.find(cup))
 			cup.take()
 			if player.has_method("add_flask_capacity"):
 				player.add_flask_capacity(1)

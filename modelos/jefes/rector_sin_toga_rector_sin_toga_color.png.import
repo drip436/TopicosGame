@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dy1yhp6736060"
-path="res://.godot/imported/rector_sin_toga_rector_sin_toga_color.png-1fd70db75f3fd0341e04a0f8be650c9f.ctex"
+path.s3tc="res://.godot/imported/rector_sin_toga_rector_sin_toga_color.png-1fd70db75f3fd0341e04a0f8be650c9f.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "bf3904d643383aeaa539b095ebca70f9"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jefes/rector_sin_toga_rector_sin_toga_color.png"
-dest_files=["res://.godot/imported/rector_sin_toga_rector_sin_toga_color.png-1fd70db75f3fd0341e04a0f8be650c9f.ctex"]
+dest_files=["res://.godot/imported/rector_sin_toga_rector_sin_toga_color.png-1fd70db75f3fd0341e04a0f8be650c9f.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

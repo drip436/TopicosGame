@@ -49,7 +49,7 @@ var m_burnt: StandardMaterial3D
 var m_tire: StandardMaterial3D
 var m_cone: StandardMaterial3D
 
-var mesh_panel: BoxMesh
+var mesh_panel: Mesh
 var mesh_slab: BoxMesh
 var mesh_col: BoxMesh
 var mesh_chunk: BoxMesh
@@ -84,6 +84,7 @@ func _build() -> void:
 	_make_statue()
 	_make_lamps()
 	_make_props()
+	_make_exam_props()
 	_make_arena_edge()
 	_make_fires_and_smoke()
 	_flush(_root)
@@ -109,20 +110,26 @@ func _make_materials() -> void:
 	m_ground.set_shader_parameter("plaza_radius", plaza_radius)
 	m_ground.set_shader_parameter("puddle_coverage", puddle_coverage)
 
+	_relieve(m_ground, "concreto", 0.45)
+
 	m_building = ShaderMaterial.new()
 	m_building.shader = load("res://shaders/building_panel.gdshader")
 	m_building.set_shader_parameter("noise_tex", noise_tex)
+	_relieve(m_building, "concreto", 0.5)
 
 	m_concrete = _concrete(Color(0.50, 0.48, 0.45), 0.75, 0.1)
 	m_concrete_dark = _concrete(Color(0.36, 0.35, 0.34), 0.7, 0.05)
 	m_rubble = _concrete(Color(0.40, 0.38, 0.36), 0.8, 0.15)
 	m_debris = _concrete(Color(0.22, 0.20, 0.19), 0.6, 0.1)
 	m_stone = _concrete(Color(0.55, 0.50, 0.42), 0.7, 0.25)
+	# Sillares de piedra: la textura de ladrillo a escala grande (piezas de 1.7 x 0.45 m)
+	_relieve(m_stone, "ladrillo", 0.15, 1.2)
+	m_stone.set_shader_parameter("joint_color", Color(0.2, 0.19, 0.17))
 
 	m_iron = _std(Color(0.045, 0.045, 0.05), 0.35, 0.7)
 	m_rebar = _std(Color(0.28, 0.13, 0.06), 0.6, 0.5)
 	m_bronze = _std(Color(0.16, 0.24, 0.20), 0.4, 0.8)
-	m_wood = _std(Color(0.09, 0.07, 0.055), 0.7, 0.0)
+	m_wood = _relieve(_std(Color(0.09, 0.07, 0.055), 0.7, 0.0), "madera", 1.5) as StandardMaterial3D
 	m_glass = _std(Color(0.02, 0.025, 0.03), 0.05, 0.2)
 	m_burnt = _std(Color(0.07, 0.05, 0.045), 0.6, 0.5)
 	m_tire = _std(Color(0.03, 0.03, 0.03), 0.6, 0.0)
@@ -132,7 +139,7 @@ func _make_materials() -> void:
 	m_lamp_on.emission = Color(1.0, 0.62, 0.3)
 	m_lamp_on.emission_energy_multiplier = 4.0
 
-	mesh_panel = _bm(Vector3(BAY, FLOOR_H, 0.3), m_building)
+	mesh_panel = _facade_mesh(m_building)
 	mesh_slab = _bm(Vector3(BAY + 0.02, 0.35, BAY + 0.02), m_concrete)
 	mesh_col = _bm(Vector3(0.55, 1.0, 0.55), m_concrete_dark)
 	mesh_chunk = _bm(Vector3.ONE, m_rubble)
@@ -168,15 +175,171 @@ func _concrete(c: Color, wet: float, moss: float) -> ShaderMaterial:
 	m.set_shader_parameter("tint", c)
 	m.set_shader_parameter("wetness", wet)
 	m.set_shader_parameter("moss", moss)
+	_relieve(m, "concreto", 0.5)
 	return m
 
 
+## Material liso; si es opaco le pone relieve de metal (rayones, óxido) o uno fino genérico.
 func _std(c: Color, rough: float, metal: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
 	m.roughness = rough
 	m.metallic = metal
+	if c.a >= 1.0:
+		if metal >= 0.3:
+			_relieve(m, "metal", 1.2, 0.8)
+		else:
+			_relieve(m, "yeso", 1.0, 0.5)
 	return m
+
+
+# ------------------------------------------------------------------ relieve
+# Texturas de detalle de texturas/ (arte/texturas/gen_texturas.py): normales, rugosidad,
+# color y juntas. Es lo que quita el aspecto de plástico a concreto, ladrillo, metal...
+
+## Rugosidad media del canal G de cada textura (para que el valor del material se respete).
+const _RUG_MEDIA := {"concreto": 0.75, "ladrillo": 0.8, "metal": 0.45, "madera": 0.65, "yeso": 0.85}
+var _tex := {}
+
+
+func _dtex(kind: String, ch: String) -> Texture2D:
+	var k := kind + ch
+	if not _tex.has(k):
+		var path := "res://texturas/%s_%s.png" % [kind, ch]
+		_tex[k] = load(path) if ResourceLoader.exists(path) else null
+	return _tex[k]
+
+
+## kind: "concreto", "ladrillo", "metal", "madera" o "yeso". scale = repeticiones por metro.
+func _relieve(m: Material, kind: String, scale: float, strength := 1.0) -> Material:
+	var tn := _dtex(kind, "n")
+	var td := _dtex(kind, "d")
+	if tn == null or td == null:
+		return m
+	if m is ShaderMaterial:
+		var sm := m as ShaderMaterial
+		sm.set_shader_parameter("det_n", tn)
+		sm.set_shader_parameter("det_d", td)
+		var path := sm.shader.resource_path if sm.shader else ""
+		if path.ends_with("wet_ground.gdshader") or path.ends_with("tile_floor.gdshader"):
+			sm.set_shader_parameter("det_scale", scale)
+		else:
+			sm.set_shader_parameter("det_scale", Vector2(scale, scale))
+		sm.set_shader_parameter("det_strength", strength)
+		sm.set_shader_parameter("joint_mix", 1.0 if kind == "ladrillo" else 0.0)
+	elif m is StandardMaterial3D:
+		var st := m as StandardMaterial3D
+		st.normal_enabled = true
+		st.normal_texture = tn
+		st.normal_scale = strength
+		st.roughness_texture = td
+		st.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+		st.roughness = clampf(st.roughness / float(_RUG_MEDIA[kind]), 0.0, 1.0)
+		st.uv1_triplanar = true
+		st.uv1_world_triplanar = true
+		st.uv1_triplanar_sharpness = 4.0
+		st.uv1_scale = Vector3.ONE * scale
+	return m
+
+
+## Panel de fachada con volumen (BAY x FLOOR_H x 0.3, centrado): vano de ventana
+## hundido con vidrio al centro del muro, parteluz, alféizar, moldura de entrepiso y
+## pilastras en los extremos. El shader building_panel pinta vidrio, marco y hollín según
+## la posición local, igual que en la caja plana de antes.
+func _facade_mesh(mat: Material) -> ArrayMesh:
+	var hx := BAY * 0.5
+	var hy := FLOOR_H * 0.5
+	var wx := 1.5
+	var y0 := -0.7
+	var y1 := 1.25
+	var boxes := [
+		# muro alrededor del vano
+		[Vector3(-hx, -hy, -0.15), Vector3(hx, y0, 0.15)],
+		[Vector3(-hx, y1, -0.15), Vector3(hx, hy, 0.15)],
+		[Vector3(-hx, y0, -0.15), Vector3(-wx, y1, 0.15)],
+		[Vector3(wx, y0, -0.15), Vector3(hx, y1, 0.15)],
+		# vidrio (al centro del espesor) y parteluz
+		[Vector3(-wx, y0, -0.015), Vector3(wx, y1, 0.015)],
+		[Vector3(-0.035, y0, -0.05), Vector3(0.035, y1, 0.05)],
+		# marco interior del vano
+		[Vector3(-wx, y0, -0.06), Vector3(wx, y0 + 0.05, 0.06)],
+		[Vector3(-wx, y1 - 0.05, -0.06), Vector3(wx, y1, 0.06)],
+		[Vector3(-wx, y0, -0.06), Vector3(-wx + 0.05, y1, 0.06)],
+		[Vector3(wx - 0.05, y0, -0.06), Vector3(wx, y1, 0.06)],
+		# alféizar y dintel que sobresalen
+		[Vector3(-wx - 0.12, y0 - 0.1, -0.25), Vector3(wx + 0.12, y0, 0.25)],
+		[Vector3(-wx - 0.08, y1, -0.19), Vector3(wx + 0.08, y1 + 0.14, 0.19)],
+		# moldura de entrepiso y pilastras
+		[Vector3(-hx, -hy, -0.21), Vector3(hx, -hy + 0.22, 0.21)],
+		[Vector3(-hx, -hy, -0.19), Vector3(-hx + 0.16, hy, 0.19)],
+		[Vector3(hx - 0.16, -hy, -0.19), Vector3(hx, hy, 0.19)],
+	]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for bx in boxes:
+		_st_box(st, bx[0], bx[1])
+	st.set_material(mat)
+	return st.commit()
+
+
+## Caja de a a b (esquinas) con normales unitarias por cara.
+func _st_box(st: SurfaceTool, a: Vector3, b: Vector3) -> void:
+	var faces := [
+		[Vector3(1, 0, 0), [Vector3(b.x, a.y, b.z), Vector3(b.x, a.y, a.z), Vector3(b.x, b.y, a.z), Vector3(b.x, b.y, b.z)]],
+		[Vector3(-1, 0, 0), [Vector3(a.x, a.y, a.z), Vector3(a.x, a.y, b.z), Vector3(a.x, b.y, b.z), Vector3(a.x, b.y, a.z)]],
+		[Vector3(0, 1, 0), [Vector3(a.x, b.y, b.z), Vector3(b.x, b.y, b.z), Vector3(b.x, b.y, a.z), Vector3(a.x, b.y, a.z)]],
+		[Vector3(0, -1, 0), [Vector3(a.x, a.y, a.z), Vector3(b.x, a.y, a.z), Vector3(b.x, a.y, b.z), Vector3(a.x, a.y, b.z)]],
+		[Vector3(0, 0, 1), [Vector3(a.x, a.y, b.z), Vector3(b.x, a.y, b.z), Vector3(b.x, b.y, b.z), Vector3(a.x, b.y, b.z)]],
+		[Vector3(0, 0, -1), [Vector3(b.x, a.y, a.z), Vector3(a.x, a.y, a.z), Vector3(a.x, b.y, a.z), Vector3(b.x, b.y, a.z)]],
+	]
+	for f in faces:
+		var q: Array = f[1]
+		for i in [0, 2, 1, 0, 3, 2]:
+			st.set_normal(f[0])
+			st.add_vertex(q[i])
+
+
+# ------------------------------------------------------------------ utilería
+# Modelos de modelos/utileria/ (arte/blender/utileria.py): barriles, racks, mesas...
+# Se dibujan con MultiMesh como el resto del escenario.
+var _props := {}
+
+
+func _prop_mesh(n: String) -> Mesh:
+	if not _props.has(n):
+		var mesh: Mesh = null
+		var path := "res://modelos/utileria/%s.glb" % n
+		if ResourceLoader.exists(path):
+			var inst := (load(path) as PackedScene).instantiate()
+			var mis := inst.find_children("*", "MeshInstance3D", true, false)
+			if mis.size() > 0:
+				mesh = (mis[0] as MeshInstance3D).mesh
+			inst.free()
+		_props[n] = mesh
+	return _props[n]
+
+
+## Pone un modelo de utilería con el origen en `pos` (piso). El frente del modelo (-Z)
+## queda girado `yaw_deg`; `tilt` (grados en x y z) lo vuelca. `collide` = tamaño de la
+## caja de colisión apoyada en el piso (Vector3.ZERO = sin colisión).
+func _prop(n: String, pos: Vector3, yaw_deg: float, collide := Vector3.ZERO, tilt := Vector3.ZERO, s := 1.0) -> void:
+	var mesh := _prop_mesh(n)
+	if mesh == null:
+		return
+	var b := Basis.from_euler(Vector3(deg_to_rad(tilt.x), deg_to_rad(yaw_deg), deg_to_rad(tilt.z))) * Basis.from_scale(Vector3.ONE * s)
+	_mm_add(mesh, Transform3D(b, pos))
+	if collide != Vector3.ZERO:
+		var xf := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_deg)), pos + Vector3(0, collide.y * 0.5, 0))
+		if has_method("_wc"):
+			call("_wc", collide, xf)
+		else:
+			_collider(_root, collide, xf)
+
+
+## Yaw (grados) para que el frente de un modelo de utilería mire de `from` hacia `to`.
+func _face(from: Vector3, to: Vector3) -> float:
+	var d := to - from
+	return rad_to_deg(atan2(-d.x, -d.z))
 
 
 func _bm(size: Vector3, mat: Material) -> BoxMesh:
@@ -244,22 +407,65 @@ func _mm_add(mesh: Mesh, xf: Transform3D) -> void:
 
 
 ## Vuelca las instancias acumuladas como MultiMeshes hijos de `parent`.
+## Rendimiento: se agrupan por celdas de MM_CELL metros y por tamaño de pieza, y cada
+## grupo deja de dibujarse a una distancia según su tamaño (un papel a 40 m, una silla a
+## 85 m, un muro nunca). Las piezas diminutas no proyectan sombra.
+const MM_CELL := 40.0
+## Distancia máxima de dibujado por clase de tamaño (diagonal de la pieza): [hasta, distancia]
+const MM_RANGES := [[0.7, 40.0], [2.6, 85.0], [9.0, 170.0]]
+
+
 func _flush(parent: Node3D) -> void:
 	for k in _mm:
 		var d: Dictionary = _mm[k]
-		var arr: Array = d["xf"]
-		if arr.is_empty():
-			continue
+		_emit_multimesh(parent, d["mesh"], d["xf"], [])
+	_mm.clear()
+
+
+## Crea las MultiMeshInstance3D de una malla repartidas por celda y tamaño.
+func _emit_multimesh(parent: Node3D, mesh: Mesh, xfs: Array, colors: Array) -> void:
+	if xfs.is_empty():
+		return
+	var msize := mesh.get_aabb().size
+	var groups := {}
+	for i in xfs.size():
+		var xf: Transform3D = xfs[i]
+		var ext := (msize * xf.basis.get_scale()).length()
+		var cls := MM_RANGES.size()
+		for c in MM_RANGES.size():
+			if ext <= float(MM_RANGES[c][0]):
+				cls = c
+				break
+		var key := Vector3i(floori(xf.origin.x / MM_CELL), floori(xf.origin.z / MM_CELL), cls)
+		if not groups.has(key):
+			groups[key] = []
+		groups[key].append(i)
+	for key: Vector3i in groups:
+		var idx: Array = groups[key]
+		var center := Vector3.ZERO
+		for i in idx:
+			center += (xfs[i] as Transform3D).origin
+		center /= float(idx.size())
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = d["mesh"]
-		mm.instance_count = arr.size()
-		for i in arr.size():
-			mm.set_instance_transform(i, arr[i])
+		mm.use_colors = not colors.is_empty()
+		mm.mesh = mesh
+		mm.instance_count = idx.size()
+		for j in idx.size():
+			var xf: Transform3D = xfs[idx[j]]
+			xf.origin -= center
+			mm.set_instance_transform(j, xf)
+			if not colors.is_empty():
+				mm.set_instance_color(j, colors[idx[j]])
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
+		mmi.position = center
+		if key.z < MM_RANGES.size():
+			mmi.visibility_range_end = float(MM_RANGES[key.z][1])
+			mmi.visibility_range_end_margin = 6.0
+		if key.z == 0 or not colors.is_empty():
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		parent.add_child(mmi)
-	_mm.clear()
 
 
 func _rebar(at: Vector3, n: int) -> void:
@@ -718,6 +924,31 @@ func _make_props() -> void:
 		_chunk(Vector3(sin(a) * r, 0, cos(a) * r), 0.7, 1.5)
 
 
+## Ambientación del Catedrático de Hierro: un examen al aire libre que quedó a medias
+## (pupitres en filas, algunos volcados, pizarrones con ruedas y el atril del profesor).
+func _make_exam_props() -> void:
+	var boards := [Vector3(-2.0, 0, -19.5), Vector3(19.0, 0, 5.0)]
+	for b in boards:
+		_prop("pizarron", b, _face(b, Vector3.ZERO), Vector3(2.0, 2.0, 0.6))
+	_prop("atril", Vector3(3.2, 0, -18.2), _face(Vector3(3.2, 0, -18.2), Vector3.ZERO), Vector3(0.6, 1.2, 0.5))
+	# Filas frente a cada pizarrón
+	var rows := [[boards[0], Vector3(0, 0, 1)], [boards[1], Vector3(-1, 0, 0)]]
+	for r in rows:
+		var bp: Vector3 = r[0]
+		var fwd: Vector3 = r[1]
+		var side := Vector3(fwd.z, 0, -fwd.x)
+		for j in 3:
+			for i in 5:
+				if rng.randf() < 0.18:
+					continue
+				var pos: Vector3 = bp + fwd * (3.2 + j * 1.35) + side * ((i - 2) * 1.15) + Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2))
+				var yaw := _face(pos, bp) + rng.randf_range(-14, 14)
+				if rng.randf() < 0.25:
+					_prop("pupitre", pos + Vector3(0, 0.22, 0), yaw, Vector3.ZERO, Vector3(rng.randf_range(80, 95), 0, rng.randf_range(-20, 20)))
+				else:
+					_prop("pupitre", pos, yaw, Vector3(0.5, 0.75, 0.6))
+
+
 func _car(parent: Node3D, pos: Vector3, yaw: float, roll: float, color: Color, burnt: bool) -> void:
 	var c := Node3D.new()
 	c.position = pos
@@ -727,16 +958,33 @@ func _car(parent: Node3D, pos: Vector3, yaw: float, roll: float, color: Color, b
 		c.position.y = 0.92
 	c.rotation_degrees = Vector3(roll, yaw, 0)
 	parent.add_child(c)
-	var body_mat: Material = m_burnt if burnt else _std(color, 0.25, 0.6)
-	_box(c, Vector3(4.3, 0.8, 1.85), _xf(Vector3(0, 0.68, 0)), body_mat)
-	_box(c, Vector3(2.3, 0.62, 1.65), _xf(Vector3(-0.25, 1.38, 0), Vector3(0, 0, 0)), m_burnt if burnt else body_mat)
-	_box(c, Vector3(2.32, 0.42, 1.67), _xf(Vector3(-0.25, 1.4, 0)), m_glass)
-	for wx in [-1.38, 1.38]:
-		for wz in [-0.86, 0.86]:
-			if burnt and rng.randf() < 0.3:
-				continue
-			_cyl(c, 0.38, 0.38, 0.28, _xf(Vector3(wx, 0.38, wz), Vector3(90, 0, 0)), m_tire, 12)
+	var model := _prop_mesh(_car_model(color, burnt))
+	if model:
+		# Modelo de arte/blender/utileria.py: a lo largo de X con el origen en el piso, igual
+		# que las cajas de antes (el giro `roll` es alrededor de ese punto)
+		_mi(c, model, Transform3D.IDENTITY)
+	else:
+		var body_mat: Material = m_burnt if burnt else _std(color, 0.25, 0.6)
+		_box(c, Vector3(4.3, 0.8, 1.85), _xf(Vector3(0, 0.68, 0)), body_mat)
+		_box(c, Vector3(2.3, 0.62, 1.65), _xf(Vector3(-0.25, 1.38, 0), Vector3(0, 0, 0)), m_burnt if burnt else body_mat)
+		_box(c, Vector3(2.32, 0.42, 1.67), _xf(Vector3(-0.25, 1.4, 0)), m_glass)
+		for wx in [-1.38, 1.38]:
+			for wz in [-0.86, 0.86]:
+				if burnt and rng.randf() < 0.3:
+					continue
+				_cyl(c, 0.38, 0.38, 0.28, _xf(Vector3(wx, 0.38, wz), Vector3(90, 0, 0)), m_tire, 12)
 	_collider(c, Vector3(4.3, 1.7, 1.9), _xf(Vector3(0, 0.85, 0)))
+
+
+## Modelo de auto según el color que pide cada lugar (rojo, azul, gris o quemado).
+func _car_model(color: Color, burnt: bool) -> String:
+	if burnt:
+		return "auto_quemado"
+	if color.r > color.g * 1.6 and color.r > color.b * 1.6:
+		return "auto_rojo"
+	if color.b > color.r * 1.15:
+		return "auto_azul"
+	return "auto_gris"
 
 
 func _bus(parent: Node3D, pos: Vector3, yaw: float) -> void:
@@ -744,8 +992,12 @@ func _bus(parent: Node3D, pos: Vector3, yaw: float) -> void:
 	b.position = pos + Vector3(0, 1.35, 0)
 	b.rotation_degrees = Vector3(90, yaw, 0)
 	parent.add_child(b)
-	_box(b, Vector3(11.0, 3.0, 2.6), _xf(Vector3(0, 1.6, 0)), _std(Color(0.55, 0.42, 0.1), 0.35, 0.5))
-	_box(b, Vector3(9.0, 0.9, 2.62), _xf(Vector3(0.6, 2.3, 0)), m_glass)
+	var model := _prop_mesh("autobus_amarillo")
+	if model:
+		_mi(b, model, Transform3D.IDENTITY)
+	else:
+		_box(b, Vector3(11.0, 3.0, 2.6), _xf(Vector3(0, 1.6, 0)), _std(Color(0.55, 0.42, 0.1), 0.35, 0.5))
+		_box(b, Vector3(9.0, 0.9, 2.62), _xf(Vector3(0.6, 2.3, 0)), m_glass)
 	_collider(b, Vector3(11.0, 3.0, 2.6), _xf(Vector3(0, 1.6, 0)))
 
 

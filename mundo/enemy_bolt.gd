@@ -81,9 +81,10 @@ func _physics_process(delta: float) -> void:
 	var next := prev + velocity * delta
 	var q := PhysicsRayQueryParameters3D.create(prev, next)
 	var excl: Array[RID] = []
-	if shooter is CollisionObject3D:
+	# (el tirador puede haber desaparecido mientras la bala sigue en el aire)
+	if is_instance_valid(shooter) and shooter is CollisionObject3D:
 		excl.append((shooter as CollisionObject3D).get_rid())
-	if target is CollisionObject3D:
+	if is_instance_valid(target) and target is CollisionObject3D:
 		excl.append((target as CollisionObject3D).get_rid())
 	q.exclude = excl
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)

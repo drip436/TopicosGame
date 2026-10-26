@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dhsf1awtknkh5"
-path="res://.godot/imported/jugador_ai_jugador_ai_color.png-f1335c0ec657c137d90d0a2dfdf526ed.ctex"
+path.s3tc="res://.godot/imported/jugador_ai_jugador_ai_color.png-f1335c0ec657c137d90d0a2dfdf526ed.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "3fb6f733f01e54ee1bc1324099e398d7"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jugador/jugador_ai_jugador_ai_color.png"
-dest_files=["res://.godot/imported/jugador_ai_jugador_ai_color.png-f1335c0ec657c137d90d0a2dfdf526ed.ctex"]
+dest_files=["res://.godot/imported/jugador_ai_jugador_ai_color.png-f1335c0ec657c137d90d0a2dfdf526ed.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

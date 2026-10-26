@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cghbvrx0lor1m"
-path="res://.godot/imported/kessler_rough.png-14e8d9d61f82fbad167b850d8d0b594a.ctex"
+path.s3tc="res://.godot/imported/kessler_rough.png-14e8d9d61f82fbad167b850d8d0b594a.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://modelos/jefes/kessler_rough.png"
-dest_files=["res://.godot/imported/kessler_rough.png-14e8d9d61f82fbad167b850d8d0b594a.ctex"]
+dest_files=["res://.godot/imported/kessler_rough.png-14e8d9d61f82fbad167b850d8d0b594a.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

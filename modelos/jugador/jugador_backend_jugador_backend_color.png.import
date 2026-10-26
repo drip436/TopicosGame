@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://khrinakxncho"
-path="res://.godot/imported/jugador_backend_jugador_backend_color.png-14cc08a6f4ffd9cc0af6bf981e546aa3.ctex"
+path.s3tc="res://.godot/imported/jugador_backend_jugador_backend_color.png-14cc08a6f4ffd9cc0af6bf981e546aa3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "1159ac448d02184178f774a7b80bbdd4"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jugador/jugador_backend_jugador_backend_color.png"
-dest_files=["res://.godot/imported/jugador_backend_jugador_backend_color.png-14cc08a6f4ffd9cc0af6bf981e546aa3.ctex"]
+dest_files=["res://.godot/imported/jugador_backend_jugador_backend_color.png-14cc08a6f4ffd9cc0af6bf981e546aa3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

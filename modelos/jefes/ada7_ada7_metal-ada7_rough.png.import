@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bkwe82q6cjcy8"
-path="res://.godot/imported/ada7_ada7_metal-ada7_rough.png-1e039f0e10d34fc70dafa4bb74b4c204.ctex"
+path.s3tc="res://.godot/imported/ada7_ada7_metal-ada7_rough.png-1e039f0e10d34fc70dafa4bb74b4c204.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "17b1f8508722e2cda3686a62a4af3a12"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://modelos/jefes/ada7_ada7_metal-ada7_rough.png"
-dest_files=["res://.godot/imported/ada7_ada7_metal-ada7_rough.png-1e039f0e10d34fc70dafa4bb74b4c204.ctex"]
+dest_files=["res://.godot/imported/ada7_ada7_metal-ada7_rough.png-1e039f0e10d34fc70dafa4bb74b4c204.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
