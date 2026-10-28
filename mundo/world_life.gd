@@ -17,6 +17,9 @@ const BONFIRE := preload("bonfire.gd")
 const CUP := preload("coffee_cup.gd")
 const KEY := preload("key_piece.gd")
 const PCLASSES := preload("res://jugador/player_classes.gd")
+const EQ := preload("res://jugador/equipo.gd")
+const CREDITO := preload("credito.gd")
+const MERCADER := preload("mercader.gd")
 const M := preload("enemy_models.gd")
 
 ## Armaduras de resistencia: dónde están (cerca de qué hoguera, por título).
@@ -175,6 +178,7 @@ func _setup() -> void:
 	_make_cups()
 	_connect_key_drops()
 	_make_armors()
+	_make_merchant()
 	if enemies_enabled:
 		_make_enemy_records()
 	_ready_done = true
@@ -183,6 +187,24 @@ func _setup() -> void:
 	var partida := get_node_or_null("/root/Partida")
 	if partida:
 		partida.aplicar(self)
+
+
+## El mercader (mundo/mercader.gd) junto a la Hoguera de la Plaza, mirando hacia ella.
+func _make_merchant() -> void:
+	var near := Vector3(5, 0, 20)
+	if bonfires.size() > 0 and is_instance_valid(bonfires[0]):
+		near = bonfires[0].global_position
+	var p := _free_near(near + Vector3(-7.0, 0, 2.0), 5.0, 1.0)
+	if p == Vector3.INF:
+		p = near + Vector3(-7.0, 0, 2.0)
+	var m := MERCADER.new()
+	m.name = "Mercader"
+	m.player = player
+	m.hud = hud
+	m.position = p
+	var to := near - p
+	m.rotation.y = atan2(-to.x, -to.z)
+	add_child(m)
 
 
 # ======================================================================
@@ -461,7 +483,7 @@ func _make_armors() -> void:
 				break
 		if g == Vector3.INF:
 			continue
-		var info: Dictionary = PCLASSES.RESIST_ARMORS[id]
+		var info: Dictionary = EQ.ARMORS[id]
 		var n := Node3D.new()
 		n.name = "Armadura_" + id
 		n.set_meta("armor_id", id)
@@ -504,21 +526,22 @@ func _update_armors() -> void:
 		if d < 1.8:
 			var id: String = n.get_meta("armor_id")
 			armors_found.append(id)
-			var info: Dictionary = PCLASSES.RESIST_ARMORS[id]
+			var partida := get_node_or_null("/root/Partida")
+			if partida and not partida.armaduras.has(id):
+				partida.armaduras.append(id)
+				partida.inventario_cambiado.emit()
+			var info: Dictionary = EQ.ARMORS[id]
 			LFX.puff(self, n.global_position + Vector3(0, 1.3, 0), Color(info["color"].r * 2.5, info["color"].g * 2.5, info["color"].b * 2.5, 1), 40, 0.2, 4.0, -2.0)
 			n.queue_free()
 			if hud:
-				hud.show_banner(String(info["name"]).to_upper(), info["color"], "%s\nEquípala descansando en una hoguera." % info["desc"], 3.5)
+				hud.show_banner(String(info["name"]).to_upper(), info["color"], "%s\nEquípala en el menú de pausa (Esc → Equipo)." % info["desc"], 3.5)
 	if _menu_open and (_menu_bonfire == null or not is_instance_valid(_menu_bonfire) or _menu_bonfire.global_position.distance_to(player.global_position) > 3.5 or player.is_dead):
 		_close_menu()
 
 
-func _open_menu(b: Node3D) -> void:
-	if armors_found.is_empty() or hud == null or not hud.has_method("show_menu"):
-		return
-	_menu_open = true
-	_menu_bonfire = b
-	_refresh_menu()
+func _open_menu(_b: Node3D) -> void:
+	# Las armaduras ahora se cambian en el menú de pausa (Esc → Equipo)
+	pass
 
 
 func _refresh_menu() -> void:
@@ -626,8 +649,20 @@ func _connect_key_drops() -> void:
 			f.connect("boss_defeated", _drop_key.bind(f, fight_name))
 
 
+## Créditos que suelta un enemigo al morir (jugador/equipo.gd DROPS).
+func _drop_credits(e: Node3D) -> void:
+	if not is_instance_valid(e) or player == null:
+		return
+	var r: Array = EQ.DROPS.get(String(e.get("type")), [10, 15])
+	CREDITO.soltar(self, e.global_position + Vector3(0, 1.0, 0), _rng.randi_range(int(r[0]), int(r[1])), player)
+
+
 func _drop_key(fight: Node, fight_name: String) -> void:
 	var info: Array = KEY_DROPS[fight_name]
+	# Botín de créditos del jefe
+	var bb = fight.get("boss")
+	var bp: Vector3 = (bb as Node3D).global_position if bb != null and is_instance_valid(bb) else player.global_position
+	CREDITO.soltar(self, bp + Vector3(0, 1.5, 0), int(EQ.BOSS_CREDITS.get(info[0], 1000)), player)
 	var pos := Vector3.INF
 	var b = fight.get("boss")
 	if b != null and is_instance_valid(b):
@@ -732,7 +767,9 @@ func _spawn(rec: Dictionary) -> void:
 	e.target = player
 	e.fx_parent = self
 	e.place(rec["pos"] + Vector3(0, 0.05, 0), rec["yaw"])
-	e.died.connect(func(_n): rec["alive"] = false)
+	e.died.connect(func(_n):
+		rec["alive"] = false
+		_drop_credits(e))
 	_enemy_root.add_child(e)
 	rec["node"] = e
 

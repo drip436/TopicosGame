@@ -11,6 +11,7 @@ extends Node3D
 ##   data      Arquero: lanza (clic izq.) y arco con flechas infinitas (clic der.).
 
 const CLASSES := preload("player_classes.gd")
+const EQUIPO := preload("equipo.gd")
 const PROJ := preload("player_projectile.gd")
 const STAND := preload("stand.gd")
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
@@ -50,8 +51,11 @@ var _shield_rest := Transform3D.IDENTITY
 # Arquero
 var _bow_cd := 0.0
 
-# Armadura de resistencia equipada
+# Armadura de resistencia equipada ("" = ropa de la clase) y arma en la mano derecha
 var resist_id := ""
+var weapon_id := ""
+## Estilo de pelea del arma: "espada", "mazo", "estoque", "lanza" o "" (AI Dev sin arma).
+var weapon_kind := ""
 var meshes: Array[MeshInstance3D] = []
 var _trim_mat: StandardMaterial3D
 var _emblem: MeshInstance3D
@@ -68,12 +72,12 @@ var action := ""
 var action_t := 0.0
 var action_dur := 0.0
 
-## Combos por arma: [animación del rig, daño, duración, momento del golpe, arco].
+## Combos por tipo de arma: [animación del rig, daño, duración, momento del golpe, arco].
 const COMBOS := {
-	"frontend": [["estoque_1", 22.0, 0.4, 0.4, 0.5], ["estoque_2", 24.0, 0.4, 0.4, 0.5], ["estoque_3", 34.0, 0.6, 0.5, 0.45]],
-	"backend": [["mazo_1", 52.0, 0.95, 0.55, -0.1], ["mazo_2", 60.0, 1.0, 0.5, -0.5]],
-	"data": [["lanza_1", 30.0, 0.5, 0.4, 0.6], ["lanza_2", 32.0, 0.5, 0.4, 0.6], ["lanza_3", 42.0, 0.7, 0.5, -0.6]],
-	"cyber": [["espada_1", 38.0, 0.55, 0.4, 0.3], ["espada_2", 40.0, 0.55, 0.4, 0.3], ["espada_3", 55.0, 0.75, 0.5, 0.35]],
+	"estoque": [["estoque_1", 22.0, 0.4, 0.4, 0.5], ["estoque_2", 24.0, 0.4, 0.4, 0.5], ["estoque_3", 34.0, 0.6, 0.5, 0.45]],
+	"mazo": [["mazo_1", 52.0, 0.95, 0.55, -0.1], ["mazo_2", 60.0, 1.0, 0.5, -0.5]],
+	"lanza": [["lanza_1", 30.0, 0.5, 0.4, 0.6], ["lanza_2", 32.0, 0.5, 0.4, 0.6], ["lanza_3", 42.0, 0.7, 0.5, -0.6]],
+	"espada": [["espada_1", 38.0, 0.55, 0.4, 0.3], ["espada_2", 40.0, 0.55, 0.4, 0.3], ["espada_3", 55.0, 0.75, 0.5, 0.35]],
 }
 
 
@@ -82,6 +86,8 @@ func setup(p: CharacterBody3D, id: String) -> void:
 	class_id = id
 	cfg = CLASSES.data(id)
 	name = "KitDeClase"
+	weapon_id = EQUIPO.CLASS_WEAPON.get(id, "")
+	weapon_kind = String(EQUIPO.weapon(weapon_id).get("kind", ""))
 	if id == "frontend":
 		max_mana = 100.0
 		mana = max_mana
@@ -101,40 +107,50 @@ func setup(p: CharacterBody3D, id: String) -> void:
 ## para que el jugador lo ejecute, o {} si la clase lo maneja sola.
 ## Largo del combo de la clase (1 = sin combo).
 func combo_length() -> int:
-	return (COMBOS[class_id] as Array).size() if COMBOS.has(class_id) else 1
+	return (COMBOS[weapon_kind] as Array).size() if COMBOS.has(weapon_kind) else 1
 
 
-## Ataque principal con combos: `step` es el paso del combo (0, 1, 2…).
+## Ataque principal con combos: `step` es el paso del combo (0, 1, 2…). El daño y la
+## velocidad salen del arma equipada (jugador/equipo.gd).
 func primary(step: int = 0) -> Dictionary:
-	if rigged and COMBOS.has(class_id):
-		var c: Array = COMBOS[class_id][step % combo_length()]
+	var w := EQUIPO.weapon(weapon_id)
+	if rigged and COMBOS.has(weapon_kind):
+		var c: Array = COMBOS[weapon_kind][step % combo_length()]
 		var base := _primary_base()
+		var spd := float(w.get("speed", 1.0))
 		base["anim"] = c[0]
-		base["damage"] = c[1]
-		base["dur"] = c[2]
+		base["damage"] = float(c[1]) * float(w.get("damage", 1.0))
+		base["dur"] = float(c[2]) / spd
 		base["hit_k"] = c[3]
 		base["arc"] = c[4]
+		base["anim_speed"] = spd
+		if w.has("status"):
+			base["status"] = w["status"]
 		if step % combo_length() == combo_length() - 1:
 			base["shake"] = 0.3
 			base["stamina"] = float(base.get("stamina", 12.0)) * 1.3
 		return base
 	var b := _primary_base()
-	if class_id == "ai" and not b.is_empty():
+	if not b.is_empty() and weapon_kind != "":
+		b["damage"] = float(b.get("damage", 0.0)) * float(w.get("damage", 1.0))
+		if w.has("status"):
+			b["status"] = w["status"]
+	if class_id == "ai" and weapon_kind == "" and not b.is_empty():
 		b["anim"] = "brazo_1"
 	return b
 
 
 func _primary_base() -> Dictionary:
-	match class_id:
-		"frontend":
+	match ("ai" if weapon_kind == "" else weapon_kind):
+		"estoque":
 			_attack_kind = "thrust"
 			return {"dur": 0.4, "hit_k": 0.4, "damage": 22.0, "reach": 2.9, "arc": 0.5, "stamina": 9.0}
-		"backend":
+		"mazo":
 			_attack_kind = "swing"
-			return {"dur": 0.95, "hit_k": 0.55, "damage": 52.0, "reach": 3.3, "arc": -0.1, "stamina": 22.0, "aoe": 2.2, "shake": 0.3}
-		"data":
+			return {"dur": 0.95, "hit_k": 0.55, "damage": 52.0, "reach": 3.3 + (0.4 if weapon_id == "mandoble" else 0.0), "arc": -0.1, "stamina": 22.0, "aoe": 2.2, "shake": 0.3}
+		"lanza":
 			_attack_kind = "thrust"
-			return {"dur": 0.5, "hit_k": 0.4, "damage": 30.0, "reach": 3.7, "arc": 0.6, "stamina": 12.0}
+			return {"dur": 0.5, "hit_k": 0.4, "damage": 30.0, "reach": 3.7 + (0.5 if weapon_id == "alabarda" else 0.0), "arc": 0.6, "stamina": 12.0}
 		"ai":
 			if stand and is_instance_valid(stand) and not stand.busy:
 				var busy: float = stand.attack(_aim_target(), _aim_point())
@@ -252,6 +268,8 @@ func process(delta: float) -> void:
 ## Multiplicador del daño recibido (armadura y escudo).
 func damage_mult(from: Variant) -> float:
 	var m: float = cfg["dmg_taken"]
+	if resist_id != "":
+		m *= float(EQUIPO.ARMORS[resist_id].get("defensa", 1.0))
 	if blocking and from is Vector3:
 		var to: Vector3 = (from as Vector3) - player.global_position
 		to.y = 0.0
@@ -888,21 +906,8 @@ func attach_to_rig(rig: Node) -> void:
 			if c is Node3D:
 				rig.attach_by_position(c)
 	var ready: Dictionary = rig.READY
-	var fwd_up := Vector3(0, 0.6, -0.8)
 	if right_pivot:
-		right_pivot.rotation = Vector3.ZERO
-		right_pivot.position = Vector3.ZERO
-		match class_id:
-			"frontend":
-				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, -0.15, -1), ready, Vector3(0.07, 0, 0))
-			"data":
-				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 0.05, -1), ready, Vector3(0.07, 0, 0))
-			"backend":
-				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), Vector3(0, 0.5, -0.85), ready, Vector3(0.07, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0))
-			"cyber":
-				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), fwd_up, ready, Vector3(0.07, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0))
-			_:
-				rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 0, -1), ready, Vector3(0.07, 0, 0))
+		_mount_right(rig)
 	if left_pivot:
 		left_pivot.rotation = Vector3.ZERO
 		left_pivot.position = Vector3.ZERO
@@ -918,15 +923,66 @@ func attach_to_rig(rig: Node) -> void:
 		rig.attach_weapon(_shield, "fore_l", Vector3(0, 1, 0), Vector3(0, 1, 0), ready, Vector3(-0.13, 0, 0), Vector3(0, 0, -1), Vector3(-1, 0, 0))
 
 
-## Equipa una armadura de resistencia ("" = ninguna): cambia los ribetes de color.
+## Monta el arma de la mano derecha según su tipo, con el mango en el puño.
+func _mount_right(rig: Node) -> void:
+	var ready: Dictionary = rig.READY
+	right_pivot.rotation = Vector3.ZERO
+	right_pivot.position = Vector3.ZERO
+	match weapon_kind:
+		"estoque":
+			rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, -0.15, -1), ready, Vector3(0.075, 0, 0))
+		"lanza":
+			rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 0.05, -1), ready, Vector3(0.075, 0, 0))
+		"mazo":
+			rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), Vector3(0, 0.5, -0.85), ready, Vector3(0.075, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0))
+		_:
+			rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), Vector3(0, 0.6, -0.8), ready, Vector3(0.075, 0, 0), Vector3(0, 0, -1), Vector3(1, 0, 0))
+
+
+## Cambia el arma de la mano derecha (id de jugador/equipo.gd; "" = sin arma).
+func equip_weapon(id: String) -> void:
+	var w := EQUIPO.weapon(id)
+	if w.is_empty() and id != "":
+		return
+	weapon_id = id
+	weapon_kind = String(w.get("kind", ""))
+	if right_pivot == null:
+		return
+	for c in right_pivot.get_children():
+		if c is MeshInstance3D:
+			meshes.erase(c)
+		c.queue_free()
+	meshes = meshes.filter(func(m): return is_instance_valid(m) and not right_pivot.is_ancestor_of(m))
+	if id != "":
+		_dress_weapon(right_pivot, String(w["model"]))
+	var rig = player.get("rig")
+	if rigged and rig:
+		_mount_right(rig)
+
+
+## Equipa una armadura (id de jugador/equipo.gd; "" = la ropa de la clase): cambia el
+## modelo del jugador y sus resistencias a estados alterados.
 func set_resist_armor(id: String) -> void:
-	resist_id = id
-	if id == "" or not CLASSES.RESIST_ARMORS.has(id):
+	resist_id = id if EQUIPO.ARMORS.has(id) else ""
+	var rig = player.get("rig")
+	if rig and rig.has_method("set_outfit"):
+		var path: String = rig.CLASS_MODEL % class_id
+		if resist_id != "":
+			var arm := "res://modelos/jugador/%s.glb" % EQUIPO.ARMORS[resist_id]["model"]
+			if ResourceLoader.exists(arm):
+				path = arm
+		rig.set_outfit(path)
+		rig.override_material("ribete", _trim_mat)
+		if _emblem:
+			_emblem.visible = false
+		return
+	id = resist_id
+	if id == "":
 		_trim_mat.albedo_color = Color(0.75, 0.62, 0.35)
 		_trim_mat.emission_enabled = false
 		_emblem.visible = false
 		return
-	var c: Color = CLASSES.RESIST_ARMORS[id]["color"]
+	var c: Color = EQUIPO.ARMORS[id]["color"]
 	_trim_mat.albedo_color = c
 	_trim_mat.emission_enabled = true
 	_trim_mat.emission = c
@@ -935,12 +991,19 @@ func set_resist_armor(id: String) -> void:
 	_emblem.visible = true
 
 
-## Multiplicadores de resistencia de la armadura equipada.
+## Multiplicadores de resistencia de la armadura equipada (dur, tick, buildup, grab).
 func resist(effect: String, key: String) -> float:
 	if resist_id == "":
 		return 1.0
-	var a: Dictionary = CLASSES.RESIST_ARMORS[resist_id]
-	var eff: String = a["effect"]
-	if eff == effect or (eff == "veneno" and effect == "ameba" and key == "buildup"):
-		return float(a.get(key, 1.0))
+	var r: Dictionary = EQUIPO.ARMORS[resist_id]["resist"]
+	if r.has(effect):
+		return float((r[effect] as Dictionary).get(key, 1.0))
 	return 1.0
+
+
+## Probabilidad de no recibir un estado (p. ej. el traje de Faraday con las descargas).
+func ignore_chance(effect: String) -> float:
+	if resist_id == "":
+		return 0.0
+	var r: Dictionary = EQUIPO.ARMORS[resist_id]["resist"]
+	return float((r.get(effect, {}) as Dictionary).get("ignore", 0.0))

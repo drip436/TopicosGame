@@ -61,6 +61,12 @@ var _prompt: Label
 var _menu_bg: ColorRect
 var _menu: Label
 var _keys_lbl: Label
+# Créditos (abajo a la derecha): el número sube poco a poco y "+N" aparece al recoger
+var _cred_lbl: Label
+var _cred_pop: Label
+var _cred_shown := 0.0
+var _cred_target := 0
+var _cred_pop_t := 0.0
 var _toast: Label
 var _toast_t := 0.0
 
@@ -127,6 +133,16 @@ func _ready() -> void:
 	_menu = _label(_root, "", 19, Color(0.92, 0.9, 0.85))
 	_keys_lbl = _label(_root, "", 18, Color(0.95, 0.8, 0.45))
 	_keys_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_cred_lbl = _label(_root, "", 22, Color(1.0, 0.86, 0.45))
+	_cred_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_cred_pop = _label(_root, "", 18, Color(1.0, 0.95, 0.7))
+	_cred_pop.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_cred_pop.modulate.a = 0.0
+	var partida := get_node_or_null("/root/Partida")
+	if partida:
+		partida.creditos_cambiados.connect(set_credits)
+		_cred_target = int(partida.creditos)
+		_cred_shown = _cred_target
 
 	# --- Letrero
 	_banner = Control.new()
@@ -284,6 +300,28 @@ func show_menu(text: String) -> void:
 
 
 ## Piezas de la llave del Aula Magna (arriba a la derecha).
+func set_credits(total: int, gained: int = 0) -> void:
+	_cred_target = total
+	if gained > 0:
+		var prev := 0
+		if _cred_pop_t > 0.0 and _cred_pop.text.begins_with("+"):
+			prev = int(_cred_pop.text.substr(1).replace(",", ""))
+		_cred_pop.text = "+%d" % (prev + gained)
+		_cred_pop_t = 2.0
+		_cred_pop.modulate.a = 1.0
+	elif gained < 0:
+		_cred_shown = total
+
+
+static func _miles(n: int) -> String:
+	var s := str(absi(n))
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.right(3) + out
+		s = s.left(s.length() - 3)
+	return ("-" if n < 0 else "") + s + out
+
+
 func set_keys(have: int, total: int) -> void:
 	_keys_lbl.text = "" if have <= 0 else "Llave del Aula Magna  %d / %d" % [have, total]
 
@@ -440,6 +478,15 @@ func _process(delta: float) -> void:
 	_menu_bg.size = Vector2(480, _menu.get_line_count() * 28 + 24)
 	_keys_lbl.position = Vector2(vs.x - 440, 34)
 	_keys_lbl.size = Vector2(400, 26)
+	_cred_shown = move_toward(_cred_shown, float(_cred_target), maxf(20.0, absf(_cred_target - _cred_shown) * 4.0) * delta)
+	_cred_lbl.text = "◆  %s  créditos" % _miles(int(round(_cred_shown)))
+	_cred_lbl.position = Vector2(vs.x - 380, vs.y - 58)
+	_cred_lbl.size = Vector2(350, 30)
+	_cred_pop.position = Vector2(vs.x - 380, vs.y - 86)
+	_cred_pop.size = Vector2(350, 26)
+	_cred_pop_t -= delta
+	if _cred_pop_t <= 0.0:
+		_cred_pop.modulate.a = maxf(0.0, _cred_pop.modulate.a - delta * 2.0)
 	_prompt.position = Vector2(0, vs.y - 190)
 	_prompt.size = Vector2(vs.x, 34)
 	_toast.position = Vector2(0, vs.y * 0.22)

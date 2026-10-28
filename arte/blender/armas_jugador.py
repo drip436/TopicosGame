@@ -54,6 +54,14 @@ MATS = {
     "runa": {"emit": (0.35, 0.75, 1.0), "strength": 3.0},
     "naranja": {"emit": (1.0, 0.5, 0.1), "strength": 3.5},
     "pantalla": {"emit": (0.45, 0.85, 1.0), "strength": 1.6},
+    "plasma": {"emit": (1.0, 0.35, 0.85), "strength": 5.0},
+    "lava": {"emit": (1.0, 0.35, 0.05), "strength": 5.0},
+    "violeta": {"emit": (0.65, 0.35, 1.0), "strength": 4.0},
+    "hielo": {"emit": (0.55, 0.9, 1.0), "strength": 4.0},
+    "acero_negro": dict(base=(0.03, 0.03, 0.035), metal=0.9, rough=0.28, rust=0.3, wear=0.5, dirt=0.5, bare=(0.4, 0.4, 0.42), engrave=0.8, engrave_scale=24.0),
+    "rojo_oscuro": dict(base=(0.12, 0.02, 0.015), metal=0.8, rough=0.3, rust=0.4, wear=0.5, dirt=0.6, bare=(0.4, 0.3, 0.28), soot=0.6),
+    "seda_negra": dict(base=(0.02, 0.02, 0.025), rough=0.8, rust=0.0, wear=0.3, dirt=0.4, scratches=False),
+    "rack": dict(base=(0.05, 0.055, 0.06), metal=0.7, rough=0.4, rust=0.4, wear=0.6, dirt=0.6, bare=(0.4, 0.4, 0.42)),
 }
 
 
@@ -294,6 +302,115 @@ def arco():
     cable("cuerda", [tuple(t1), tuple((t1 + t2) / 2), tuple(t2)], 0.003, mat="cuerda", sag=0.0)
     finish("arco", (1.4, 0.6, 0.4), G(0, 0, 0))
 
+
+# ---------------------------------------------------------------- armas del mercader
+
+def katana_plasma():
+    start(11)
+    # Tipo espada: empuñadura en y −0.18..0.1, tsuba en y 0.12, hoja hasta y 1.1 (filo hacia +z)
+    cyl("tsuka", 0.021, 0.28, G(0, -0.04, 0), mat="seda_negra", verts=12)
+    for k in range(8):
+        box("ito_%d" % k, S(0.046, 0.012, 0.046), G(0, -0.15 + k * 0.034, 0), (0, 45, 0), mat="acero_oscuro", bevel=0.004)
+    cyl("kashira", 0.024, 0.03, G(0, -0.19, 0), mat="oro", verts=12)
+    cyl("tsuba", 0.06, 0.012, G(0, 0.11, 0), mat="oro", verts=24, bevel=0.003)
+    cyl("tsuba_anillo", 0.062, 0.006, G(0, 0.11, 0), mat="plasma", verts=24, bevel=0)
+    cyl("habaki", 0.02, 0.04, G(0, 0.14, 0), mat="oro", verts=10)
+    # Hoja ligeramente curva: tramos con su filo de plasma
+    prev = Vector(G(0, 0.15, 0))
+    for k in range(6):
+        t = (k + 1) / 6
+        cur = Vector(G(0, 0.15 + t * 0.95, 0.06 * t * t))
+        blade("hoja_%d" % k, tuple(prev), tuple(cur), 0.045 - t * 0.012, 0.009, G(0, 0, 1), mat="acero_liso", taper=0.85 if k < 5 else 0.1)
+        prev = cur
+    cable("filo_plasma", [G(0, 0.16, -0.024), G(0, 0.6, -0.012), G(0, 1.08, 0.04)], 0.004, mat="plasma", sag=0.0)
+    finish("katana_plasma", (1.0, 1.4, 0.7), G(0, 0.5, 0))
+
+
+def espada_cortafuegos():
+    start(12)
+    cyl("empunadura", 0.024, 0.2, G(0, -0.02, 0), mat="cuero", verts=12)
+    sphere("pomo", 0.04, G(0, -0.15, 0), (1, 1, 0.8), mat="acero_negro", segs=14)
+    box("guarda", S(0.07, 0.06, 0.36), G(0, 0.11, 0), mat="acero_negro", bevel=0.01)
+    for k in range(4):
+        box("rejilla_%d" % k, S(0.072, 0.008, 0.25), G(0, 0.09 + k * 0.012, 0), mat="lava", bevel=0)
+    blade("hoja", G(0, 0.14, 0), G(0, 1.12, 0), 0.12, 0.018, (0, 1, 0), mat="rojo_oscuro", fuller="lava", taper=0.5)
+    for k in range(5):
+        box("grieta_%d" % k, S(0.005, 0.1, 0.02), G(0, 0.3 + k * 0.16, (-1) ** k * 0.025), (0, 0, (-1) ** k * 25), mat="lava", bevel=0)
+    finish("espada_cortafuegos", (1.0, 1.4, 0.7), G(0, 0.5, 0))
+
+
+def mandoble():
+    start(13)
+    # Tipo mazo (se agarra igual que el martillo): mango y −0.15..0.25, hoja hasta y 1.65
+    cyl("empunadura", 0.026, 0.42, G(0, 0.04, 0), mat="cuero", verts=12)
+    for k in range(7):
+        cyl("tira_%d" % k, 0.029, 0.018, G(0, -0.12 + k * 0.05, 0), (0, 0, k * 18), mat="oro", verts=12)
+    sphere("pomo", 0.05, G(0, -0.2, 0), (1, 1, 1.2), mat="oro", segs=16)
+    box("guarda", S(0.08, 0.07, 0.5), G(0, 0.28, 0), mat="oro", bevel=0.015)
+    for sgn in (-1, 1):
+        limb("guarda_cuerno_%d" % sgn, [G(0, 0.28, sgn * 0.24), G(0, 0.34, sgn * 0.3), G(0, 0.42, sgn * 0.29)], [0.03, 0.02, 0.006], mat="oro", verts=8)
+    cyl("gema", 0.03, 0.09, G(0, 0.28, 0), (0, 90, 0), mat="naranja", verts=14)
+    blade("hoja", G(0, 0.31, 0), G(0, 1.65, 0), 0.15, 0.022, (0, 1, 0), mat="acero_negro", fuller="oro", taper=0.55)
+    finish("mandoble", (1.6, 2.0, 1.2), G(0, 0.8, 0))
+
+
+def hacha_servidor():
+    start(14)
+    # Tipo mazo: mango y −0.08..0.95; cabeza (puerta de rack) en y 0.82 hacia −z
+    cyl("mango", 0.03, 1.05, G(0, 0.42, 0), mat="acero_oscuro", verts=12)
+    for k in range(5):
+        cyl("cinta_%d" % k, 0.034, 0.025, G(0, -0.04 + k * 0.035, 0), (0, 0, k * 15), mat="cuero", verts=12)
+    box("cabeza", S(0.05, 0.32, 0.36), G(0, 0.82, -0.17), mat="rack", bevel=0.012)
+    for k in range(6):
+        box("ventila_%d" % k, S(0.054, 0.012, 0.2), G(0, 0.72 + k * 0.035, -0.15), mat="acero_oscuro", bevel=0)
+    for k in range(4):
+        box("led_%d" % k, S(0.056, 0.012, 0.012), G(0, 0.7 + k * 0.05, -0.3), mat="hielo" if k % 2 else "cian", bevel=0)
+    blade("filo", G(0, 0.66, -0.36), G(0, 0.98, -0.36), 0.05, 0.03, G(0, 0, 1), mat="acero_liso", taper=0.9)
+    cable("rayo", [G(0, 0.66, -0.38), G(0, 0.78, -0.4), G(0, 0.86, -0.37), G(0, 0.98, -0.39)], 0.004, mat="hielo", sag=0.0)
+    box("contrapeso", S(0.06, 0.12, 0.1), G(0, 0.82, 0.06), mat="acero_oscuro", bevel=0.01)
+    finish("hacha_servidor", (1.2, 1.6, 1.2), G(0, 0.6, 0))
+
+
+def alabarda():
+    start(15)
+    # Tipo lanza: asta a lo largo de −z (Godot) de 0.5 a −1.6; cabeza en −1.6..−2.05
+    cyl("asta", 0.022, 2.1, G(0, 0, -0.55), (90, 0, 0), mat="acero_oscuro", verts=10)
+    for k in range(5):
+        cyl("tira_%d" % k, 0.026, 0.03, G(0, 0, 0.1 - k * 0.05), (90, 0, 0), mat="cuero", verts=10)
+    for k in range(3):
+        cable("fibra_%d" % k, [G(0.024 * math.cos(k * 2.1), 0.024 * math.sin(k * 2.1), 0.3), G(0.026 * math.cos(k * 2.1 + 1), 0.026 * math.sin(k * 2.1 + 1), -0.6), G(0.024 * math.cos(k * 2.1 + 2), 0.024 * math.sin(k * 2.1 + 2), -1.55)],
+              0.0035, mat="hielo" if k != 1 else "plasma", sag=0.0)
+    cyl("cubo", 0.04, 0.12, G(0, 0, -1.6), (90, 0, 0), mat="acero", verts=14)
+    blade("punta", G(0, 0, -1.66), G(0, 0, -2.08), 0.07, 0.014, G(1, 0, 0), mat="acero_liso", fuller="hielo", taper=0.5)
+    # Hoja de hacha a un lado y pico al otro
+    box("hacha", S(0.012, 0.26, 0.22), G(0, 0.13, -1.72), mat="acero", bevel=0.01)
+    blade("filo_hacha", G(0, 0.26, -1.6), G(0, 0.26, -1.86), 0.04, 0.014, G(0, 1, 0), mat="acero_liso", taper=0.9)
+    limb("pico", [G(0, -0.02, -1.7), G(0, -0.14, -1.72), G(0, -0.22, -1.66)], [0.02, 0.012, 0.002], mat="acero", verts=6)
+    cyl("regaton", 0.025, 0.06, G(0, 0, 0.52), (90, 0, 0), mat="acero", verts=10, r2=0.012)
+    finish("alabarda", (1.8, 1.6, 0.8), G(0, 0, -0.8))
+
+
+def estoque_cuantico():
+    start(16)
+    # Tipo estoque: empuñadura en z 0.04, cazoleta en −0.05, hoja hasta −1.1
+    cyl("empunadura", 0.018, 0.14, G(0, 0, 0.04), (90, 0, 0), mat="seda_negra", verts=12)
+    sphere("pomo", 0.032, G(0, 0, 0.13), mat="violeta", segs=12)
+    sphere("cazoleta", 0.065, G(0, 0, -0.06), (1, 1, 0.45), mat="oro", segs=20)
+    for k in range(4):
+        a = k / 4 * math.tau
+        cable("lazo_%d" % k, [G(0.06 * math.cos(a), 0.06 * math.sin(a), -0.05), G(0.04 * math.cos(a + 0.6), 0.04 * math.sin(a + 0.6), 0.04), G(0, 0, 0.1)], 0.004, mat="oro", sag=0.0)
+    blade("hoja", G(0, 0, -0.08), G(0, 0, -1.1), 0.02, 0.008, G(1, 0, 0), mat="acero_liso", fuller="violeta", taper=0.5)
+    # Hoja "fantasma" desplazada (superposición cuántica)
+    blade("fantasma", G(0.03, 0.02, -0.15), G(0.04, 0.03, -1.05), 0.012, 0.004, G(1, 0, 0), mat="violeta", taper=0.4)
+    for k in range(5):
+        sphere("particula_%d" % k, 0.008, G(0.05 * math.sin(k * 1.7), 0.04 * math.cos(k * 1.3), -0.25 - k * 0.17), mat="violeta", segs=6)
+    finish("estoque_cuantico", (0.9, 0.8, 0.5), G(0, 0, -0.45))
+
+
+for name, fn in (("katana_plasma", katana_plasma), ("espada_cortafuegos", espada_cortafuegos), ("mandoble", mandoble),
+                 ("hacha_servidor", hacha_servidor), ("alabarda", alabarda), ("estoque_cuantico", estoque_cuantico)):
+    if not ONLY or name in ONLY:
+        fn()
 
 for name, fn in (("espada", espada), ("escudo", escudo), ("estoque", estoque), ("baston", baston), ("mazo", mazo),
                  ("tableta", tableta), ("lanza", lanza), ("arco", arco)):

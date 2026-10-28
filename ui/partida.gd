@@ -8,10 +8,15 @@ extends Node
 ##   armaduras de resistencia encontradas y la equipada, y el tiempo jugado.
 
 signal guardada
+## Cambió la cantidad de créditos (`ganados` > 0 cuando se recogen).
+signal creditos_cambiados(total: int, ganados: int)
+## Se compró o se equipó algo.
+signal inventario_cambiado
 
 const RUTA := "user://partida.json"
 const MAIN := "res://Scenes/main.tscn"
 const CLASSES := preload("res://jugador/player_classes.gd")
+const EQUIPO := preload("res://jugador/equipo.gd")
 
 ## Peleas de jefe: nodo -> id del jefe (el mismo que usa CampusWorld) y pieza de llave.
 const PELEAS := {
@@ -26,6 +31,17 @@ var pendiente := false
 ## Segundos jugados (se suman mientras hay un jugador en la escena y no está en pausa).
 var tiempo := 0.0
 var _datos := {}
+
+# ------------------------------------------------------------------ inventario
+## Créditos (la moneda del juego: los sueltan los enemigos y se gastan con el mercader).
+var creditos := 0
+## Armas y armaduras que tiene el jugador (ids de jugador/equipo.gd).
+var armas: Array = []
+var armaduras: Array = []
+## Lo que tiene equipado ("" = arma de la clase / ropa de la clase).
+var arma := ""
+var armadura := ""
+var _clase_inv := ""
 
 
 func _ready() -> void:
@@ -77,10 +93,78 @@ func borrar() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(RUTA))
 
 
+## Inventario inicial de una clase: solo su arma.
+func reiniciar_inventario(clase: String) -> void:
+	_clase_inv = clase
+	creditos = 0
+	var w: String = EQUIPO.CLASS_WEAPON.get(clase, "")
+	armas = [w] if w != "" else []
+	armaduras = []
+	arma = w
+	armadura = ""
+	creditos_cambiados.emit(creditos, 0)
+	inventario_cambiado.emit()
+
+
+## El jugador lo llama al aparecer: si se entró directo a main.tscn (sin menú) o cambió
+## la clase, arranca con el inventario de su clase.
+func asegurar_inventario(clase: String) -> void:
+	if _clase_inv != clase:
+		reiniciar_inventario(clase)
+
+
+func dar_creditos(n: int) -> void:
+	if n <= 0:
+		return
+	creditos += n
+	creditos_cambiados.emit(creditos, n)
+
+
+## Compra un arma ("arma") o armadura ("armadura"). Devuelve "" o el motivo del fallo.
+func comprar(tipo: String, id: String) -> String:
+	var d: Dictionary = EQUIPO.weapon(id) if tipo == "arma" else EQUIPO.armor(id)
+	if d.is_empty():
+		return "No existe"
+	var lista: Array = armas if tipo == "arma" else armaduras
+	if lista.has(id):
+		return "Ya lo tienes"
+	var precio := int(d.get("price", 0))
+	if creditos < precio:
+		return "Te faltan %d créditos" % (precio - creditos)
+	creditos -= precio
+	lista.append(id)
+	creditos_cambiados.emit(creditos, -precio)
+	inventario_cambiado.emit()
+	return ""
+
+
+## Equipa un arma o armadura que ya tienes (armadura "" = ropa de la clase).
+func equipar(tipo: String, id: String, player: Node = null) -> void:
+	if tipo == "arma":
+		if id != "" and not armas.has(id):
+			return
+		arma = id
+	else:
+		if id != "" and not armaduras.has(id):
+			return
+		armadura = id
+	if player == null:
+		player = get_tree().get_first_node_in_group("player")
+	if player:
+		var kit = player.get("kit")
+		if kit:
+			if tipo == "arma" and kit.has_method("equip_weapon"):
+				kit.equip_weapon(id)
+			elif tipo == "armadura":
+				kit.set_resist_armor(id)
+	inventario_cambiado.emit()
+
+
 ## Nueva partida: el guardado anterior se reemplaza la primera vez que descanses.
 func nueva(clase: String) -> void:
 	pendiente = false
 	tiempo = 0.0
+	reiniciar_inventario(clase)
 	CLASSES.selected = clase
 	get_tree().change_scene_to_file(MAIN)
 
@@ -130,7 +214,11 @@ func guardar(vida: Node) -> void:
 		"tazas_max": int(player.get_max_flasks()) if player.has_method("get_max_flasks") else 4,
 		"tazas_tomadas": vida.get("cups_taken"),
 		"armaduras": vida.get("armors_found"),
-		"armadura": String(kit.resist_id) if kit else "",
+		"armadura": armadura,
+		"creditos": creditos,
+		"armas": armas,
+		"armaduras_inv": armaduras,
+		"arma": arma,
 		"tiempo": tiempo,
 		"fecha": Time.get_datetime_string_from_system(false, true),
 	}

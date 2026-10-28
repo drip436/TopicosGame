@@ -28,6 +28,7 @@ const BUILDUP := {
 
 const PLAYER_MODEL: PackedScene = preload("res://Modelo/modelo.glb")
 const CLASSES := preload("res://jugador/player_classes.gd")
+const DOT := preload("res://mundo/dot.gd")
 const KIT := preload("res://jugador/class_kit.gd")
 const RIG := preload("res://jugador/player_rig.gd")
 
@@ -121,6 +122,14 @@ func _ready() -> void:
 	kit.setup(self, class_id)
 	if rig:
 		kit.attach_to_rig(rig)
+	# Inventario (Partida): arma y armadura equipadas
+	var partida := get_node_or_null("/root/Partida")
+	if partida:
+		partida.asegurar_inventario(class_id)
+		if String(partida.arma) != kit.weapon_id:
+			kit.equip_weapon(String(partida.arma))
+		if String(partida.armadura) != "":
+			kit.set_resist_armor(String(partida.armadura))
 	_build_status_fx()
 	_build_camera()
 	# Menú de pausa (Esc)
@@ -401,7 +410,7 @@ func take_damage(amount: float, from: Variant = null) -> void:
 	hp = maxf(0.0, hp - amount)
 	health_changed.emit(hp, max_hp)
 	_m_body.emission_energy_multiplier = 2.0
-	for mesh in _model_meshes:
+	for mesh in _live_meshes():
 		mesh.material_overlay = _m_body
 	add_camera_shake(0.45)
 	_attack_t = 0.0
@@ -453,7 +462,7 @@ func _physics_process(delta: float) -> void:
 				(overlay as StandardMaterial3D).albedo_color.a = a
 				break
 		# Solo sobre el cuerpo (en las piezas de armadura cuadradas el contorno se ve como bloque)
-		for mesh in _model_meshes:
+		for mesh in _live_meshes():
 			mesh.material_overlay = overlay
 
 	if _locked and (_focus_target == null or _target_dead(_focus_target)
@@ -575,7 +584,7 @@ func apply_status(effect: String, duration: float) -> void:
 	if is_dead:
 		return
 	# Armadura de resistencia
-	if effect == "electrocutado" and kit.resist_id == "aislante" and randf() < 0.5:
+	if randf() < kit.ignore_chance(effect):
 		return
 	duration *= kit.resist(effect, "dur")
 	_status[effect] = maxf(duration, float(_status.get(effect, 0.0)))
@@ -807,15 +816,27 @@ func _deal_damage() -> void:
 		if to.length() < reach and (to.length() < 1.0 or _face_dir.dot(to.normalized()) > arc):
 			b.take_damage(_atk.get("damage", attack_damage), global_position)
 			add_camera_shake(float(_atk.get("shake", 0.12)))
+			# Armas con efecto (quemadura, descarga, veneno): daño continuo al enemigo
+			if _atk.has("status") and is_instance_valid(b):
+				DOT.apply(b, String(_atk["status"]))
 		elif _atk.has("aoe") and to.length() < base_reach + float(_atk["aoe"]) * 0.5:
 			# Mazo: la onda del golpe alcanza un poco alrededor
 			b.take_damage(float(_atk.get("damage", attack_damage)) * 0.5, global_position)
 
 
+## Mallas del cuerpo vigentes (al cambiar de armadura el rig cambia de malla).
+func _live_meshes() -> Array[MeshInstance3D]:
+	if rig and is_instance_valid(rig.mesh_instance) and (_model_meshes.is_empty() or _model_meshes[0] != rig.mesh_instance):
+		_model_meshes.clear()
+		_model_meshes.append(rig.mesh_instance)
+	_model_meshes = _model_meshes.filter(func(m): return is_instance_valid(m))
+	return _model_meshes
+
+
 func _status_meshes() -> Array:
-	var out: Array = _model_meshes.duplicate()
+	var out: Array = _live_meshes().duplicate()
 	if kit:
-		out.append_array(kit.meshes)
+		out.append_array(kit.meshes.filter(func(m): return is_instance_valid(m)))
 	return out
 
 

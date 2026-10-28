@@ -917,6 +917,13 @@ def _bake(body, name, size, out_dir):
 
     sc.cycles.samples = 16
     bake_ch("color", "DIFFUSE", {"COLOR"})
+    # Si la GPU falla sin avisar (memoria llena) el horneado sale negro: se repite en CPU
+    px = imgs["color"].pixels
+    step = max(1, len(px) // 40000)
+    if max(px[i] for i in range(0, len(px), step * 4)) < 0.004:
+        print("AVISO: horneado vacío en GPU, se repite en CPU")
+        sc.cycles.device = "CPU"
+        bake_ch("color", "DIFFUSE", {"COLOR"})
     bake_ch("rough", "ROUGHNESS")
     bake_ch("normal", "NORMAL")
     # Metalicidad: se pasa por emisión temporalmente

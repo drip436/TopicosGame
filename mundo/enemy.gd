@@ -46,6 +46,10 @@ const GLB_LOCO := {"mecha": [1.8, 3.0], "androide": [1.25, 2.9], "mutante_peq": 
 ## Armas hechas en Blender (modelos/armas). Se modelan a lo largo de −Y con el filo hacia −Z.
 const GLB_WEAPONS := {"hacha": "res://modelos/armas/hacha.glb", "espada": "res://modelos/armas/espada.glb", "laser": "res://modelos/armas/pistola_laser.glb",
 	"dual": "res://modelos/armas/hoja_androide.glb"}
+## Ángulo (grados) al que se levanta hacia adelante cada arma de filo en la mano.
+const HOLD_ANGLE := {"hacha": 105.0, "espada": 118.0, "dual": 92.0, "laser": 90.0}
+## Armas que no se voltean al levantarlas (la pistola mantiene la mira arriba).
+const NO_FLIP := ["laser"]
 ## Animación del modelo para cada pose de ataque.
 ## Segundo de cada animación en el que cae el golpe (ver arte/blender/robot.py).
 const GLB_IMPACT := {"jab": 0.62, "lunge": 0.6, "overhead": 0.78, "sweep": 0.72, "slash": 0.5, "thrust": 0.6,
@@ -365,9 +369,13 @@ func _build_glb_model() -> void:
 	# Arma en la mano derecha
 	var weapon: String = info[3]
 	if weapon != "" and GLB_WEAPONS.has(weapon) and ResourceLoader.exists(GLB_WEAPONS[weapon]) and _skel:
-		_weapon_r = _attach_glb(GLB_WEAPONS[weapon], "hand_r")
+		# Las armas de filo se empuñan con la hoja hacia adelante (no colgando hasta el
+		# suelo); la pistola se queda apuntando al frente como está modelada
+		var hold: float = HOLD_ANGLE.get(weapon, 0.0)
+		# (con hold 0 la pistola queda con el mango abajo y el cañón al frente)
+		_weapon_r = _attach_glb(GLB_WEAPONS[weapon], "hand_r", false, hold)
 		if weapon == "dual":
-			_attach_glb(GLB_WEAPONS[weapon], "hand_l")
+			_attach_glb(GLB_WEAPONS[weapon], "hand_l", false, hold)
 	elif weapon != "":
 		var sk: Skeleton3D = scene.find_children("*", "Skeleton3D", true, false)[0]
 		var proc := MODELS.robot(1.0, weapon, _rng)
@@ -398,18 +406,25 @@ func _build_glb_model() -> void:
 	_overlay.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_set_eyes(false)
 	_play("idle", 0.0, 1.0)
+	if not _pending_grips.is_empty():
+		_orient_weapons()
 
 
-## Pega una escena .glb (arma) al hueso de la mano: en reposo queda a lo largo del
-## brazo (hacia abajo) con el filo al frente.
-func _attach_glb(path: String, bone: String, holo := false) -> Node3D:
+## Pega una escena .glb (arma) al hueso de la mano. Con `hold` = 0 queda a lo largo del
+## brazo (hacia abajo) con el filo al frente; con `hold` (grados) la hoja se levanta hacia
+## adelante y el filo queda hacia abajo, como un arma empuñada lista para golpear.
+func _attach_glb(path: String, bone: String, holo := false, hold := 0.0) -> Node3D:
 	var at := BoneAttachment3D.new()
 	at.bone_name = bone
 	_skel.add_child(at)
 	var w: Node3D = (load(path) as PackedScene).instantiate()
 	at.add_child(w)
 	var hb := _skel.get_bone_global_rest(_skel.find_bone(bone)).basis.orthonormalized()
-	w.transform = Transform3D(hb.inverse(), Vector3(0, 0.06, 0))
+	var grip := Basis.IDENTITY
+	if hold >= 0.0:
+		# La orientación final se fija con la pose real del idle (ver _orient_weapons)
+		_pending_grips.append([w, bone, hold, NO_FLIP.has(path.get_file().get_basename().replace("pistola_", ""))])
+	w.transform = Transform3D(hb.inverse() * grip, Vector3(0, 0.06, 0))
 	var mz := w.find_child("muzzle", true, false)
 	if mz:
 		J["muzzle"] = mz
@@ -422,6 +437,37 @@ func _attach_glb(path: String, bone: String, holo := false) -> Node3D:
 			_model["meshes"].append(m3)
 			m3.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	return w
+
+
+## Armas pendientes de orientar: [nodo, hueso, grados que se levanta la hoja].
+var _pending_grips: Array = []
+
+
+## Con el idle ya aplicado, gira cada arma (respecto a su mano) para que en el espacio del
+## modelo (el enemigo mira a −Z) quede con el mango abajo y la hoja levantada `hold` grados
+## hacia adelante con el filo abajo; la pistola (hold 0) con el cañón al frente. Desde ahí
+## sigue a la mano en todas las animaciones.
+func _orient_weapons() -> void:
+	for i in 3:
+		await get_tree().process_frame
+	if not is_instance_valid(_skel):
+		return
+	var root: Node3D = _model.get("root")
+	for g in _pending_grips:
+		var w: Node3D = g[0]
+		if not is_instance_valid(w):
+			continue
+		var hold: float = g[2]
+		var tilt := Basis(Vector3.RIGHT, deg_to_rad(hold))
+		var want := tilt
+		if hold != 0.0 and not bool(g[3]):
+			want = Basis((tilt * Vector3.DOWN).normalized(), PI) * tilt
+		# Base del modelo y de la mano en el espacio global (sin escala)
+		var model_b := root.global_transform.basis.orthonormalized()
+		var hand_b := (w.get_parent() as Node3D).global_transform.basis.orthonormalized()
+		var local := hand_b.inverse() * (model_b * want)
+		w.transform = Transform3D(local, w.transform.origin)
+	_pending_grips.clear()
 
 
 func _find_owner_mesh(root: Node, mat: Material) -> Node:

@@ -119,3 +119,23 @@ Animaciones (procedurales, por capas):
   golpe sísmico con ambos brazos, invocar con los brazos en alto.
 - **Reacciones:** retroceso al recibir golpe, temblor al estar electrocutado, forcejeo al estar
   atrapado y caída al morir.
+
+## Créditos, mercader y equipo
+
+- **Créditos** (`Partida.creditos`): cada enemigo suelta cristales dorados al morir que vuelan
+  hacia el jugador (`mundo/credito.gd`, cantidades en `equipo.gd` → `DROPS`); cada jefe suelta
+  un botín grande (`BOSS_CREDITS`). Se ven abajo a la derecha del HUD y se guardan al
+  descansar en una hoguera, junto con el inventario.
+- **Mercader** (`mundo/mercader.gd`, modelo `modelos/jugador/mercader.glb`): está junto a la
+  Hoguera de la Plaza, te saluda con la "V" y con **E** abre la tienda (`ui/tienda.gd`).
+- **Catálogo** (`jugador/equipo.gd`):
+  - Armas: cada una tiene un tipo (`espada`, `mazo`, `estoque`, `lanza`) que decide sus combos
+    y cómo se agarra, más multiplicadores de daño y velocidad, y un efecto opcional
+    (quemadura, electrocutado o veneno) que hace daño continuo al enemigo (`mundo/dot.gd`).
+    Cualquier clase usa cualquier arma; la habilidad de clic derecho no cambia.
+  - Armaduras: reemplazan la ropa de la clase por su modelo (`modelos/jugador/armadura_*.glb`)
+    y bajan los estados alterados (duración, daño por segundo, barra de veneno, daño estando
+    atrapado o probabilidad de no recibirlo) y el daño recibido.
+- **Menú de equipo:** Esc → Equipo (`ui/panel_equipo.gd`, el mismo panel que usa la tienda).
+- **Manos de agarre:** los modelos se generan con las manos cerradas en puño
+  (`humano.curl_hands`), así el mango del arma queda dentro del puño.

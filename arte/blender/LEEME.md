@@ -123,3 +123,25 @@ y en `_d` color (R), rugosidad (G) y juntas/mortero (B). Los shaders del mundo l
 proyectan en coordenadas de mundo (`shaders/detalle.gdshaderinc`) y los materiales las
 reciben con `_relieve(material, tipo, repeticiones_por_metro)`. Las fachadas usan además
 `_facade_mesh()`: ventanas hundidas, alféizar, dintel, moldura de entrepiso y pilastras.
+
+## Jugador: armaduras del mercader y mercader (`jugador.py`)
+
+Además de las 5 clases, `jugador.py` genera las armaduras que vende el mercader
+(`armadura_ignifuga`, `armadura_aislante`, `armadura_antiveneno`, `armadura_anclaje`,
+`armadura_rector`) y al **mercader** (`mercader.glb`, a partir de la foto de referencia: pelo
+lacio con fleco, lentes rectangulares, chamarra rompevientos, playera azul marino, mezclilla,
+audífonos al cuello y gafete con listón rojo). Todos comparten el esqueleto de
+`jugador/player_rig.gd`, con las manos cerradas en puño (`humano.curl_hands`).
+
+```
+blender -b --python arte/blender/jugador.py -- modelos/jugador [preview] [frontend | armadura_rector | mercader ...]
+TEX=1024 ...   # resolución de las texturas horneadas (por defecto 4096 las clases, 2048 lo demás)
+```
+
+`armas_jugador.py` incluye las armas del mercader: `katana_plasma`, `espada_cortafuegos`,
+`mandoble`, `hacha_servidor`, `alabarda` y `estoque_cuantico`.
+
+**Ojo:** no hornees mientras Godot u otro Blender usan la GPU: si se llena la memoria el
+horneado puede salir negro sin dar error. `bk.py` lo detecta y repite el horneado en CPU.
+Después de importar en Godot, pon las texturas extraídas en *VRAM Compressed*
+(`compress/mode=2`); sin compresión llenan la memoria de video.

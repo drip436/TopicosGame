@@ -6,6 +6,7 @@ extends CanvasLayer
 ## Lo crea el jugador (boss_profesor/test_player.gd).
 
 const E := preload("res://ui/estilo.gd")
+const PANEL_EQUIPO := preload("res://ui/panel_equipo.gd")
 const AJUSTES := preload("res://ui/panel_ajustes.gd")
 const CLASSES := preload("res://jugador/player_classes.gd")
 const MENU := "res://Scenes/UI.tscn"
@@ -56,7 +57,7 @@ func _ready() -> void:
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(0, 12)
 	col.add_child(sep)
-	for b in [["continuar", "Continuar"], ["estado", "Estado del personaje"], ["controles", "Controles"], ["ajustes", "Ajustes"],
+	for b in [["continuar", "Continuar"], ["estado", "Estado del personaje"], ["equipo", "Equipo"], ["controles", "Controles"], ["ajustes", "Ajustes"],
 			["hoguera", "Volver a la hoguera"], ["menu", "Menú principal"], ["salir", "Salir del juego"]]:
 		var btn := E.boton(b[1], 20, 330, 50)
 		btn.pressed.connect(_on_boton.bind(b[0]))
@@ -116,7 +117,7 @@ func _on_boton(id: String) -> void:
 	match id:
 		"continuar":
 			cerrar()
-		"estado", "controles", "ajustes":
+		"estado", "equipo", "controles", "ajustes":
 			_mostrar(id)
 		"hoguera":
 			E.confirmar(_raiz, "¿Volver a la última hoguera?\nÚsalo si te quedaste atorado. Los enemigos reaparecen.", _volver_hoguera)
@@ -140,6 +141,12 @@ func _mostrar(seccion: String) -> void:
 	match seccion:
 		"estado":
 			_estado(v)
+		"equipo":
+			v.add_child(E.titulo("EQUIPO", 30))
+			var pe: VBoxContainer = PANEL_EQUIPO.new()
+			pe.modo = "equipo"
+			pe.player = player
+			v.add_child(pe)
 		"controles":
 			_controles(v)
 		"ajustes":
@@ -182,10 +189,18 @@ func _estado(v: VBoxContainer) -> void:
 	var mx: int = player.get_max_flasks() if player.has_method("get_max_flasks") else 4
 	_fila(v, "Cafés (curación)", "%d / %d" % [int(player.get("flasks")), mx])
 	_fila(v, "Armadura", "%s  ·  recibes %d %% del daño" % [String(cls["armor"]).capitalize(), roundi(float(cls["dmg_taken"]) * 100)])
-	var res := "Ninguna"
+	var EQ = PANEL_EQUIPO.EQUIPO
+	var res := "Ropa de la clase"
 	if kit and String(kit.get("resist_id")) != "":
-		res = CLASSES.RESIST_ARMORS[String(kit.get("resist_id"))]["name"]
-	_fila(v, "Armadura de resistencia", res)
+		res = EQ.ARMORS[String(kit.get("resist_id"))]["name"]
+	_fila(v, "Armadura equipada", res)
+	var arma := "Tus IAs"
+	if kit and String(kit.get("weapon_id")) != "":
+		arma = EQ.WEAPONS[String(kit.get("weapon_id"))]["name"]
+	_fila(v, "Arma", arma)
+	var inv := get_node_or_null("/root/Partida")
+	if inv:
+		_fila(v, "Créditos", "◆ %d" % int(inv.creditos), Color(1.0, 0.84, 0.42))
 	_fila(v, "Velocidad", "%.1f m/s caminando · %.1f m/s corriendo" % [float(cls["walk"]), float(cls["run"])])
 	v.add_child(E.linea())
 	var world := get_tree().current_scene.find_child("CampusWorld", true, false) if get_tree().current_scene else null

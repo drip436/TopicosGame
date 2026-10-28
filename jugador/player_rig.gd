@@ -62,7 +62,7 @@ var _held := {}          # objetos temporales en la mano (taza, lata)
 
 ## Reemplaza el modelo estático por uno con esqueleto. `visual` es el nodo Visual
 ## del jugador y `model` la instancia del glb.
-func build(visual: Node3D, model: Node3D, class_id := "") -> MeshInstance3D:
+func build(visual: Node3D, model: Node3D, class_id := "", outfit_path := "") -> MeshInstance3D:
 	name = "Rig"
 	var src: MeshInstance3D = model.find_children("*", "MeshInstance3D", true, false)[0]
 	# Transformación de la malla hasta el espacio de Visual
@@ -89,10 +89,11 @@ func build(visual: Node3D, model: Node3D, class_id := "") -> MeshInstance3D:
 		skeleton.set_bone_rest(i, Transform3D(Basis.IDENTITY, (b[2] as Vector3) - parent_pos))
 		_cur[b[0]] = Vector3.ZERO
 	skeleton.reset_bone_poses()
-	var outfit := CLASS_MODEL % class_id
-	if class_id != "" and ResourceLoader.exists(outfit):
+	var outfit := outfit_path if outfit_path != "" else CLASS_MODEL % class_id
+	if (class_id != "" or outfit_path != "") and ResourceLoader.exists(outfit):
 		mesh_instance = _outfit_mesh(outfit)
 		has_outfit = true
+		_outfit_path = outfit
 	else:
 		mesh_instance = MeshInstance3D.new()
 		mesh_instance.name = "CuerpoConPiel"
@@ -138,6 +139,22 @@ func _outfit_mesh(path: String) -> MeshInstance3D:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	scene.free()
 	return mi
+
+
+## Cambia el modelo (cuerpo + armadura) por otro glb con los mismos huesos: las
+## armaduras del mercader. Las armas y objetos pegados a los huesos se quedan.
+var _outfit_path := ""
+
+
+func set_outfit(path: String) -> void:
+	if path == _outfit_path or not ResourceLoader.exists(path) or skeleton == null:
+		return
+	var old := mesh_instance
+	mesh_instance = _outfit_mesh(path)
+	has_outfit = true
+	_outfit_path = path
+	if old and is_instance_valid(old):
+		old.queue_free()
 
 
 ## Cambia un material del modelo de Blender por nombre (p. ej. "ribete" toma el color
@@ -476,6 +493,10 @@ const ACTIONS := {
 	"sismico": {"arm_r": Vector3(170, 0, 20), "fore_r": Vector3(30, 0, 0), "arm_l": Vector3(165, 0, 25), "fore_l": Vector3(30, 0, 0), "chest": Vector3(12, 0, 0)},
 	"sismico_golpe": {"arm_r": Vector3(40, 0, 60), "fore_r": Vector3(0, 0, 0), "arm_l": Vector3(40, 0, 60), "chest": Vector3(-40, 0, 0), "spine": Vector3(-15, 0, 0), "thigh_r": Vector3(50, 0, 0), "shin_r": Vector3(-70, 0, 0), "thigh_l": Vector3(-10, 0, 0), "shin_l": Vector3(-40, 0, 0)},
 	"ordenar": {"arm_r": Vector3(92, 0, 80), "fore_r": Vector3(0, 0, 0), "hand_r": Vector3(0, 0, -25), "chest": Vector3(0, -15, 0), "arm_l": Vector3(20, 0, 70), "fore_l": Vector3(60, 0, 0)},
+	# Mercader: la "V" junto a la cara (como en la foto) y la otra mano con el celular
+	"saludo_v": {"arm_r": Vector3(75, -15, 0), "fore_r": Vector3(120, 0, 0), "hand_r": Vector3(0, 0, 15), "head": Vector3(4, -12, 10), "chest": Vector3(0, 10, 0),
+		"arm_l": Vector3(55, 0, 65), "fore_l": Vector3(85, 0, 0)},
+	"celular": {"arm_l": Vector3(55, 0, 65), "fore_l": Vector3(85, 0, 0), "arm_r": Vector3(8, 0, 80), "fore_r": Vector3(12, 0, 0), "head": Vector3(14, 0, 0)},
 	"ordenar_especial": {"arm_r": Vector3(160, 0, 30), "fore_r": Vector3(10, 0, 0), "arm_l": Vector3(160, 0, 30), "fore_l": Vector3(10, 0, 0), "chest": Vector3(10, 0, 0), "head": Vector3(15, 0, 0)},
 }
 

@@ -162,6 +162,112 @@ class Humano:
         self._regions()
         self.arm = None
 
+    # ------------------------------------------------------------------ manos
+    def curl_hands(self, radius=0.022, max_angle=1.65, knuckle=1.05, thumb=0.45, sides=("r", "l")):
+        """Cierra las manos en puño de agarre (antes de fit). En la malla base las manos
+        cuelgan con la palma hacia el cuerpo y los dedos abiertos en abanico: la mano se
+        corta a la altura de los nudillos, cada dedo (pedazo conectado de la malla) se dobla
+        en arco hacia la palma sobre su propio eje y el pulgar se cierra un poco. Así el
+        mango del arma pasa por el hueco del puño en vez de flotar junto a una mano abierta."""
+        hands = self.region("hands")
+        me = self.body.data
+        vs = me.vertices
+        self._orig_hand = {k: self.base_co[k].copy() for k in hands}
+        nbr = {}
+        for e in me.edges:
+            a_, b_ = e.vertices
+            nbr.setdefault(a_, []).append(b_)
+            nbr.setdefault(b_, []).append(a_)
+        for s in sides:
+            sg = 1.0 if s == "r" else -1.0
+            idx = [k for k, w in hands.items() if w > 0.2 and self.base_co[k].x * sg > 0.3]
+            if not idx:
+                continue
+            co = {k: self.base_co[k].copy() for k in idx}
+            wr = [co[k] for k in idx if co[k].z > 0.835]
+            tip = [co[k] for k in idx if co[k].z < 0.735]
+            if not wr or not tip:
+                continue
+            W = sum(wr, Vector()) / len(wr)
+            T = sum(tip, Vector()) / len(tip)
+            f = (T - W).normalized()
+            n = Vector((-sg, 0.0, 0.0))
+            n = (n - f * n.dot(f)).normalized()
+            L = (T - W).dot(f)
+            # 1) Flexión en los nudillos: todo lo que pasa de t_k gira hacia la palma, con
+            #    una rampa suave que cruza la membrana entre los dedos (sin romper la malla)
+            t_k = L * 0.36
+            axis = f.cross(n).normalized()
+            u0 = sum((co[k] - W).dot(n) for k in idx) / len(idx)
+            P0 = W + f * t_k + n * u0
+            for k in idx:
+                t = (co[k] - W).dot(f)
+                if t <= t_k:
+                    continue
+                x = min(1.0, (t - t_k) / 0.025)
+                ang = knuckle * x * x * (3 - 2 * x)
+                p = P0 + Matrix.Rotation(ang, 3, axis) @ (co[k] - P0)
+                co[k] = p
+                vs[k].co = p
+                self.base_co[k] = p.copy()
+            # 2) Cada dedo se curva sobre su propio eje. Se busca el corte más cercano a los
+            #    nudillos donde los dedos ya quedan separados (al menos 4 pedazos)
+            comps = []
+            for frac in (0.5, 0.54, 0.58, 0.62, 0.66, 0.7, 0.74):
+                t_cut = L * frac
+                cut = {k for k in idx if (self._orig_hand.get(k, co[k]) - W).dot(f) > t_cut}
+                seen = set()
+                comps = []
+                for k in cut:
+                    if k in seen:
+                        continue
+                    stack = [k]
+                    seen.add(k)
+                    comp = []
+                    while stack:
+                        c = stack.pop()
+                        comp.append(c)
+                        for m in nbr.get(c, []):
+                            if m in cut and m not in seen:
+                                seen.add(m)
+                                stack.append(m)
+                    if len(comp) > 20:
+                        comps.append(comp)
+                if len(comps) >= 4:
+                    break
+            if not comps:
+                continue
+            # El pulgar es el pedazo más adelantado (+Y)
+            thumb_i = max(range(len(comps)), key=lambda i: sum(co[k].y for k in comps[i]) / len(comps[i]))
+            for i, comp in enumerate(comps):
+                pts = [co[k] for k in comp]
+                tmin = min((p - W).dot(f) for p in pts)
+                base = [p for p in pts if (p - W).dot(f) < tmin + 0.008]
+                B = sum(base, Vector()) / len(base)
+                far = sorted(pts, key=lambda p: -(p - B).length)[:max(3, len(pts) // 12)]
+                F = sum(far, Vector()) / len(far)
+                fi = (F - B).normalized()
+                # Se sigue doblando en el mismo sentido que en los nudillos
+                ni = axis.cross(fi).normalized()
+                bend = thumb if i == thumb_i else 1.0
+                R = radius * (1.6 if i == thumb_i else 1.0)
+                amax = max_angle * bend
+                for k in comp:
+                    d = co[k] - B
+                    s_ = max(0.0, d.dot(fi))
+                    u = d.dot(ni)
+                    side = d - fi * d.dot(fi) - ni * u
+                    a = min(s_ / R, amax)
+                    r = R - u
+                    pos = B + fi * (r * math.sin(a)) + ni * (R - r * math.cos(a)) + side
+                    rest = s_ - a * R
+                    if rest > 0:
+                        pos += (fi * math.cos(a) + ni * math.sin(a)) * rest
+                    vs[k].co = pos
+                    self.base_co[k] = pos.copy()
+        me.update()
+        self._kd = None
+
     # ------------------------------------------------------------------ regiones
     def _regions(self):
         """Zonas del cuerpo base guardadas como grupos de vértices R_* (pesos 0..1): se
