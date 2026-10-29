@@ -208,7 +208,11 @@ func secondary_released() -> void:
 func cycle() -> void:
 	match class_id:
 		"frontend":
-			spell_idx = (spell_idx + 1) % SPELLS.size()
+			# Solo entre los hechizos aprendidos (Partida.hechizos)
+			for k in SPELLS.size():
+				spell_idx = (spell_idx + 1) % SPELLS.size()
+				if _knows(SPELLS[spell_idx]["id"]):
+					break
 		"ai":
 			if stand and is_instance_valid(stand) and stand.busy:
 				return
@@ -357,7 +361,24 @@ func _face_towards(p: Vector3) -> void:
 #  Frontend: hechizos
 # ======================================================================
 
+## ¿El jugador aprendió este hechizo? (sin autoload Partida se conocen todos)
+func _knows(id: String) -> bool:
+	var p := get_node_or_null("/root/Partida")
+	return p == null or (p.hechizos as Array).has(id)
+
+
+## Selecciona un hechizo aprendido (desde el menú de equipo o al comprarlo).
+func select_spell(id: String) -> void:
+	for i in SPELLS.size():
+		if SPELLS[i]["id"] == id and _knows(id):
+			spell_idx = i
+
+
 func _cast() -> void:
+	if not _knows(SPELLS[spell_idx]["id"]):
+		cycle()
+		if not _knows(SPELLS[spell_idx]["id"]):
+			return
 	var s: Dictionary = SPELLS[spell_idx]
 	if mana < float(s["cost"]):
 		_code(["ERROR: maná insuficiente"], Color(1.0, 0.3, 0.25))

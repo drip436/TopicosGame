@@ -6,6 +6,7 @@ extends VBoxContainer
 
 const E := preload("res://ui/estilo.gd")
 const EQUIPO := preload("res://jugador/equipo.gd")
+const KIT := preload("res://jugador/class_kit.gd")
 const ORO := Color(1.0, 0.84, 0.42)
 
 var modo := "equipo"
@@ -22,8 +23,8 @@ func _ready() -> void:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
 	add_child(top)
-	for t in [["armas", "Armas"], ["armaduras", "Armaduras"]]:
-		var b := E.boton(t[1], 18, 190, 44)
+	for t in [["armas", "Armas"], ["armaduras", "Armaduras"], ["hechizos", "Hechizos"]]:
+		var b := E.boton(t[1], 18, 170, 44)
 		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.toggle_mode = true
 		b.pressed.connect(_cambiar.bind(t[0]))
@@ -76,6 +77,22 @@ func _refrescar() -> void:
 			_tarjeta_simple("arma", "", "Sin arma (pelean tus IAs)", "El clic izquierdo vuelve a ordenar ataques a tu IA.", String(p.arma) == "")
 		if ids.is_empty():
 			_lista.add_child(E.etiqueta("No tienes armas. El mercader vende varias.", 17, E.TEXTO_TENUE))
+	elif _pestana == "hechizos":
+		var mago := player != null and String(player.get("class_id")) == "frontend"
+		if not mago:
+			_lista.add_child(E.etiqueta("Solo el Mago (Frontend) tiene maná para lanzar hechizos.", 17, E.TEXTO_TENUE))
+		var kit = player.get("kit") if player else null
+		var actual := ""
+		if kit and mago:
+			actual = String(kit.SPELLS[int(kit.spell_idx)]["id"])
+		for id in EQUIPO.SPELLS.keys():
+			var h: Dictionary = EQUIPO.SPELLS[id]
+			var tiene: bool = (p.hechizos as Array).has(id)
+			if modo == "equipo" and not tiene:
+				continue
+			if modo == "tienda" and int(h["price"]) <= 0:
+				continue
+			_tarjeta("hechizo", id, h, tiene, mago and actual == id)
 	else:
 		if modo == "equipo":
 			_tarjeta_simple("armadura", "", "Ropa de la clase", "La armadura con la que empezaste. Sin resistencias extra.", String(p.armadura) == "")
@@ -117,12 +134,12 @@ func _tarjeta(tipo: String, id: String, d: Dictionary, tiene: bool, puesto: bool
 		comprar.pressed.connect(_comprar.bind(tipo, id))
 		b.add_child(comprar)
 	elif puesto:
-		var eq := E.etiqueta("EQUIPADO", 16, ORO, 700)
+		var eq := E.etiqueta("EN USO" if tipo == "hechizo" else "EQUIPADO", 16, ORO, 700)
 		eq.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		eq.custom_minimum_size = Vector2(150, 0)
 		b.add_child(eq)
 	else:
-		var equipar := E.boton("Equipar", 17, 150, 42)
+		var equipar := E.boton("Usar" if tipo == "hechizo" else "Equipar", 17, 150, 42)
 		equipar.alignment = HORIZONTAL_ALIGNMENT_CENTER
 		equipar.pressed.connect(_equipar.bind(tipo, id))
 		b.add_child(equipar)
@@ -134,6 +151,11 @@ func _tarjeta_simple(tipo: String, id: String, nombre: String, desc: String, pue
 
 
 func _stats(tipo: String, d: Dictionary) -> String:
+	if tipo == "hechizo":
+		for sp in KIT.SPELLS:
+			if String(sp["name"]) == String(d["name"]):
+				return "Hechizo  ·  %d de maná  ·  clic derecho para lanzar, Q para cambiar" % int(sp["cost"])
+		return "Hechizo"
 	if tipo == "arma":
 		if String(d.get("kind", "")) == "":
 			return ""

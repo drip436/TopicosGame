@@ -61,6 +61,19 @@ const ARMORS := {
 		"desc": "Armadura negra y oro de un rector olvidado. Protege de todo un poco y mucho del daño."},
 }
 
+## Hechizos del Mago (ids de SPELLS en class_kit.gd). Se lanzan con clic derecho y Q cambia
+## entre los que ya aprendiste. Los iniciales vienen con la clase; el resto los vende el
+## mercader. Solo el Mago (Frontend) tiene maná para lanzarlos.
+const STARTER_SPELLS := ["bola_fuego", "flecha_mat"]
+const SPELLS := {
+	"bola_fuego": {"name": "Bola de fuego", "price": 0, "desc": "Proyectil de fuego que estalla al impactar."},
+	"flecha_mat": {"name": "Flecha matemática", "price": 0, "desc": "Flecha que sigue una función (seno, parábola...) hasta el objetivo."},
+	"veneno": {"name": "Frasco de veneno", "price": 600, "desc": "Lanza un frasco que deja un charco tóxico: daño continuo."},
+	"nova": {"name": "Nova arcana", "price": 750, "desc": "Explosión de área alrededor del mago. Ideal si te rodean."},
+	"rayos": {"name": "Rayos del cielo", "price": 950, "desc": "Invoca tres rayos que caen sobre el objetivo."},
+	"lluvia": {"name": "Lluvia de flechas", "price": 1200, "desc": "24 flechas de luz caen sobre la zona del objetivo."},
+}
+
 ## Créditos que suelta cada enemigo al morir: [mínimo, máximo].
 const DROPS := {
 	"robot": [12, 20], "robot_hacha": [20, 30], "robot_espada": [20, 30], "robot_laser": [22, 32],

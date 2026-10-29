@@ -1,7 +1,7 @@
 extends Node3D
 ## El mercader del campus (modelo de arte/blender/jugador.py → mercader.glb, hecho a
-## partir de la foto de referencia). Vende armas y armaduras a cambio de créditos.
-## Lo crea VidaDelCampus cerca de la Hoguera de la Plaza.
+## partir de la foto de referencia). Vende armas, armaduras y hechizos a cambio de créditos.
+## Lo crea VidaDelCampus en su tiendita del patio de la Facultad de Ingeniería.
 ##   - Respira y mira al jugador cuando está cerca; al acercarte la primera vez te saluda
 ##     con la "V" de la foto (la otra mano como si sostuviera el celular).
 ##   - E (a menos de 2.6 m) abre la tienda (ui/tienda.gd).
@@ -73,7 +73,7 @@ func _physics_process(delta: float) -> void:
 	var d := to.length()
 	# Mira al jugador cuando está cerca
 	if d < 9.0 and d > 0.1:
-		var want := atan2(-to.x, -to.z) - rotation.y
+		var want := atan2(-to.x, -to.z) - global_rotation.y
 		_visual.rotation.y = lerp_angle(_visual.rotation.y, want, 1.0 - exp(-4.0 * delta))
 	if d < 7.0 and not _greeted:
 		_greeted = true

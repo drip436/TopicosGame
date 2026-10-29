@@ -181,6 +181,8 @@ func _setup() -> void:
 	_make_merchant()
 	if enemies_enabled:
 		_make_enemy_records()
+		if shop_pos != Vector3.INF:
+			_records = _records.filter(func(r): return (r["pos"] as Vector3).distance_to(shop_pos) > SHOP_SAFE)
 	_ready_done = true
 	print("VidaDelCampus: %d hogueras, %d tazas, %d enemigos" % [bonfires.size(), _cups.size(), _records.size()])
 	# Partida guardada (Continuar en el menú principal)
@@ -189,22 +191,121 @@ func _setup() -> void:
 		partida.aplicar(self)
 
 
-## El mercader (mundo/mercader.gd) junto a la Hoguera de la Plaza, mirando hacia ella.
+## Tiendita del mercader (mundo/mercader.gd) en el patio de la Facultad de Ingeniería:
+## puesto con toldo, mostrador, armas en exhibición, cajas y un letrero. Es zona segura
+## (no aparecen enemigos a menos de SHOP_SAFE metros).
+const SHOP_SPOT := Vector3(-225.0, 0.0, 7.0)
+const SHOP_SAFE := 16.0
+var shop_pos := Vector3.INF
+
+
 func _make_merchant() -> void:
-	var near := Vector3(5, 0, 20)
-	if bonfires.size() > 0 and is_instance_valid(bonfires[0]):
-		near = bonfires[0].global_position
-	var p := _free_near(near + Vector3(-7.0, 0, 2.0), 5.0, 1.0)
+	var c := SHOP_SPOT
+	if world and world.has_method("get_prefabs_of_kind"):
+		for f in world.get_prefabs_of_kind("FACULTAD"):
+			if String(f.get("title")).to_upper().contains("INGENIER"):
+				var fn := f as Node3D
+				c = fn.global_position + fn.global_basis * Vector3(7.0, 0, 5.0)
+	var p := _free_near(c, 6.0, 2.2)
 	if p == Vector3.INF:
-		p = near + Vector3(-7.0, 0, 2.0)
+		p = c
+	p.y = 0.0
+	shop_pos = p
+	var shop := Node3D.new()
+	shop.name = "Tiendita"
+	shop.position = p
+	add_child(shop)
+	# El puesto mira hacia el centro del patio
+	var to := (c - Vector3(7.0, 0, 5.0)) - p
+	to.y = 0.0
+	if to.length() < 0.5:
+		to = Vector3(0, 0, 1)
+	shop.rotation.y = atan2(to.x, to.z)
+	_build_stall(shop)
 	var m := MERCADER.new()
 	m.name = "Mercader"
 	m.player = player
 	m.hud = hud
-	m.position = p
-	var to := near - p
-	m.rotation.y = atan2(-to.x, -to.z)
-	add_child(m)
+	m.position = Vector3(0, 0, -0.9)
+	m.rotation.y = PI
+	shop.add_child(m)
+
+
+func _build_stall(shop: Node3D) -> void:
+	var wood := M.mat(Color(0.32, 0.2, 0.11), 0.7)
+	var metal := M.mat(Color(0.25, 0.26, 0.28), 0.4, 0.7)
+	var cloth := M.mat(Color(0.55, 0.12, 0.1), 0.85)
+	var cloth2 := M.mat(Color(0.85, 0.75, 0.55), 0.85)
+	var d := {"meshes": [], "J": {}, "eyes": []}
+	# Mostrador (frente hacia +z local)
+	M.box(d, shop, Vector3(2.6, 0.95, 0.6), Vector3(0, 0.475, 0.2), wood)
+	M.box(d, shop, Vector3(2.7, 0.06, 0.7), Vector3(0, 0.98, 0.2), metal)
+	# Postes y toldo a rayas
+	for sx: float in [-1.4, 1.4]:
+		for sz: float in [-1.6, 0.5]:
+			M.box(d, shop, Vector3(0.08, 2.5, 0.08), Vector3(sx, 1.25, sz), metal)
+	for k in 7:
+		var x := -1.35 + k * 0.45
+		M.box(d, shop, Vector3(0.45, 0.04, 2.5), Vector3(x, 2.55, -0.55), cloth if k % 2 == 0 else cloth2, Vector3(-8, 0, 0))
+		M.box(d, shop, Vector3(0.45, 0.3, 0.03), Vector3(x, 2.4, 0.72), cloth if k % 2 == 0 else cloth2)
+	# Repisa trasera con armas en exhibición
+	M.box(d, shop, Vector3(2.6, 0.06, 0.4), Vector3(0, 1.3, -1.5), wood)
+	M.box(d, shop, Vector3(2.6, 1.6, 0.06), Vector3(0, 1.1, -1.72), wood)
+	var armas := ["katana_plasma", "espada_cortafuegos", "alabarda", "mandoble", "hacha_servidor"]
+	for i in armas.size():
+		var path := "res://modelos/armas_jugador/%s.glb" % armas[i]
+		if not ResourceLoader.exists(path):
+			continue
+		var w: Node3D = (load(path) as PackedScene).instantiate()
+		shop.add_child(w)
+		var x := -1.0 + i * 0.5
+		if armas[i] == "alabarda":
+			# Va a lo largo de −z: se para vertical
+			w.transform = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-90)), Vector3(x, 0.6, -1.62))
+		else:
+			w.transform = Transform3D(Basis(Vector3.FORWARD, deg_to_rad(8 - i * 4)), Vector3(x, 0.35, -1.6))
+		for mi in w.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Cajas, un frasco de pociones y bolsas de créditos sobre el mostrador
+	for k in 3:
+		M.box(d, shop, Vector3(0.5, 0.45, 0.45), Vector3(1.9 + (k % 2) * 0.1, 0.225 + (k / 2) * 0.45, -0.6 + k * 0.5), wood, Vector3(0, k * 17, 0))
+	M.cyl(d, shop, 0.08, 0.22, Vector3(-0.8, 1.12, 0.25), LFX.emissive(Color(0.35, 0.8, 1.0), 1.5))
+	M.cyl(d, shop, 0.07, 0.18, Vector3(-0.55, 1.1, 0.3), LFX.emissive(Color(1.0, 0.4, 0.8), 1.5))
+	M.sph(d, shop, Vector3(0.16, 0.14, 0.16), Vector3(0.7, 1.08, 0.25), M.mat(Color(0.6, 0.45, 0.2), 0.8))
+	for k in 6:
+		M.box(d, shop, Vector3(0.05, 0.08, 0.05), Vector3(0.45 + k * 0.05, 1.05, 0.35), LFX.emissive(Color(1.0, 0.8, 0.3), 2.0), Vector3(45, 45, 0))
+	# Letrero y luz cálida
+	M.box(d, shop, Vector3(2.2, 0.5, 0.06), Vector3(0, 3.0, 0.74), wood)
+	var l3 := Label3D.new()
+	l3.text = "TIENDITA DEL INGE"
+	l3.font_size = 64
+	l3.outline_size = 12
+	l3.modulate = Color(1.0, 0.86, 0.45)
+	l3.position = Vector3(0, 3.02, 0.78)
+	shop.add_child(l3)
+	var l4 := Label3D.new()
+	l4.text = "armas · armaduras · hechizos   ◆ solo créditos"
+	l4.font_size = 26
+	l4.outline_size = 8
+	l4.modulate = Color(0.85, 0.9, 1.0)
+	l4.position = Vector3(0, 2.84, 0.78)
+	shop.add_child(l4)
+	var luz := OmniLight3D.new()
+	luz.light_color = Color(1.0, 0.75, 0.45)
+	luz.light_energy = 2.2
+	luz.omni_range = 7.0
+	luz.position = Vector3(0, 2.2, -0.2)
+	shop.add_child(luz)
+	# Colisión del mostrador y de la repisa
+	var body := StaticBody3D.new()
+	for box in [[Vector3(2.7, 1.0, 0.7), Vector3(0, 0.5, 0.2)], [Vector3(2.6, 1.9, 0.5), Vector3(0, 0.95, -1.6)]]:
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = box[0]
+		cs.shape = bs
+		cs.position = box[1]
+		body.add_child(cs)
+	shop.add_child(body)
 
 
 # ======================================================================

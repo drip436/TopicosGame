@@ -38,6 +38,8 @@ var creditos := 0
 ## Armas y armaduras que tiene el jugador (ids de jugador/equipo.gd).
 var armas: Array = []
 var armaduras: Array = []
+## Hechizos aprendidos (solo los usa el Mago).
+var hechizos: Array = []
 ## Lo que tiene equipado ("" = arma de la clase / ropa de la clase).
 var arma := ""
 var armadura := ""
@@ -100,6 +102,7 @@ func reiniciar_inventario(clase: String) -> void:
 	var w: String = EQUIPO.CLASS_WEAPON.get(clase, "")
 	armas = [w] if w != "" else []
 	armaduras = []
+	hechizos = EQUIPO.STARTER_SPELLS.duplicate() if clase == "frontend" else []
 	arma = w
 	armadura = ""
 	creditos_cambiados.emit(creditos, 0)
@@ -122,10 +125,19 @@ func dar_creditos(n: int) -> void:
 
 ## Compra un arma ("arma") o armadura ("armadura"). Devuelve "" o el motivo del fallo.
 func comprar(tipo: String, id: String) -> String:
-	var d: Dictionary = EQUIPO.weapon(id) if tipo == "arma" else EQUIPO.armor(id)
+	var d: Dictionary
+	match tipo:
+		"arma":
+			d = EQUIPO.weapon(id)
+		"hechizo":
+			d = EQUIPO.SPELLS.get(id, {})
+			if _clase_inv != "frontend":
+				return "Solo el Mago (Frontend) puede aprender hechizos"
+		_:
+			d = EQUIPO.armor(id)
 	if d.is_empty():
 		return "No existe"
-	var lista: Array = armas if tipo == "arma" else armaduras
+	var lista: Array = armas if tipo == "arma" else (hechizos if tipo == "hechizo" else armaduras)
 	if lista.has(id):
 		return "Ya lo tienes"
 	var precio := int(d.get("price", 0))
@@ -140,6 +152,15 @@ func comprar(tipo: String, id: String) -> String:
 
 ## Equipa un arma o armadura que ya tienes (armadura "" = ropa de la clase).
 func equipar(tipo: String, id: String, player: Node = null) -> void:
+	if tipo == "hechizo":
+		# Los hechizos no se equipan: se elige con Q entre los aprendidos
+		if player == null:
+			player = get_tree().get_first_node_in_group("player")
+		var k = player.get("kit") if player else null
+		if k and k.has_method("select_spell"):
+			k.select_spell(id)
+		inventario_cambiado.emit()
+		return
 	if tipo == "arma":
 		if id != "" and not armas.has(id):
 			return
@@ -218,6 +239,7 @@ func guardar(vida: Node) -> void:
 		"creditos": creditos,
 		"armas": armas,
 		"armaduras_inv": armaduras,
+		"hechizos": hechizos,
 		"arma": arma,
 		"tiempo": tiempo,
 		"fecha": Time.get_datetime_string_from_system(false, true),

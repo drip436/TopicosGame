@@ -126,8 +126,8 @@ Animaciones (procedurales, por capas):
   hacia el jugador (`mundo/credito.gd`, cantidades en `equipo.gd` → `DROPS`); cada jefe suelta
   un botín grande (`BOSS_CREDITS`). Se ven abajo a la derecha del HUD y se guardan al
   descansar en una hoguera, junto con el inventario.
-- **Mercader** (`mundo/mercader.gd`, modelo `modelos/jugador/mercader.glb`): está junto a la
-  Hoguera de la Plaza, te saluda con la "V" y con **E** abre la tienda (`ui/tienda.gd`).
+- **Mercader** (`mundo/mercader.gd`, modelo `modelos/jugador/mercader.glb`): tiene su tiendita en el patio de la Facultad de Ingeniería (zona segura, sin enemigos cerca);
+  te saluda con la "V" y con **E** abre la tienda (`ui/tienda.gd`): armas, armaduras y hechizos.
 - **Catálogo** (`jugador/equipo.gd`):
   - Armas: cada una tiene un tipo (`espada`, `mazo`, `estoque`, `lanza`) que decide sus combos
     y cómo se agarra, más multiplicadores de daño y velocidad, y un efecto opcional
