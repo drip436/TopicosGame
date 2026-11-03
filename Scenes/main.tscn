@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://prefabs/Robot.tscn" id="13_wsu2k"]
 [ext_resource type="PackedScene" path="res://prefabs/Vehiculo.tscn" id="14_k12tt"]
 [ext_resource type="PackedScene" path="res://prefabs/Lago.tscn" id="15_wsu2k"]
+[ext_resource type="Script" uid="uid://bu6m3f2xyaxxi" path="res://scripts/bus_intro_cinematic.gd" id="16_intro"]
 
 [sub_resource type="FastNoiseLite" id="Noise_clouds"]
 frequency = 0.008
@@ -102,6 +103,10 @@ far = 600.0
 script = ExtResource("3_cam")
 
 [node name="BossFight" parent="." unique_id=795247481 instance=ExtResource("5_kry3j")]
+spawn_test_player = false
+
+[node name="BusIntroCinematic" type="Node3D" parent="." unique_id=500514200]
+script = ExtResource("16_intro")
 
 [node name="CampusWorld" type="Node3D" parent="." unique_id=633895617]
 script = ExtResource("6_world")
