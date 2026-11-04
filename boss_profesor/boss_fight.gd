@@ -27,6 +27,8 @@ signal player_died
 ## Niebla de jefe en la entrada (posición y ancho del portón).
 @export var fog_gate_position: Vector3 = Vector3(0, 0, 23)
 @export var fog_gate_width: float = 15.0
+## Vida, estamina y barra del jefe aparecen hasta que el jugador entra a la plaza.
+@export var hud_hidden_until_fight: bool = true
 @export_range(0.0, 1.0) var rain_phase1: float = 0.15
 @export_range(0.0, 1.0) var rain_phase2: float = 1.0
 ## Al ganar la tormenta se disipa y solo cae una que otra gota (0 = deja de llover).
@@ -62,6 +64,12 @@ var _fog: MeshInstance3D
 var _fog_body: StaticBody3D
 var _state := "setup"   # setup | waiting | intro | fight | won | lost
 var _intro_requested := false
+## Cinemática en curso (bus_intro_cinematic.gd): HUD oculto y la pelea no se dispara.
+var _cinematic := false
+var _hint := ""
+var _gate_shapes: Array[CollisionShape3D] = []
+var _entrance_checked := false
+var _hud_shown := false
 
 
 func _ready() -> void:
@@ -78,33 +86,32 @@ func _setup() -> void:
 	hud = CanvasLayer.new()
 	hud.set_script(HUD)
 	add_child(hud)
+	# Si la intro del autobús está corriendo, el HUD espera a que termine
+	if hud_hidden_until_fight or _in_cinematic():
+		hud.visible = false
+	else:
+		_hud_shown = true
 
-	# Jugador
+	# Jugador. Si todavía no existe (la intro lo crea unos cuadros después), se sigue
+	# buscando en _physics_process hasta encontrarlo.
 	var players := get_tree().get_nodes_in_group("player")
 	if players.size() > 0:
-		player = players[0]
-	elif spawn_test_player:
-		player = CharacterBody3D.new()
-		player.set_script(PLAYER)
-		player.name = "TestPlayer"
+		_bind_player(players[0])
+	elif spawn_test_player and not _in_cinematic():
+		var tp := CharacterBody3D.new()
+		tp.set_script(PLAYER)
+		tp.name = "TestPlayer"
 		var ps := _find_by_name(get_tree().current_scene, "PlayerSpawn")
 		var spawn := Vector3(0, 0.2, 20)
 		var yaw := 0.0
 		if ps is Node3D:
 			spawn = (ps as Node3D).global_position + Vector3(0, 0.2, 2.0)
 			yaw = (ps as Node3D).global_rotation.y
-		arena.add_child(player)
-		player.global_position = spawn
-		player.rotation.y = yaw
+		arena.add_child(tp)
+		tp.global_position = spawn
+		tp.rotation.y = yaw
+		_bind_player(tp)
 		_disable_other_cameras()
-	if player:
-		var hint := "WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar objetivo\nR beber café (curar) · E descansar en hoguera (guarda) · Esc pausa"
-		if player.has_method("get_class_name"):
-			var cls = preload("res://jugador/player_classes.gd").data(player.class_id)
-			hint = "Clase: %s\n%s\n%s" % [player.get_class_name(), cls["controls"], hint]
-		hud.show_hint(hint, 18.0)
-	if player and player.has_signal("died"):
-		player.died.connect(_on_player_died)
 
 	# Jefe
 	boss = BOSS_SCENE.instantiate() as CharacterBody3D
@@ -116,7 +123,8 @@ func _setup() -> void:
 	arena.add_child(boss)
 	boss.weather = weather
 	boss.fx_parent = arena
-	boss.target = player
+	if player:
+		boss.target = player
 	boss.health_changed.connect(func(c, m): hud.set_boss_health(c, m))
 	boss.damaged.connect(func(a): hud.boss_damaged(a))
 	boss.intro_landed.connect(func(): hud.show_boss(boss_name))
@@ -148,11 +156,99 @@ func start_fight() -> void:
 	if _state != "waiting":
 		return
 	_state = "intro"
+	_close_entrance()
 	_close_fog_gate()
+	_show_hud()
 	boss.begin_intro(landing_point)
 
 
+## La intro del autobús la llama con true al empezar y con false cuando el jugador se
+## levanta. Mientras dura, la pelea no se dispara. (Además se respeta el meta
+## "intro_activa" del árbol, por si la intro no llama a esta función.)
+func set_cinematic(active: bool) -> void:
+	_cinematic = active
+	if hud and active:
+		hud.visible = false
+
+
+func _in_cinematic() -> bool:
+	return _cinematic or get_tree().has_meta("intro_activa")
+
+
+## Vida, estamina, controles y (cuando aterriza) la barra del jefe aparecen al entrar.
+func _show_hud() -> void:
+	if hud == null or _hud_shown:
+		return
+	_hud_shown = true
+	hud.visible = true
+	for c in hud.get_children():
+		if c is CanvasItem:
+			var a: float = (c as CanvasItem).modulate.a
+			(c as CanvasItem).modulate.a = 0.0
+			create_tween().tween_property(c, "modulate:a", a, 0.8)
+	if _hint != "":
+		hud.show_hint(_hint, 14.0)
+
+
+## El muro invisible de la arena (ArenaBounds, radio ~26 m) deja afuera la calle donde
+## para el autobús. Si el jugador está afuera, se desactiva solo el tramo de la puerta;
+## al empezar la pelea se cierra de nuevo (y la niebla del jefe tapa el portón).
+func _open_entrance() -> void:
+	if _entrance_checked:
+		return
+	var bounds := _find_by_name(arena, "ArenaBounds") as Node3D
+	if bounds == null or player == null:
+		return
+	_entrance_checked = true
+	var r := 0.0
+	for c in bounds.get_children():
+		if c is CollisionShape3D:
+			r = maxf(r, Vector2((c as Node3D).position.x, (c as Node3D).position.z).length())
+	var lp := bounds.to_local(player.global_position)
+	if Vector2(lp.x, lp.z).length() < r - 1.0:
+		return   # ya está adentro
+	var gate := bounds.to_local(fog_gate_position)
+	var gate_ang := atan2(gate.x, gate.z)
+	var half := asin(clampf((fog_gate_width * 0.5 + 0.6) / maxf(r, 1.0), 0.0, 1.0))
+	for c in bounds.get_children():
+		var cs := c as CollisionShape3D
+		if cs and absf(angle_difference(atan2(cs.position.x, cs.position.z), gate_ang)) < half:
+			cs.set_deferred("disabled", true)
+			_gate_shapes.append(cs)
+	print("BossFight: entrada de la arena abierta (%d tramos del muro)." % _gate_shapes.size())
+
+
+func _close_entrance() -> void:
+	for cs in _gate_shapes:
+		if is_instance_valid(cs):
+			cs.set_deferred("disabled", false)
+	_gate_shapes.clear()
+
+
+## Enlaza al jugador con la pelea: el HUD lo sigue, el jefe lo ataca y su muerte se detecta.
+func _bind_player(p: Node3D) -> void:
+	if p == player:
+		return
+	player = p
+	if boss and is_instance_valid(boss):
+		boss.target = player
+	if player.has_signal("died") and not player.died.is_connected(_on_player_died):
+		player.died.connect(_on_player_died)
+	var hint := "WASD mover · Shift correr · Espacio rodar\nClic izq. atacar · Ruedita / Tab fijar objetivo\nR beber café (curar) · E descansar en hoguera (guarda) · Esc pausa"
+	if player.has_method("get_class_name"):
+		var cls = preload("res://jugador/player_classes.gd").data(player.class_id)
+		hint = "Clase: %s\n%s\n%s" % [player.get_class_name(), cls["controls"], hint]
+	_hint = hint
+	if hud and hud.visible:
+		hud.show_hint(hint, 18.0)
+
+
 func _physics_process(_delta: float) -> void:
+	if player == null or not is_instance_valid(player):
+		player = null
+		var players := get_tree().get_nodes_in_group("player")
+		if players.size() > 0 and players[0] is Node3D:
+			_bind_player(players[0])
 	if player and hud and "hp" in player:
 		hud.set_player(player.hp, player.max_hp, player.stamina, player.max_stamina, player.flasks)
 		if player.has_method("get_status_names") and hud.has_method("set_status"):
@@ -164,7 +260,8 @@ func _physics_process(_delta: float) -> void:
 		if player.has_method("get_buildups") and hud.has_method("set_buildups"):
 			hud.set_buildups(player.get_buildups())
 			hud.set_flask_max(player.get_max_flasks())
-	if _state == "waiting" and player:
+	if _state == "waiting" and player and not _in_cinematic():
+		_open_entrance()
 		var d := Vector2(player.global_position.x - arena_center.x, player.global_position.z - arena_center.z).length()
 		if d < trigger_distance:
 			start_fight()
@@ -309,6 +406,7 @@ func _open_fog_gate() -> void:
 ## cielo queda despejado.
 func restore_won() -> void:
 	_state = "won"
+	_show_hud()
 	if boss and is_instance_valid(boss):
 		boss.queue_free()
 	boss = null

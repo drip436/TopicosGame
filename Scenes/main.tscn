@@ -74,6 +74,11 @@ adjustment_saturation = 0.72
 
 [node name="CampusBossArena" type="Node3D" unique_id=1565782696]
 script = ExtResource("1_gen")
+seed_value = null
+plaza_radius = null
+arena_wall_radius = null
+puddle_coverage = null
+rebuild_now = null
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1182321168]
 environment = SubResource("Env_storm")
@@ -110,7 +115,32 @@ script = ExtResource("16_intro")
 
 [node name="CampusWorld" type="Node3D" parent="." unique_id=633895617]
 script = ExtResource("6_world")
-bosses_for_final_gate = PackedStringArray("biblioteca", "computo", "laboratorio")
+bus_length = null
+bus_width = null
+bus_floor_height = null
+bus_world_yaw_deg = null
+front_door_x = null
+wheel_radius = null
+interior_lights = null
+headlights = null
+show_driver = null
+driver_shirt = null
+pusher_shirt = null
+street_offset = null
+location_title = null
+arrival_time = null
+arrival_distance = null
+slowmo_scale = null
+skip_intro = null
+use_existing_player = null
+hide_hud = null
+pause_groups = null
+pause_script_hints = null
+pause_nodes = null
+open_arena_gate = null
+arena_gate_angle_deg = null
+arena_gate_half_angle_deg = null
+hold_fight_until_inside = null
 
 [node name="Estructuras" type="Node3D" parent="CampusWorld" unique_id=408791338]
 

@@ -156,6 +156,8 @@ var _rebuild_timer: Timer
 var _built_at := -100000
 var _zone_parent: Node3D
 var _prefab_local := false
+## Escala del prefab que se está generando (la colisión no puede heredarla con Jolt).
+var _prefab_scale := Vector3.ONE
 
 
 func _enter_tree() -> void:
@@ -729,11 +731,14 @@ func _rod(a: Vector3, b: Vector3, r: float, mat: Material, segs := 6) -> void:
 
 
 func _wc(size: Vector3, xf: Transform3D) -> void:
+	# Jolt no admite colisiones con escala: la escala del transform pasa al tamaño de la caja
+	if _prefab_local and not _prefab_scale.is_equal_approx(Vector3.ONE):
+		xf = Transform3D(Basis.from_scale(_prefab_scale), Vector3.ZERO) * xf
 	var cs := CollisionShape3D.new()
 	var s := BoxShape3D.new()
-	s.size = size
+	s.size = (size * xf.basis.get_scale()).abs()
 	cs.shape = s
-	cs.transform = xf
+	cs.transform = Transform3D(xf.basis.orthonormalized(), xf.origin)
 	w_body.add_child(cs)
 
 
@@ -4730,6 +4735,12 @@ func _build_prefab(pf: Node3D) -> void:
 	w_body = StaticBody3D.new()
 	w_body.name = "Collision"
 	content.add_child(w_body)
+	# Si el prefab está escalado en el editor, el cuerpo de colisión no hereda esa escala
+	# (Jolt no la admite): se coloca sin escala y _wc ajusta el tamaño de cada caja.
+	_prefab_scale = pf.global_basis.get_scale()
+	if not _prefab_scale.is_equal_approx(Vector3.ONE):
+		w_body.top_level = true
+		w_body.global_transform = Transform3D(pf.global_basis.orthonormalized(), pf.global_position)
 	_zone_parent = content
 	_prefab_local = true
 	rng.seed = hash(int(pf.variation) * 7919 + int(pf.kind) * 104729 + int(pf.zone) * 31 + int(pf.robot) * 13 + int(pf.vehicle) * 7 + int(pf.ruin) * 3 + 17)
@@ -4764,6 +4775,7 @@ func _build_prefab(pf: Node3D) -> void:
 		_:
 			_build_zone(pf, c)
 	_prefab_local = false
+	_prefab_scale = Vector3.ONE
 	_zone_parent = null
 	_root = saved_root
 	w_body = saved_body
