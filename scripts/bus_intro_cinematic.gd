@@ -50,6 +50,8 @@ const ENV_KEYS := ["fog_density", "fog_light_color", "fog_light_energy",
 @export var leave_distance := 34.0
 @export_range(0.05, 1.0) var slowmo_scale := 0.3
 @export var skip_intro := false
+## Al entrar con "Continuar" (Partida.pendiente) no se reproduce la intro.
+@export var skip_on_continue := true
 
 @export_group("Juego durante la intro")
 ## Usa el jugador que ya exista en el grupo "player" (p. ej. el que crea BossFight) en vez de crear otro.
@@ -88,6 +90,8 @@ var _puppet_state := "idle" # idle, walk, fly, down
 var _puppet_speed := 0.0
 var _puppet_yaw := 0.0
 var _bob_t := 0.0
+var _cine_k := 0.0          # avance de la animación de cuerpo completo del rig (0..1)
+var _thud_done := false
 var _hud_released := false
 var _tex_cache := {}
 var _arena: StaticBody3D
@@ -146,11 +150,18 @@ func _ready() -> void:
 	if _camera == null:
 		push_warning("Intro: no se encontró FreeCamera; se omite la cinemática.")
 		return
+	# "Continuar" una partida guardada: sin cinemática. Solo hace falta el protagonista;
+	# Partida.aplicar() lo lleva a la hoguera donde descansaste.
+	var partida := get_node_or_null("/root/Partida")
+	if skip_on_continue and partida and bool(partida.get("pendiente")):
+		_spawn_player_for_game()
+		return
 	_running = true
 	get_tree().set_meta("intro_activa", true)
 	intro_started.emit()
 	_build_overlay()   # empieza en negro
 	_take_camera()
+	_setup_player()   # ya, en el primer cuadro (ver _setup_player)
 	_bf = _find_boss_fight()
 	if _bf:
 		_bf.call("set_cinematic", true)
@@ -161,6 +172,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_sweep(true)
 	_build_world()
+	# Si viene de la pantalla de carga (ui/pantalla_carga.gd), espera a que se quite
+	while get_tree().has_meta("cargando"):
+		await get_tree().process_frame
 	if skip_intro:
 		_finish(true)
 	else:
@@ -232,12 +246,29 @@ func _build_world() -> void:
 			"shoes": Color(0.16, 0.16, 0.18), "sole": Color(0.92, 0.92, 0.9), "print": "SIN RUMBO",
 			"armor": true})
 	_bus_body.add_child(_pusher)
-	_pusher.position = Vector3(front_door_x - 5.3, bus_floor_height, 0.05)
+	_pusher.position = Vector3(front_door_x - 8.4, bus_floor_height, 0.05)
 	_npc_face(_pusher, Vector3.RIGHT)
 
-	_setup_player()
 
 
+## Partida cargada: el protagonista aparece listo para jugar, sin autobús ni cámara de cine.
+func _spawn_player_for_game() -> void:
+	set_process(false)
+	set_physics_process(false)
+	set_process_unhandled_input(false)
+	for p in get_tree().get_nodes_in_group("player"):
+		if p is CharacterBody3D:
+			return   # ya hay uno en la escena
+	var pl := PLAYER_SCRIPT.new() as CharacterBody3D
+	pl.name = "Protagonista"
+	add_child(pl)
+	var spawn := get_parent().get_node_or_null("PlayerSpawn") as Node3D
+	if spawn:
+		pl.global_position = spawn.global_position + Vector3(0, 0.2, 2.0)
+
+
+## Se llama en _ready, ANTES de cualquier espera: VidaDelCampus, BossFight y los demás
+## controladores buscan al jugador una sola vez al arrancar y se cancelan si no existe.
 func _setup_player() -> void:
 	if use_existing_player:
 		for p in get_tree().get_nodes_in_group("player"):
@@ -248,6 +279,10 @@ func _setup_player() -> void:
 		_player = PLAYER_SCRIPT.new() as CharacterBody3D
 		_player.name = "Protagonista"
 		add_child(_player)
+		# Mientras espera su turno en la cinemática queda donde aparecía normalmente
+		var spawn := get_parent().get_node_or_null("PlayerSpawn") as Node3D
+		if spawn:
+			_player.global_position = spawn.global_position + Vector3(0, 0.2, 2.0)
 	_player_saved = {"mode": _player.process_mode, "visible": _player.visible}
 	_player.set("input_locked", true)
 	_player.visible = false
@@ -279,20 +314,20 @@ func _play_intro() -> void:
 	if await _wait(0.8): return
 
 	# --- 2. Interior: el protagonista va por el pasillo; el pasajero de atrás lo sigue
-	_place_player(Vector3(front_door_x - 3.4, bus_floor_height + 0.02, 0.0), _bus_dir(Vector3.RIGHT))
+	_place_player(Vector3(front_door_x - 6.2, bus_floor_height + 0.02, 0.0), _bus_dir(Vector3.RIGHT))
 	_cut_to(_shot_interior, 2.5)
 	if await _wait(0.7): return
 	_set_doors(true)
 	_turn_head(_driver, -0.7, 0.5)        # el chofer voltea hacia la puerta
 	if await _wait(0.5): return
 	var follow := _npc_walk(_pusher, [Vector3(front_door_x - 0.9, bus_floor_height, 0.05),
-			Vector3(front_door_x - 0.05, bus_floor_height, bus_width * 0.5 - 1.2)], 1.15, 0.6)
-	if await _walk_to(Vector3(front_door_x - 1.5, 0.0, 0.0), 1.25): return
+			Vector3(front_door_x - 0.05, bus_floor_height, bus_width * 0.5 - 1.2)], _walk_speed(0.48), 0.45)
+	if await _walk_to(Vector3(front_door_x - 1.5, 0.0, 0.0), _walk_speed(0.55)): return
 
 	# --- 3. Exterior: llega a la puerta, gira y se detiene en el escalón
 	_cut_to(_shot_door, 2.5)
-	if await _walk_to(Vector3(front_door_x - 0.05, 0.0, 0.0), 1.2): return
-	if await _walk_to(Vector3(front_door_x, 0.0, bus_width * 0.5 - 0.35), 0.9): return
+	if await _walk_to(Vector3(front_door_x - 0.05, 0.0, 0.0), _walk_speed(0.45)): return
+	if await _walk_to(Vector3(front_door_x, 0.0, bus_width * 0.5 - 0.35), _walk_speed(0.32)): return
 	_face(_bus_dir(Vector3.BACK))         # se queda mirando el campus
 	if await _wait_tween(follow): return
 	if await _wait(0.5): return
@@ -323,9 +358,9 @@ func _play_intro() -> void:
 	if await _wait(0.45): return          # vuelo en cámara lenta
 	Engine.time_scale = 1.0
 	if await _wait_tween(fall): return
-	_sound("caida", _synth(0.5, 70.0, 35.0, 0.35, 0.9, 0.003, 2.5), _player.global_position, 0.0)
-	_trauma = 0.6
-	if await _wait(0.25): return
+	if not _thud_done:
+		_thud()
+	if await _wait(0.4): return
 
 	# --- 5. Corte a negro: el golpe marca el cambio de escena
 	_fade_to(1.0, 0.1)
@@ -354,7 +389,7 @@ func _play_intro() -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	leave.tween_callback(func() -> void: _bus.visible = false)
 	if await _wait(2.7): return
-	var up := _get_up(1.3)                # se levanta como si nada
+	var up := _get_up(2.6)                # se levanta como si nada
 	if await _wait_tween(up): return
 	_release_hud()                        # vuelven la vida y la estamina
 	if _bf and is_instance_valid(_bf):
@@ -770,6 +805,8 @@ func _physics_process(delta: float) -> void:
 			"hold": String(_player.get("class_id")) != "ai",
 			"dead": false,
 			"stagger": _puppet_state == "fly",
+			"cine": {"fall": "caida", "down": "tendido", "getup": "levantarse"}.get(_puppet_state, ""),
+			"ck": _cine_k,
 			"shock": false,
 			"grabbed": false,
 		}
@@ -780,6 +817,14 @@ func _physics_process(delta: float) -> void:
 		_bob_t += delta * (3.0 + _puppet_speed * 6.0)
 		vis.position.y = lerpf(vis.position.y, absf(sin(_bob_t)) * 0.045 * k, 1.0 - exp(-12.0 * delta))
 		vis.rotation.z = lerpf(vis.rotation.z, sin(_bob_t) * 0.04 * k, 1.0 - exp(-12.0 * delta))
+
+
+## Velocidad de caminata en la cinemática: una fracción de la velocidad de la clase, para
+## que el esqueleto use la misma zancada que en el juego (a 1 m/s daba pasitos tiesos).
+func _walk_speed(f: float) -> float:
+	var cfg = _player.get("_cfg") if _player else null
+	var w := float((cfg as Dictionary).get("walk", 5.0)) if cfg is Dictionary else 5.0
+	return w * f
 
 
 ## Camina hasta un punto (coordenadas locales del autobús) con arranque y frenado suaves.
@@ -809,44 +854,95 @@ func _walk_to(local_target: Vector3, speed: float, timeout := 8.0) -> bool:
 
 
 ## Empujón: la intro lanza al jugador fuera del autobús en arco y lo deja boca abajo (sin daño).
+## ¿El rig del jugador tiene las animaciones de cuerpo completo (jugador/player_rig.gd CINE)?
+func _rig_cine() -> bool:
+	var rig: Variant = _player.get("rig")
+	if not (rig is Object) or not is_instance_valid(rig):
+		return false
+	var scr := (rig as Object).get_script() as Script
+	return scr != null and scr.get_script_constant_map().has("CINE")
+
+
+## Golpe seco contra el suelo.
+func _thud() -> void:
+	_thud_done = true
+	_sound("caida", _synth(0.5, 70.0, 35.0, 0.35, 0.9, 0.003, 2.5), _player.global_position, 0.0)
+	_trauma = maxf(_trauma, 0.6)
+
+
+## Empujón: sale despedido de la puerta, tropieza dos pasos, cae de frente sobre las manos
+## y queda tendido (animación "caida" del rig). Sin daño.
 func _push_out() -> Tween:
 	var out := _bus_dir(Vector3.BACK)
 	_face(out, true)
-	_puppet_state = "fly"
 	_puppet_speed = 0.0
+	_thud_done = false
 	var start := _player.global_position
-	var land := start + out * 2.3
-	land.y = _ground_y(land)
+	if _rig_cine():
+		var dur := 1.5
+		var land := start + out * 2.0
+		land.y = _ground_y(land)
+		_puppet_state = "fall"
+		_cine_k = 0.0
+		var tw := _tw()
+		tw.set_trans(Tween.TRANS_LINEAR)
+		tw.tween_property(self, "_cine_k", 1.0, dur)
+		# Los pies avanzan con los tropiezos y bajan el escalón; luego el cuerpo cae
+		tw.parallel().tween_method(func(k: float) -> void:
+			var e := 1.0 - pow(1.0 - k, 2.0)
+			var p := start.lerp(land, e)
+			p.y = lerpf(start.y, land.y, smoothstep(0.15, 0.7, k))
+			_player.global_position = p, 0.0, 1.0, dur * 0.66)
+		tw.parallel().tween_callback(_thud).set_delay(dur * 0.72)
+		tw.tween_callback(func() -> void: _puppet_state = "down")
+		return tw
+	# Sin esqueleto: se inclina el modelo completo
+	var land2 := start + out * 2.3
+	land2.y = _ground_y(land2)
+	_puppet_state = "fly"
 	var vis := _visual()
-	var tw := _tw()
-	tw.tween_method(func(k: float) -> void:
-		var p := start.lerp(land, k)
-		p.y = lerpf(start.y, land.y, k * k) + sin(k * PI) * 0.45
+	var tw2 := _tw()
+	tw2.tween_method(func(k: float) -> void:
+		var p := start.lerp(land2, k)
+		p.y = lerpf(start.y, land2.y, k * k) + sin(k * PI) * 0.45
 		_player.global_position = p, 0.0, 1.0, 0.5).set_trans(Tween.TRANS_LINEAR)
-	tw.parallel().tween_property(vis, "rotation:x", deg_to_rad(-88.0), 0.5) \
+	tw2.parallel().tween_property(vis, "rotation:x", deg_to_rad(-88.0), 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.parallel().tween_property(vis, "rotation:z", deg_to_rad(9.0), 0.5)
-	tw.parallel().tween_property(vis, "position:y", 0.16, 0.5)
-	tw.tween_callback(func() -> void: _puppet_state = "down")
-	tw.tween_property(vis, "rotation:x", deg_to_rad(-78.0), 0.08).set_ease(Tween.EASE_OUT)
-	tw.tween_property(vis, "rotation:x", deg_to_rad(-88.0), 0.16) \
+	tw2.parallel().tween_property(vis, "rotation:z", deg_to_rad(9.0), 0.5)
+	tw2.parallel().tween_property(vis, "position:y", 0.16, 0.5)
+	tw2.tween_callback(func() -> void: _puppet_state = "down")
+	tw2.tween_property(vis, "rotation:x", deg_to_rad(-78.0), 0.08).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(vis, "rotation:x", deg_to_rad(-88.0), 0.16) \
 			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	return tw
+	return tw2
 
 
-## Se incorpora: apoya una rodilla y se pone de pie, sin daño.
+## Se levanta: brazos, cuatro puntos, una rodilla, se impulsa y se sacude (animación
+## "levantarse" del rig). Al recoger las piernas avanza un poco, hasta donde quedó la cadera.
 func _get_up(duration: float) -> Tween:
+	if _rig_cine():
+		_puppet_state = "getup"
+		_cine_k = 0.0
+		var dir := _bus_dir(Vector3.BACK)
+		var p0 := _player.global_position
+		var tw := _tw()
+		tw.set_trans(Tween.TRANS_LINEAR)
+		tw.tween_property(self, "_cine_k", 1.0, duration)
+		tw.parallel().tween_method(func(k: float) -> void:
+			_player.global_position = p0 + dir * 0.4 * smoothstep(0.0, 1.0, k), 0.0, 1.0, duration * 0.35).set_delay(duration * 0.28)
+		tw.tween_callback(func() -> void: _puppet_state = "idle")
+		return tw
 	var vis := _visual()
-	var tw := _tw()
-	tw.tween_property(vis, "rotation:x", deg_to_rad(-40.0), duration * 0.4) \
+	var tw2 := _tw()
+	tw2.tween_property(vis, "rotation:x", deg_to_rad(-40.0), duration * 0.4) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(vis, "rotation:z", 0.0, duration * 0.4)
-	tw.parallel().tween_property(vis, "position:y", 0.0, duration * 0.4)
-	tw.tween_interval(duration * 0.2)
-	tw.tween_property(vis, "rotation:x", 0.0, duration * 0.4) \
+	tw2.parallel().tween_property(vis, "rotation:z", 0.0, duration * 0.4)
+	tw2.parallel().tween_property(vis, "position:y", 0.0, duration * 0.4)
+	tw2.tween_interval(duration * 0.2)
+	tw2.tween_property(vis, "rotation:x", 0.0, duration * 0.4) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(func() -> void: _puppet_state = "idle")
-	return tw
+	tw2.tween_callback(func() -> void: _puppet_state = "idle")
+	return tw2
 
 
 ## Al levantarse vuelven la vida y la estamina (con un fundido suave).

@@ -8,6 +8,7 @@ extends CanvasLayer
 const E := preload("res://ui/estilo.gd")
 const PANEL_EQUIPO := preload("res://ui/panel_equipo.gd")
 const AJUSTES := preload("res://ui/panel_ajustes.gd")
+const MENU_EQUIPO := preload("res://ui/menu_equipo.gd")
 const CLASSES := preload("res://jugador/player_classes.gd")
 const MENU := "res://Scenes/UI.tscn"
 
@@ -77,6 +78,14 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# I: menú de equipo (cambiar armas y armaduras) sin pasar por la pausa
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_I and not abierto:
+		if _puede_abrir_equipo():
+			var m: CanvasLayer = MENU_EQUIPO.new()
+			m.player = player
+			get_tree().root.add_child(m)
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		if abierto:
 			# Esc cierra primero una confirmación abierta, luego el menú
@@ -88,6 +97,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			abrir()
 		get_viewport().set_input_as_handled()
+
+
+## No durante cinemáticas, con el juego ya pausado (tienda, otro menú) ni muerto.
+func _puede_abrir_equipo() -> bool:
+	if player == null or get_tree().paused or get_tree().has_meta("intro_activa"):
+		return false
+	return not bool(player.get("input_locked")) and not bool(player.get("is_dead"))
 
 
 func abrir() -> void:
@@ -235,7 +251,7 @@ func _controles(v: VBoxContainer) -> void:
 	var cls: Dictionary = CLASSES.data(String(player.get("class_id"))) if player else CLASSES.data()
 	for c in [["WASD", "Moverse"], ["Shift", "Correr"], ["Espacio", "Rodar (esquivar)"], ["Clic izquierdo", "Atacar (repite para el combo)"],
 			["Clic derecho", "Habilidad de la clase"], ["Rueda / Tab", "Fijar objetivo"], ["R / F", "Beber café (curar)"],
-			["E", "Encender / descansar en hoguera (guarda la partida)"], ["Q", "Cambiar hechizo / IA"], ["G", "Bebida energética (maná)"],
+			["E", "Encender / descansar en hoguera · abrir cofres · recoger armas"], ["I", "Equipo (cambiar armas y armaduras)"], ["Q", "Cambiar hechizo / IA"], ["G", "Bebida energética (maná)"],
 			["0 – 4", "Equipar armadura de resistencia en la hoguera"], ["Esc", "Pausa"]]:
 		_fila(v, c[0], c[1])
 	v.add_child(E.linea())

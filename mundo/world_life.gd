@@ -21,6 +21,7 @@ const EQ := preload("res://jugador/equipo.gd")
 const CREDITO := preload("credito.gd")
 const MERCADER := preload("mercader.gd")
 const M := preload("enemy_models.gd")
+const BOTIN := preload("botin.gd")
 
 ## Armaduras de resistencia: dónde están (cerca de qué hoguera, por título).
 const ARMOR_SPOTS := {
@@ -179,6 +180,7 @@ func _setup() -> void:
 	_connect_key_drops()
 	_make_armors()
 	_make_merchant()
+	_make_loot()
 	if enemies_enabled:
 		_make_enemy_records()
 		if shop_pos != Vector3.INF:
@@ -189,6 +191,15 @@ func _setup() -> void:
 	var partida := get_node_or_null("/root/Partida")
 	if partida:
 		partida.aplicar(self)
+
+
+## Cofres y armas tiradas (especiales, épicas y legendarias): mundo/botin.gd.
+func _make_loot() -> void:
+	var b := BOTIN.new()
+	b.name = "Botin"
+	b.vida = self
+	b.player = player
+	add_child(b)
 
 
 ## Tiendita del mercader (mundo/mercader.gd) en el patio de la Facultad de Ingeniería:
@@ -634,8 +645,8 @@ func _update_armors() -> void:
 			var info: Dictionary = EQ.ARMORS[id]
 			LFX.puff(self, n.global_position + Vector3(0, 1.3, 0), Color(info["color"].r * 2.5, info["color"].g * 2.5, info["color"].b * 2.5, 1), 40, 0.2, 4.0, -2.0)
 			n.queue_free()
-			if hud:
-				hud.show_banner(String(info["name"]).to_upper(), info["color"], "%s\nEquípala en el menú de pausa (Esc → Equipo)." % info["desc"], 3.5)
+			# Notificación arriba a la derecha (antes: letrero grande en medio de la pantalla)
+			preload("res://ui/notificaciones.gd").armadura(get_tree(), id)
 	if _menu_open and (_menu_bonfire == null or not is_instance_valid(_menu_bonfire) or _menu_bonfire.global_position.distance_to(player.global_position) > 3.5 or player.is_dead):
 		_close_menu()
 

@@ -111,6 +111,7 @@ func build(visual: Node3D, model: Node3D, class_id := "", outfit_path := "") -> 
 		at.bone_name = b[0]
 		skeleton.add_child(at)
 		_attach[b[0]] = at
+	_apply_helmet()
 	return mesh_instance
 
 
@@ -155,6 +156,152 @@ func set_outfit(path: String) -> void:
 	_outfit_path = path
 	if old and is_instance_valid(old):
 		old.queue_free()
+	_apply_helmet()
+	_regrip()
+
+
+# ======================================================================
+#  Cascos (modelos/jugador/cascos/, arte/blender/cascos.py)
+# ======================================================================
+
+## Casco de cada modelo (nombre del glb sin extensión). Los modelos de clase
+## ("jugador_<clase>") usan CLASS_HELMET; pon "" para dejarle su cabeza original.
+const HELMETS := {
+	"armadura_ignifuga": "corintio",
+	"armadura_aislante": "celada",
+	"armadura_antiveneno": "hazmat",
+	"armadura_anclaje": "gran_yelmo",
+	"armadura_rector": "rector",
+}
+const CLASS_HELMET := "caballero"
+## Clases que NO llevan casco nuevo con la ropa de su clase (p. ej. si su modelo tiene
+## capucha o pelo que quieres conservar).
+const CLASS_NO_HELMET: Array[String] = []
+const HELMET_PATH := "res://modelos/jugador/cascos/casco_%s.glb"
+## Semiejes del casco alrededor del centro de la cabeza (x ancho, y alto, z fondo), los
+## mismos de cascos.py (CAB): sirve para escalarlo a la cabeza del modelo.
+const HELMET_HEAD := Vector3(0.096, 0.104, 0.11)
+## Holgura del casco sobre la cabeza medida (1.0 = justo).
+const HELMET_FIT := 1.0
+
+var helmet: Node3D
+
+
+## Pone el casco nuevo sobre la cabeza del modelo actual: mide la cabeza (vértices del
+## hueso "head", sin contar cuernos ni adornos sueltos), ajusta el tamaño del casco y mete
+## el casco viejo del modelo por dentro para que no atraviese el nuevo.
+func _apply_helmet() -> void:
+	if helmet and is_instance_valid(helmet):
+		helmet.queue_free()
+	helmet = null
+	if mesh_instance == null or not _attach.has("head"):
+		return
+	var key := _outfit_path.get_file().get_basename()
+	var id := String(HELMETS.get(key, ""))
+	if id == "" and key.begins_with("jugador_"):
+		id = "" if CLASS_NO_HELMET.has(key.trim_prefix("jugador_")) else CLASS_HELMET
+	if id == "" or not ResourceLoader.exists(HELMET_PATH % id):
+		return
+	var head := _measure_head()
+	if head.is_empty():
+		return
+	var c: Vector3 = head["center"]
+	var half: Vector3 = head["half"]
+	var sc := Vector3(half.x / HELMET_HEAD.x, half.y / HELMET_HEAD.y, half.z / HELMET_HEAD.z) * HELMET_FIT
+	# Escala casi uniforme (que no se deforme el casco)
+	var avg := (sc.x + sc.y + sc.z) / 3.0
+	sc = Vector3(clampf(sc.x, avg * 0.9, avg * 1.1), clampf(sc.y, avg * 0.9, avg * 1.1), clampf(sc.z, avg * 0.9, avg * 1.1))
+	_tuck_head(c, Vector3(HELMET_HEAD.x * sc.x, HELMET_HEAD.y * sc.y, HELMET_HEAD.z * sc.z) * 0.9)
+	helmet = (load(HELMET_PATH % id) as PackedScene).instantiate()
+	helmet.name = "Casco"
+	_attach["head"].add_child(helmet)
+	helmet.transform = Transform3D(Basis.from_scale(sc), c - _bone_pos("head"))
+	for mi in helmet.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	print("Rig: casco '%s' en %s (escala %.2f)" % [id, key, avg])
+
+
+## Centro y semiejes de la cabeza del modelo (percentiles 6–94 %, así los cuernos o las
+## plumas del casco viejo no la agrandan).
+func _measure_head() -> Dictionary:
+	var idx := _head_indices()
+	var xs: Array[float] = []
+	var ys: Array[float] = []
+	var zs: Array[float] = []
+	for si: int in idx.keys():
+		var verts: PackedVector3Array = mesh_instance.mesh.surface_get_arrays(si)[Mesh.ARRAY_VERTEX]
+		for vi: int in idx[si]:
+			xs.append(verts[vi].x)
+			ys.append(verts[vi].y)
+			zs.append(verts[vi].z)
+	if xs.size() < 30:
+		return {}
+	xs.sort()
+	ys.sort()
+	zs.sort()
+	var a := int(xs.size() * 0.06)
+	var b := int(xs.size() * 0.94)
+	var mn := Vector3(xs[a], ys[a], zs[a])
+	var mx := Vector3(xs[b], ys[b], zs[b])
+	return {"center": (mn + mx) * 0.5, "half": (mx - mn) * 0.5}
+
+
+## Mete los vértices de la cabeza que sobresalgan dentro del elipsoide (centro, semiejes):
+## el casco viejo (y sus cuernos) queda escondido dentro del nuevo.
+func _tuck_head(center: Vector3, half: Vector3) -> void:
+	var mesh := mesh_instance.mesh as ArrayMesh
+	if mesh == null:
+		return
+	var idx := _head_indices()
+	var out := ArrayMesh.new()
+	for si in mesh.get_surface_count():
+		var arr: Array = mesh.surface_get_arrays(si)
+		if idx.has(si):
+			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			for vi: int in idx[si]:
+				var d := (verts[vi] - center) / half
+				if d.length() > 1.0:
+					verts[vi] = center + d.normalized() * half
+			arr[Mesh.ARRAY_VERTEX] = verts
+		var flags: int = mesh.surface_get_format(si) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
+		out.add_surface_from_arrays(mesh.surface_get_primitive_type(si), arr, [], {}, flags)
+		out.surface_set_material(si, mesh.surface_get_material(si))
+		out.surface_set_name(si, mesh.surface_get_name(si))
+	mesh_instance.mesh = out
+
+
+## Índices de los vértices pesados al hueso "head" (peso > 0.5): superficie -> índices.
+func _head_indices() -> Dictionary:
+	var res := {}
+	var mesh := mesh_instance.mesh
+	var skin: Skin = mesh_instance.skin
+	if mesh == null or skin == null:
+		return res
+	var ids := {}
+	for i in skin.get_bind_count():
+		if String(skin.get_bind_name(i)) == "head":
+			ids[i] = true
+	for si in mesh.get_surface_count():
+		var arr: Array = mesh.surface_get_arrays(si)
+		if arr[Mesh.ARRAY_BONES] == null or arr[Mesh.ARRAY_WEIGHTS] == null:
+			continue
+		var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var bones: PackedInt32Array = arr[Mesh.ARRAY_BONES]
+		var wts: PackedFloat32Array = arr[Mesh.ARRAY_WEIGHTS]
+		var per := bones.size() / maxi(verts.size(), 1)
+		if per < 1:
+			continue
+		var lista := PackedInt32Array()
+		for vi in verts.size():
+			var w := 0.0
+			for k in per:
+				if ids.has(bones[vi * per + k]):
+					w += wts[vi * per + k]
+			if w > 0.5:
+				lista.append(vi)
+		if not lista.is_empty():
+			res[si] = lista
+	return res
 
 
 ## Cambia un material del modelo de Blender por nombre (p. ej. "ribete" toma el color
@@ -291,6 +438,104 @@ func attach_weapon(node: Node3D, bone: String, axis: Vector3, world_dir: Vector3
 	node.get_parent().remove_child(node)
 	_attach[bone].add_child(node)
 	node.transform = Transform3D(hb.inverse() * want, offset)
+
+
+## Pone un arma EMPUÑADA: el mango atraviesa el puño como en la vida real (de lado a lado
+## de la mano, perpendicular a los dedos) y la hoja sale por el lado del pulgar.
+## Se define en el espacio de la mano (en pose T: dedos hacia ±X, pulgar hacia −Z,
+## palma hacia −Y), así que el agarre es el mismo en cualquier animación.
+##   blade_axis  eje del arma hacia la punta (en el espacio del modelo del arma)
+##   flat_axis   normal de la cara plana de la hoja (el filo queda hacia los nudillos)
+##   tilt_deg    cuánto se inclina la hoja desde el pulgar hacia los dedos (muñeca)
+##   offset      dónde queda el centro del mango respecto a la muñeca. Por defecto se
+##               calcula del modelo: el centro del puño (los vértices de esa mano), así el
+##               mango pasa por la mano de verdad con cualquier modelo o armadura.
+func grip_weapon(node: Node3D, bone: String, blade_axis: Vector3, flat_axis: Vector3, tilt_deg := 30.0, offset := Vector3.INF) -> void:
+	var side := -1.0 if bone.ends_with("_l") else 1.0
+	var t := deg_to_rad(tilt_deg)
+	var blade := Vector3(side * sin(t), 0.0, -cos(t)).normalized()
+	var flat := Vector3(0, 1, 0)
+	var a := blade_axis.normalized()
+	var b := (flat_axis - a * flat_axis.dot(a)).normalized()
+	var src := Basis(a, b, a.cross(b))
+	var dst := Basis(blade, flat, blade.cross(flat))
+	if node.get_parent() != _attach[bone]:
+		if node.get_parent():
+			node.get_parent().remove_child(node)
+		_attach[bone].add_child(node)
+	if offset == Vector3.INF:
+		offset = hand_center(bone) + GRIP_NUDGE * Vector3(side, 1, 1)
+	else:
+		offset = Vector3(offset.x * side, offset.y, offset.z)
+	node.transform = Transform3D(dst * src.inverse(), offset)
+	_grips[node] = [bone, blade_axis, flat_axis, tilt_deg]
+
+
+## Ajuste fino del agarre (metros, en la mano derecha; la izquierda se refleja):
+## x hacia los dedos, y hacia el dorso, z hacia atrás (el pulgar está en −z).
+const GRIP_NUDGE := Vector3(0.0, 0.0, 0.0)
+
+var _grips := {}          # arma empuñada -> [hueso, ejes, inclinación] (para rehacerlo)
+var _hand_cache := {}
+
+
+## Centro del puño en el espacio del hueso de la mano: centro de la caja de los vértices
+## pesados a esa mano en el modelo actual. Si no se puede medir, la palma por defecto.
+func hand_center(bone: String) -> Vector3:
+	if _hand_cache.has(bone):
+		return _hand_cache[bone]
+	var side := -1.0 if bone.ends_with("_l") else 1.0
+	var fallback := Vector3(0.075 * side, -0.012, 0.0)
+	var res := fallback
+	if mesh_instance and mesh_instance.mesh and mesh_instance.skin:
+		var skin: Skin = mesh_instance.skin
+		var ids := {}
+		for i in skin.get_bind_count():
+			if String(skin.get_bind_name(i)) == bone:
+				ids[i] = true
+		var lo := Vector3(INF, INF, INF)
+		var hi := -lo
+		var n := 0
+		var bp := _bone_pos(bone)
+		for si in mesh_instance.mesh.get_surface_count():
+			var arr: Array = mesh_instance.mesh.surface_get_arrays(si)
+			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+			if arr[Mesh.ARRAY_BONES] == null or arr[Mesh.ARRAY_WEIGHTS] == null:
+				continue
+			var bones: PackedInt32Array = arr[Mesh.ARRAY_BONES]
+			var wts: PackedFloat32Array = arr[Mesh.ARRAY_WEIGHTS]
+			var per := bones.size() / maxi(verts.size(), 1)
+			if per < 1:
+				continue
+			for vi in verts.size():
+				var w := 0.0
+				for k in per:
+					if ids.has(bones[vi * per + k]):
+						w += wts[vi * per + k]
+				# Solo la mano (no la muñeca mezclada con el antebrazo)
+				if w > 0.6 and (verts[vi].x - bp.x) * side > -0.02:
+					lo = lo.min(verts[vi])
+					hi = hi.max(verts[vi])
+					n += 1
+		if n >= 8:
+			var c := (lo + hi) * 0.5 - bp
+			# Si el puño medido es absurdo (modelo raro), se queda la palma por defecto
+			if c.length() < 0.2:
+				res = c
+	_hand_cache[bone] = res
+	print("Rig: centro del puño %s = %s" % [bone, res])
+	return res
+
+
+## Tras cambiar de modelo (armadura), vuelve a centrar las armas en el puño.
+func _regrip() -> void:
+	_hand_cache.clear()
+	for node in _grips.keys():
+		if not is_instance_valid(node):
+			_grips.erase(node)
+			continue
+		var g: Array = _grips[node]
+		grip_weapon(node, g[0], g[1], g[2], g[3])
 
 
 ## Base global de un hueso en una pose dada (cinemática directa; los reposos no rotan).
@@ -506,6 +751,96 @@ const ROLL := {"thigh_l": Vector3(115, 0, 0), "thigh_r": Vector3(115, 0, 0), "sh
 const STAGGER := {"chest": Vector3(18, 0, 6), "head": Vector3(20, 0, 0), "spine": Vector3(8, 0, 0), "arm_l": Vector3(-20, 0, 50), "arm_r": Vector3(-20, 0, 50), "fore_l": Vector3(40, 0, 0), "fore_r": Vector3(40, 0, 0)}
 const SHOCK := {"arm_l": Vector3(0, 0, 25), "arm_r": Vector3(0, 0, 25), "fore_l": Vector3(30, 0, 0), "fore_r": Vector3(30, 0, 0), "head": Vector3(15, 0, 0), "chest": Vector3(10, 0, 0)}
 const GRABBED := {"arm_l": Vector3(150, 0, 20), "arm_r": Vector3(150, 0, 20), "fore_l": Vector3(60, 0, 0), "fore_r": Vector3(60, 0, 0), "thigh_l": Vector3(30, 0, 0), "shin_l": Vector3(-40, 0, 0), "thigh_r": Vector3(-10, 0, 0), "shin_r": Vector3(-30, 0, 0), "head": Vector3(10, 0, 0)}
+## Animaciones de cuerpo completo por cuadros clave (cinemáticas, derribos):
+##   st["cine"] = nombre, st["ck"] = avance 0..1.
+## Además de los huesos, cada cuadro puede llevar:
+##   "_hips": desplazamiento de la cadera (x lado, y altura, z adelante = negativo)
+##   "_piv":  Vector3(inclinación adelante/atrás °, ladeo °, altura del pivote en m)
+##            (el pivote de rodada: −90 = boca abajo; la altura negativa lo baja al suelo)
+## Una pose vacía es la postura normal (reposo con el arma lista).
+const _TENDIDO := {"chest": Vector3(4, 0, 6), "spine": Vector3(2, 0, 3), "neck": Vector3(4, 0, 0), "head": Vector3(14, 45, 0),
+	"arm_l": Vector3(150, 0, 28), "fore_l": Vector3(35, 0, 0), "hand_l": Vector3(0, 0, 10),
+	"arm_r": Vector3(10, 0, 82), "fore_r": Vector3(25, 0, 0),
+	"thigh_l": Vector3(35, 0, -8), "shin_l": Vector3(-55, 0, 0), "foot_l": Vector3(15, 0, 0),
+	"thigh_r": Vector3(-3, 0, 6), "shin_r": Vector3(-12, 0, 0), "foot_r": Vector3(25, 0, 0),
+	"_hips": Vector3.ZERO, "_piv": Vector3(-88, 12, -0.4)}
+const CINE := {
+	# Empujón por la espalda: se arquea, tropieza dos pasos, mete las manos y cae de frente
+	"caida": [[0.0, {}],
+		[0.1, {"chest": Vector3(16, 0, 0), "spine": Vector3(8, 0, 0), "neck": Vector3(4, 0, 0), "head": Vector3(10, 0, 0),
+			"arm_l": Vector3(-35, 0, 40), "arm_r": Vector3(-35, 0, 40), "fore_l": Vector3(25, 0, 0), "fore_r": Vector3(25, 0, 0),
+			"thigh_l": Vector3(-10, 0, 0), "_hips": Vector3(0, 0, -0.1), "_piv": Vector3(6, 0, 0)}],
+		[0.28, {"chest": Vector3(-18, 0, 0), "spine": Vector3(-10, 0, 0), "head": Vector3(12, 0, 0),
+			"arm_l": Vector3(55, 0, 40), "arm_r": Vector3(35, 0, 45), "fore_l": Vector3(30, 0, 0), "fore_r": Vector3(40, 0, 0),
+			"thigh_r": Vector3(50, 0, 0), "shin_r": Vector3(-25, 0, 0), "thigh_l": Vector3(-30, 0, 0), "shin_l": Vector3(-45, 0, 0), "foot_l": Vector3(20, 0, 0),
+			"_hips": Vector3(0, -0.05, 0), "_piv": Vector3(-14, 0, 0)}],
+		[0.44, {"chest": Vector3(-22, 0, 0), "spine": Vector3(-12, 0, 0), "head": Vector3(18, 0, 0),
+			"arm_l": Vector3(70, 0, 35), "arm_r": Vector3(80, 0, 30), "fore_l": Vector3(20, 0, 0), "fore_r": Vector3(20, 0, 0),
+			"thigh_l": Vector3(55, 0, 0), "shin_l": Vector3(-30, 0, 0), "thigh_r": Vector3(-18, 0, 0), "shin_r": Vector3(-75, 0, 0), "foot_r": Vector3(20, 0, 0),
+			"_hips": Vector3(0, -0.08, 0), "_piv": Vector3(-30, 0, 0)}],
+		[0.6, {"chest": Vector3(-10, 0, 0), "spine": Vector3(-6, 0, 0), "neck": Vector3(10, 0, 0), "head": Vector3(28, 0, 0),
+			"arm_l": Vector3(100, 0, 30), "arm_r": Vector3(100, 0, 30), "fore_l": Vector3(8, 0, 0), "fore_r": Vector3(8, 0, 0),
+			"thigh_l": Vector3(35, 0, 0), "shin_l": Vector3(-50, 0, 0), "thigh_r": Vector3(10, 0, 0), "shin_r": Vector3(-35, 0, 0),
+			"_hips": Vector3(0, -0.12, 0), "_piv": Vector3(-62, 0, -0.12)}],
+		[0.72, {"chest": Vector3(14, 0, 0), "head": Vector3(30, 0, 0),
+			"arm_l": Vector3(115, 0, 25), "arm_r": Vector3(115, 0, 25), "fore_l": Vector3(75, 0, 0), "fore_r": Vector3(75, 0, 0),
+			"thigh_l": Vector3(20, 0, 0), "shin_l": Vector3(-40, 0, 0), "thigh_r": Vector3(5, 0, 0), "shin_r": Vector3(-25, 0, 0),
+			"_hips": Vector3(0, -0.05, 0), "_piv": Vector3(-82, 0, -0.33)}],
+		[0.84, {"chest": Vector3(2, 0, 4), "head": Vector3(18, 25, 0),
+			"arm_l": Vector3(140, 0, 30), "fore_l": Vector3(60, 0, 0), "arm_r": Vector3(60, 0, 70), "fore_r": Vector3(50, 0, 0),
+			"thigh_l": Vector3(30, 0, -6), "shin_l": Vector3(-45, 0, 0), "thigh_r": Vector3(-4, 0, 5), "shin_r": Vector3(-15, 0, 0),
+			"_hips": Vector3.ZERO, "_piv": Vector3(-91, 6, -0.42)}],
+		[1.0, _TENDIDO]],
+	# Tendido boca abajo (respira; ver "_tendido_respira" en animate)
+	"tendido": [[0.0, _TENDIDO], [1.0, _TENDIDO]],
+	# Se levanta: brazos, cuatro puntos, una rodilla, se impulsa y se sacude el pecho
+	"levantarse": [[0.0, _TENDIDO],
+		[0.15, {"chest": Vector3(20, 0, 0), "spine": Vector3(10, 0, 0), "head": Vector3(20, 0, 0),
+			"arm_l": Vector3(80, 0, 62), "fore_l": Vector3(30, 0, 0), "arm_r": Vector3(80, 0, 62), "fore_r": Vector3(30, 0, 0),
+			"thigh_l": Vector3(20, 0, 0), "shin_l": Vector3(-40, 0, 0), "thigh_r": Vector3(5, 0, 0), "shin_r": Vector3(-20, 0, 0),
+			"_hips": Vector3.ZERO, "_piv": Vector3(-80, 0, -0.37)}],
+		[0.3, {"chest": Vector3(24, 0, 0), "spine": Vector3(12, 0, 0), "head": Vector3(16, 0, 0),
+			"arm_l": Vector3(82, 0, 70), "fore_l": Vector3(4, 0, 0), "arm_r": Vector3(82, 0, 70), "fore_r": Vector3(4, 0, 0),
+			"thigh_l": Vector3(25, 0, 0), "shin_l": Vector3(-50, 0, 0), "thigh_r": Vector3(10, 0, 0), "shin_r": Vector3(-30, 0, 0),
+			"_hips": Vector3.ZERO, "_piv": Vector3(-62, 0, -0.3)}],
+		[0.46, {"chest": Vector3(6, 0, 0), "head": Vector3(10, 0, 0),
+			"arm_l": Vector3(78, 0, 72), "fore_l": Vector3(6, 0, 0), "arm_r": Vector3(78, 0, 72), "fore_r": Vector3(6, 0, 0),
+			"thigh_l": Vector3(95, 0, 0), "shin_l": Vector3(-115, 0, 0), "thigh_r": Vector3(95, 0, 0), "shin_r": Vector3(-115, 0, 0),
+			"_hips": Vector3(0, -0.05, 0), "_piv": Vector3(-55, 0, -0.32)}],
+		[0.62, {"chest": Vector3(-14, 0, 0), "spine": Vector3(-8, 0, 0), "head": Vector3(-4, 0, 0),
+			"thigh_r": Vector3(95, 0, 0), "shin_r": Vector3(-95, 0, 0), "foot_r": Vector3(5, 0, 0),
+			"thigh_l": Vector3(-5, 0, 0), "shin_l": Vector3(-100, 0, 0), "foot_l": Vector3(40, 0, 0),
+			"arm_r": Vector3(55, 0, 72), "fore_r": Vector3(45, 0, 0), "arm_l": Vector3(25, 0, 75), "fore_l": Vector3(30, 0, 0),
+			"_hips": Vector3(0, -0.43, 0.05), "_piv": Vector3(-8, 0, 0)}],
+		[0.8, {"chest": Vector3(-20, 0, 0), "spine": Vector3(-10, 0, 0), "head": Vector3(-2, 0, 0),
+			"thigh_r": Vector3(55, 0, 0), "shin_r": Vector3(-60, 0, 0), "thigh_l": Vector3(5, 0, 0), "shin_l": Vector3(-45, 0, 0), "foot_l": Vector3(15, 0, 0),
+			"arm_r": Vector3(40, 0, 74), "fore_r": Vector3(30, 0, 0), "arm_l": Vector3(20, 0, 76), "fore_l": Vector3(20, 0, 0),
+			"_hips": Vector3(0, -0.18, 0), "_piv": Vector3(-4, 0, 0)}],
+		[0.9, {"chest": Vector3(-6, 10, 0), "head": Vector3(12, 10, 0),
+			"arm_l": Vector3(50, 30, 50), "fore_l": Vector3(120, 0, 0), "arm_r": Vector3(20, 0, 75), "fore_r": Vector3(20, 0, 0),
+			"_hips": Vector3(0, -0.02, 0), "_piv": Vector3.ZERO}],
+		[1.0, {}]],
+}
+
+
+## Pose de una animación de CINE en el avance k (0..1), mezclada sobre `base`.
+static func cine_pose(seq: Array, k: float, base: Dictionary) -> Dictionary:
+	k = clampf(k, 0.0, 1.0)
+	var i := 0
+	while i < seq.size() - 2 and k > float(seq[i + 1][0]):
+		i += 1
+	var t0: float = seq[i][0]
+	var t1: float = seq[i + 1][0]
+	var f := smoothstep(0.0, 1.0, clampf((k - t0) / maxf(t1 - t0, 0.0001), 0.0, 1.0))
+	var a := _merge(base.duplicate(), seq[i][1])
+	var b := _merge(base.duplicate(), seq[i + 1][1])
+	for d in [a, b]:
+		if not d.has("_hips"):
+			d["_hips"] = Vector3.ZERO
+		if not d.has("_piv"):
+			d["_piv"] = Vector3.ZERO
+	return _lerp_pose(a, b, f)
+
 const DEAD := {"arm_l": Vector3(-20, 0, 15), "arm_r": Vector3(-30, 0, 20), "fore_l": Vector3(20, 0, 0), "fore_r": Vector3(10, 0, 0), "head": Vector3(15, 30, 0), "thigh_l": Vector3(10, 0, -8), "thigh_r": Vector3(-5, 0, 6), "shin_l": Vector3(-20, 0, 0)}
 
 
@@ -567,7 +902,25 @@ func animate(delta: float, st: Dictionary) -> void:
 	# --- Cuerpo completo
 	var roll: float = st.get("roll", -1.0)
 	var rot_x := 0.0
+	var rot_z := 0.0
 	var lift := 0.0
+	# Animación de cuerpo completo (caída, levantarse…): manda sobre todo lo demás
+	var cine: String = st.get("cine", "")
+	if CINE.has(cine):
+		var cp := cine_pose(CINE[cine], float(st.get("ck", 0.0)), target)
+		hips_off = cp["_hips"]
+		var piv: Vector3 = cp["_piv"]
+		cp.erase("_hips")
+		cp.erase("_piv")
+		target = cp
+		hips_y = 0.0
+		rot_x = deg_to_rad(piv.x)
+		rot_z = deg_to_rad(piv.y)
+		lift = piv.z
+		if cine == "tendido":   # respira tirado en el suelo
+			_add(target, "chest", Vector3(sin(_t * 2.2) * 2.5, 0, 0))
+			_add(target, "head", Vector3(0, 0, sin(_t * 1.1) * 2.0))
+		roll = -1.0
 	if roll >= 0.0:
 		var tuck := sin(clampf(roll, 0.0, 1.0) * PI)
 		target = _lerp_pose(target, ROLL, clampf(tuck * 1.6, 0.0, 1.0))
@@ -588,7 +941,7 @@ func animate(delta: float, st: Dictionary) -> void:
 		target = _merge(_merge({}, RELAX), DEAD)
 	# --- Aplicar (más rápido en acciones)
 	# Los ataques ya vienen animados por cuadros clave: se siguen casi sin retraso
-	var rate := 60.0 if ATTACKS.has(act) else (26.0 if act != "" or roll >= 0.0 else 14.0)
+	var rate := 60.0 if ATTACKS.has(act) else (30.0 if CINE.has(cine) else (26.0 if act != "" or roll >= 0.0 else 14.0))
 	var f := 1.0 - exp(-rate * delta)
 	for b in BONES:
 		var n: String = b[0]
@@ -599,9 +952,10 @@ func animate(delta: float, st: Dictionary) -> void:
 		var e: Vector3 = conv[n]
 		skeleton.set_bone_pose_rotation(_idx[n], Quaternion(Basis.from_euler(Vector3(deg_to_rad(e.x), deg_to_rad(e.y), deg_to_rad(e.z)))))
 	_hips_y = lerpf(_hips_y, hips_y, 1.0 - exp(-14.0 * delta))
-	_hips_off = _hips_off.lerp(hips_off, 1.0 - exp(-(40.0 if ATTACKS.has(act) else 10.0) * delta))
+	_hips_off = _hips_off.lerp(hips_off, 1.0 - exp(-(40.0 if ATTACKS.has(act) or CINE.has(cine) else 10.0) * delta))
 	skeleton.set_bone_pose_position(_idx["hips"], Vector3(_hips_off.x, 0.92 + _hips_y + _hips_off.y, _hips_off.z))
 	roll_pivot.rotation.x = rot_x
+	roll_pivot.rotation.z = rot_z
 	# Al rodar el centro de giro sube un poco para no atravesar el suelo
 	roll_pivot.position.y = 0.55 + lift
 	skeleton.position.y = -0.55

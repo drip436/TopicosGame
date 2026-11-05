@@ -949,6 +949,20 @@ func _mount_right(rig: Node) -> void:
 	var ready: Dictionary = rig.READY
 	right_pivot.rotation = Vector3.ZERO
 	right_pivot.position = Vector3.ZERO
+	# Agarre real: el mango atraviesa el puño y la hoja sale por el lado del pulgar
+	# (player_rig.grip_weapon). Antes la hoja seguía la línea del antebrazo y el arma
+	# parecía flotar delante de la mano.
+	if rig.has_method("grip_weapon"):
+		match weapon_kind:
+			"estoque":
+				rig.grip_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 1, 0), 62.0)
+			"lanza":
+				rig.grip_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, 1, 0), 55.0)
+			"mazo":
+				rig.grip_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), Vector3(0, 0, 1), 25.0)
+			_:
+				rig.grip_weapon(right_pivot, "hand_r", Vector3(0, 1, 0), Vector3(0, 0, 1), 32.0)
+		return
 	match weapon_kind:
 		"estoque":
 			rig.attach_weapon(right_pivot, "hand_r", Vector3(0, 0, -1), Vector3(0, -0.15, -1), ready, Vector3(0.075, 0, 0))

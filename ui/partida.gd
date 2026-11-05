@@ -12,11 +12,15 @@ signal guardada
 signal creditos_cambiados(total: int, ganados: int)
 ## Se compró o se equipó algo.
 signal inventario_cambiado
+## aplicar() terminó (o no había nada que restaurar). La espera la pantalla de carga.
+signal restaurada
 
 const RUTA := "user://partida.json"
 const MAIN := "res://Scenes/main.tscn"
 const CLASSES := preload("res://jugador/player_classes.gd")
 const EQUIPO := preload("res://jugador/equipo.gd")
+const CARGA := preload("res://ui/pantalla_carga.gd")
+const NOTIF := preload("res://ui/notificaciones.gd")
 
 ## Peleas de jefe: nodo -> id del jefe (el mismo que usa CampusWorld) y pieza de llave.
 const PELEAS := {
@@ -44,6 +48,8 @@ var hechizos: Array = []
 var arma := ""
 var armadura := ""
 var _clase_inv := ""
+## Botín recogido: ids de lugares de mundo/botin.gd (cofres abiertos y armas levantadas).
+var botin: Array = []
 
 
 func _ready() -> void:
@@ -105,6 +111,7 @@ func reiniciar_inventario(clase: String) -> void:
 	hechizos = EQUIPO.STARTER_SPELLS.duplicate() if clase == "frontend" else []
 	arma = w
 	armadura = ""
+	botin = []
 	creditos_cambiados.emit(creditos, 0)
 	inventario_cambiado.emit()
 
@@ -147,6 +154,10 @@ func comprar(tipo: String, id: String) -> String:
 	lista.append(id)
 	creditos_cambiados.emit(creditos, -precio)
 	inventario_cambiado.emit()
+	if tipo == "arma":
+		NOTIF.arma(get_tree(), id)
+	elif tipo == "armadura":
+		NOTIF.armadura(get_tree(), id)
 	return ""
 
 
@@ -187,7 +198,8 @@ func nueva(clase: String) -> void:
 	tiempo = 0.0
 	reiniciar_inventario(clase)
 	CLASSES.selected = clase
-	get_tree().change_scene_to_file(MAIN)
+	get_tree().paused = false
+	CARGA.ir(get_tree(), MAIN, "nueva")
 
 
 ## Continuar: carga la escena del juego con la clase guardada y luego restaura.
@@ -199,7 +211,7 @@ func continuar() -> bool:
 	tiempo = float(_datos.get("tiempo", 0.0))
 	pendiente = true
 	get_tree().paused = false
-	get_tree().change_scene_to_file(MAIN)
+	CARGA.ir(get_tree(), MAIN, "continuar")
 	return true
 
 
@@ -241,6 +253,7 @@ func guardar(vida: Node) -> void:
 		"armaduras_inv": armaduras,
 		"hechizos": hechizos,
 		"arma": arma,
+		"botin": botin,
 		"tiempo": tiempo,
 		"fecha": Time.get_datetime_string_from_system(false, true),
 	}
@@ -253,10 +266,12 @@ func guardar(vida: Node) -> void:
 ## La llama VidaDelCampus al terminar de armar el mundo. Restaura si se entró con Continuar.
 func aplicar(vida: Node) -> void:
 	if not pendiente:
+		restaurada.emit()
 		return
 	pendiente = false
 	var d := _datos if not _datos.is_empty() else leer()
 	if d.is_empty():
+		restaurada.emit()
 		return
 	var scene := get_tree().current_scene
 	var player = vida.get("player")
@@ -271,6 +286,16 @@ func aplicar(vida: Node) -> void:
 		if listo:
 			break
 		await get_tree().physics_frame
+	# Inventario: armas, armaduras, hechizos, créditos y botín recogido. (El jugador lo
+	# reinicia al aparecer con asegurar_inventario(); aquí se recupera lo guardado.)
+	_clase_inv = String(d.get("clase", _clase_inv))
+	creditos = int(d.get("creditos", creditos))
+	armas = (d.get("armas", armas) as Array).duplicate()
+	armaduras = (d.get("armaduras_inv", armaduras) as Array).duplicate()
+	hechizos = (d.get("hechizos", hechizos) as Array).duplicate()
+	botin = (d.get("botin", []) as Array).duplicate()
+	arma = String(d.get("arma", arma))
+	armadura = String(d.get("armadura", armadura))
 	var jefes: Array = d.get("jefes", [])
 	var llaves: Array = d.get("llaves", [])
 	# Jefes vencidos
@@ -310,5 +335,10 @@ func aplicar(vida: Node) -> void:
 		var arm := String(d.get("armadura", ""))
 		if kit and arm != "":
 			kit.set_resist_armor(arm)
+		if kit and kit.has_method("equip_weapon") and String(kit.get("weapon_id")) != arma:
+			kit.equip_weapon(arma)
+	creditos_cambiados.emit(creditos, 0)
+	inventario_cambiado.emit()
 	if hud and hud.has_method("toast"):
 		hud.toast("Partida cargada  ·  %s" % String(d.get("hoguera", "")), 4.0)
+	restaurada.emit()

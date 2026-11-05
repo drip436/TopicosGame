@@ -38,6 +38,48 @@ const WEAPONS := {
 		"status": "veneno", "desc": "Su hoja existe en dos lugares a la vez. Estocadas que envenenan."},
 	"espada_cortafuegos": {"name": "Espada Cortafuegos", "kind": "espada", "model": "espada_cortafuegos", "damage": 1.35, "speed": 1.0, "price": 1700,
 		"status": "quemadura", "desc": "Espada ancha al rojo vivo. Cada golpe incendia."},
+
+	# Botín: no se venden (price 0). Están en cofres o tiradas por el campus (mundo/botin.gd).
+	# ---- Especiales
+	"sable_ethernet": {"name": "Sable Ethernet", "kind": "espada", "model": "sable_ethernet", "damage": 1.3, "speed": 1.15, "price": 0,
+		"rarity": "especial", "status": "electrocutado",
+		"desc": "Sable curvo con guarda de conector RJ45. Cada corte manda un paquete eléctrico."},
+	"mazo_disco_duro": {"name": "Martillo de Disco Duro", "kind": "mazo", "model": "mazo_disco_duro", "damage": 1.5, "speed": 0.95, "price": 0,
+		"rarity": "especial",
+		"desc": "Un disco de 3.5\" de los de antes montado en un mango de acero. Sus platos todavía giran."},
+	"lanza_antena": {"name": "Lanza Antena 5G", "kind": "lanza", "model": "lanza_antena", "damage": 1.35, "speed": 1.05, "price": 0,
+		"rarity": "especial", "status": "electrocutado",
+		"desc": "Antena de telecomunicaciones afilada. Tiene cobertura completa… de dolor."},
+	# ---- Épicas
+	"estoque_compilador": {"name": "Estoque del Compilador", "kind": "estoque", "model": "estoque_compilador", "damage": 1.5, "speed": 1.3, "price": 0,
+		"rarity": "epica", "status": "veneno",
+		"desc": "Su guarda forma un < > y la hoja brilla con runas de código. Compila heridas que no cierran."},
+	"guadana_kernel": {"name": "Guadaña del Kernel Panic", "kind": "mazo", "model": "guadana_kernel", "damage": 1.75, "speed": 0.95, "price": 0,
+		"rarity": "epica", "status": "quemadura",
+		"desc": "Cuando el sistema colapsa, ella cosecha. Barridos amplios que dejan todo en llamas."},
+	"espada_neon": {"name": "Espada de Neón Overclock", "kind": "espada", "model": "espada_neon", "damage": 1.6, "speed": 1.2, "price": 0,
+		"rarity": "epica", "status": "quemadura",
+		"desc": "Hoja oscura con filos de neón llevados al límite. Rápida, brillante y peligrosamente caliente."},
+	# ---- Legendarias
+	"excalibyte": {"name": "Excalibyte", "kind": "espada", "model": "excalibyte", "damage": 2.0, "speed": 1.15, "price": 0,
+		"rarity": "legendaria", "status": "electrocutado",
+		"desc": "La espada del primer servidor del campus. Solo quien llega al Memorial la puede sacar."},
+	"martillo_singularidad": {"name": "Martillo de la Singularidad", "kind": "mazo", "model": "martillo_singularidad", "damage": 2.3, "speed": 0.9, "price": 0,
+		"rarity": "legendaria", "status": "electrocutado",
+		"desc": "Un agujero negro contenido en anillos de oro. Cada golpe dobla el espacio a su alrededor."},
+	"lanza_tesis": {"name": "Lanza de la Tesis Doctoral", "kind": "lanza", "model": "lanza_tesis", "damage": 1.95, "speed": 1.1, "price": 0,
+		"rarity": "legendaria", "status": "quemadura",
+		"desc": "Siete años de investigación forjados en una punta ardiente. Alcance enorme, como la bibliografía."},
+	"estoque_root": {"name": "Estoque de Acceso Root", "kind": "estoque", "model": "estoque_root", "damage": 1.9, "speed": 1.4, "price": 0,
+		"rarity": "legendaria", "status": "veneno",
+		"desc": "Hoja negra con la terminal encendida. Tiene permisos sobre cualquier armadura."},
+}
+
+## Rarezas del botín: nombre, color (nombre en menús, haz de luz, cofre) y orden.
+const RAREZAS := {
+	"especial": {"name": "Especial", "color": Color(0.35, 0.68, 1.0), "rank": 1},
+	"epica": {"name": "Épica", "color": Color(0.75, 0.4, 1.0), "rank": 2},
+	"legendaria": {"name": "Legendaria", "color": Color(1.0, 0.76, 0.28), "rank": 3},
 }
 
 ## Arma inicial de cada clase ("" = el AI Dev pelea con sus IAs).
@@ -90,6 +132,16 @@ static func weapon(id: String) -> Dictionary:
 
 static func armor(id: String) -> Dictionary:
 	return ARMORS.get(id, {})
+
+
+## Rareza de un arma ({} si es común: las iniciales y las del mercader).
+static func rarity(id: String) -> Dictionary:
+	return RAREZAS.get(String(WEAPONS.get(id, {}).get("rarity", "")), {})
+
+
+## Para ordenar: legendaria 3, épica 2, especial 1, común 0.
+static func rarity_rank(id: String) -> int:
+	return int(rarity(id).get("rank", 0))
 
 
 static func status_text(effect: String) -> String:

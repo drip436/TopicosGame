@@ -84,6 +84,9 @@ var _mmc := {}
 var _units := {}
 var _paths: Array = []
 var _blocked: Array = []
+## Fuentes del campus: [centro (Vector3), radio]. Las usa mundo/botin.gd para no dejar
+## cofres ni armas dentro del agua.
+var fountains: Array = []
 
 var m_path: ShaderMaterial
 var m_marble: ShaderMaterial
@@ -3126,6 +3129,7 @@ func _fountain_plaza(zone: Node3D, c: Vector3, r: float) -> void:
 
 ## Fuente con tazón central. `jets` = todavía sale agua.
 func _fountain(zone: Node3D, c: Vector3, r: float, jets: bool) -> void:
+	fountains.append([c, r])
 	var n := 28
 	for i in n:
 		var a := TAU * i / n

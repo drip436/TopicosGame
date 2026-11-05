@@ -67,8 +67,12 @@ func _refrescar() -> void:
 	for c in _lista.get_children():
 		c.queue_free()
 	if _pestana == "armas":
-		var ids: Array = EQUIPO.WEAPONS.keys() if modo == "tienda" else p.armas
+		var ids: Array = EQUIPO.WEAPONS.keys() if modo == "tienda" else (p.armas as Array).duplicate()
+		# Lo mejor arriba: legendarias, épicas, especiales y luego las comunes
+		ids.sort_custom(func(a, b): return EQUIPO.rarity_rank(a) > EQUIPO.rarity_rank(b))
 		for id in ids:
+			if not EQUIPO.WEAPONS.has(id):
+				continue
 			var w: Dictionary = EQUIPO.WEAPONS[id]
 			if modo == "tienda" and int(w["price"]) <= 0:
 				continue
@@ -77,6 +81,15 @@ func _refrescar() -> void:
 			_tarjeta_simple("arma", "", "Sin arma (pelean tus IAs)", "El clic izquierdo vuelve a ordenar ataques a tu IA.", String(p.arma) == "")
 		if ids.is_empty():
 			_lista.add_child(E.etiqueta("No tienes armas. El mercader vende varias.", 17, E.TEXTO_TENUE))
+		if modo == "equipo":
+			var faltan := 0
+			for wid in EQUIPO.WEAPONS.keys():
+				if EQUIPO.rarity_rank(wid) > 0 and not (p.armas as Array).has(wid):
+					faltan += 1
+			if faltan > 0:
+				var pista := E.etiqueta("Quedan %d armas especiales, épicas o legendarias escondidas en el campus: busca cofres y haces de luz." % faltan, 15, E.TEXTO_TENUE, 500)
+				pista.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				_lista.add_child(pista)
 	elif _pestana == "hechizos":
 		var mago := player != null and String(player.get("class_id")) == "frontend"
 		if not mago:
@@ -105,6 +118,11 @@ func _refrescar() -> void:
 
 func _tarjeta(tipo: String, id: String, d: Dictionary, tiene: bool, puesto: bool) -> void:
 	var pc := E.panel(0.75)
+	var rz: Dictionary = EQUIPO.RAREZAS.get(String(d.get("rarity", "")), {}) if tipo == "arma" else {}
+	if not rz.is_empty():
+		# Borde y brillo del color de la rareza
+		var col: Color = rz["color"]
+		pc.add_theme_stylebox_override("panel", E.caja(0.75, 2, 12, Color(col.r, col.g, col.b, 0.85)))
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 16)
 	pc.add_child(h)
@@ -112,7 +130,10 @@ func _tarjeta(tipo: String, id: String, d: Dictionary, tiene: bool, puesto: bool
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 4)
 	h.add_child(v)
-	var nombre := E.etiqueta(String(d["name"]).to_upper(), 20, ORO if puesto else E.TEXTO, 700)
+	if not rz.is_empty():
+		v.add_child(E.etiqueta("◆ " + String(rz["name"]).to_upper(), 13, rz["color"], 800))
+	var color_nombre: Color = ORO if puesto else (rz["color"] if not rz.is_empty() else E.TEXTO)
+	var nombre := E.etiqueta(String(d["name"]).to_upper(), 20, color_nombre, 700)
 	v.add_child(nombre)
 	var st := E.etiqueta(_stats(tipo, d), 15, E.NEON, 600)
 	st.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
