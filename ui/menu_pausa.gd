@@ -58,7 +58,7 @@ func _ready() -> void:
 	var sep := Control.new()
 	sep.custom_minimum_size = Vector2(0, 12)
 	col.add_child(sep)
-	for b in [["continuar", "Continuar"], ["estado", "Estado del personaje"], ["equipo", "Equipo"], ["controles", "Controles"], ["ajustes", "Ajustes"],
+	for b in [["continuar", "Continuar"], ["estado", "Estado del personaje"], ["equipo", "Equipo"], ["controles", "Controles"], ["ajustes", "Ajustes"], ["rendimiento", "Rendimiento"],
 			["hoguera", "Volver a la hoguera"], ["menu", "Menú principal"], ["salir", "Salir del juego"]]:
 		var btn := E.boton(b[1], 20, 330, 50)
 		btn.pressed.connect(_on_boton.bind(b[0]))
@@ -133,7 +133,7 @@ func _on_boton(id: String) -> void:
 	match id:
 		"continuar":
 			cerrar()
-		"estado", "equipo", "controles", "ajustes":
+		"estado", "equipo", "controles", "ajustes", "rendimiento":
 			_mostrar(id)
 		"hoguera":
 			E.confirmar(_raiz, "¿Volver a la última hoguera?\nÚsalo si te quedaste atorado. Los enemigos reaparecen.", _volver_hoguera)
@@ -168,6 +168,9 @@ func _mostrar(seccion: String) -> void:
 		"ajustes":
 			v.add_child(E.titulo("AJUSTES", 30))
 			v.add_child(AJUSTES.new())
+		"rendimiento":
+			v.add_child(E.titulo("RENDIMIENTO", 30))
+			v.add_child(preload("res://ui/rendimiento.gd").panel(get_tree()))
 
 
 func _fila(v: VBoxContainer, a: String, b: String, color := E.TEXTO) -> void:
@@ -225,7 +228,7 @@ func _estado(v: VBoxContainer) -> void:
 		piezas = (world.get("key_pieces") as Dictionary).size()
 	_fila(v, "Piezas de la llave del Aula Magna", "%d / 4" % piezas, E.ORO)
 	var jefes: Array = []
-	var nombres := {"BossFight": "Catedrático de Hierro", "LibraryFight": "Bibliófilo Demente", "ComputeFight": "ADA-7", "LabFight": "Dr. Kessler", "FinalFight": "Rector Eterno"}
+	var nombres := {"BossFight": "Catedrático de Hierro", "LibraryFight": "Bibliófilo Demente", "ComputeFight": "ADA-7", "LabFight": "Paciente Cero", "FinalFight": "Rector Eterno"}
 	for f in nombres.keys():
 		var n := get_tree().current_scene.find_child(f, true, false) if get_tree().current_scene else null
 		if n and String(n.get("_state")) in ["won", "thesis", "ending"]:

@@ -1542,6 +1542,13 @@ func _suppress_node(n: Node) -> void:
 		return
 	if _bf and (n == _bf or _bf.is_ancestor_of(n)):
 		return   # BossFight oculta y muestra su propio HUD
+	# La pantalla de carga y las notificaciones viven en /root y no son HUD del juego:
+	# si se ocultaran, la barra de carga desaparecería a medias al empezar partida nueva
+	var top: Node = n
+	while top.get_parent() and top.get_parent() != get_tree().root:
+		top = top.get_parent()
+	if String(top.name) in ["PantallaCarga", "Notificaciones"]:
+		return
 	if (n is CanvasLayer or n is Control) and not n.find_children("*", "SubViewport", true, false).is_empty():
 		return   # capas que dibujan el mundo (no son HUD)
 	if hide_hud and not _hud_released and not _hidden_ui.has(n):

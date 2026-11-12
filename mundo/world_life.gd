@@ -85,7 +85,9 @@ const ENEMY_ZONES := [
 	[Vector2(78, -352), 20.0, "Asaderos"],
 	[Vector2(215, -300), 18.0, "Patio del Laboratorio"],
 	# Sector norte (Aula Magna)
-	[Vector2(0, -205), 24.0, "Explanada de los Fundadores"],
+	# (La Explanada de los Fundadores es el Hub: zona segura. Sus enemigos se mudaron
+	# a la Avenida del Aula Magna, del otro lado del acceso norte.)
+	[Vector2(0, -250), 16.0, "Avenida del Aula Magna"],
 	[Vector2(-74, -350), 22.0, "Jardín de las Esculturas"],
 	[Vector2(-62, -385), 16.0, "Memorial"],
 	[Vector2(-148, -404), 20.0, "Área de Descanso"],
@@ -101,7 +103,7 @@ const MECH_ZONES := [
 	[Vector2(-212, -198), 18.0, "Facultad de Derecho"],
 	[Vector2(-150, -185), 18.0, "Filosofía y Letras"],
 	[Vector2(80, -150), 22.0, "Estacionamiento Norte"],
-	[Vector2(0, -205), 20.0, "Explanada de los Fundadores"],
+	[Vector2(0, -252), 12.0, "Avenida del Aula Magna"],
 ]
 
 ## Tazas de café: punto aproximado (se busca un lugar libre cerca).
@@ -136,6 +138,8 @@ var _pieces: Array = []
 var cups_taken: Array = []
 var _armor_nodes: Array = []
 var armors_found: Array = []
+## Atajos al Hub ya abiertos (ids de CampusWorld.SHORTCUTS): se guardan con la partida.
+var shortcuts_open: Array = []
 var _menu_open := false
 var _menu_bonfire: Node3D
 var _enemy_root: Node3D
@@ -185,6 +189,7 @@ func _setup() -> void:
 		_make_enemy_records()
 		if shop_pos != Vector3.INF:
 			_records = _records.filter(func(r): return (r["pos"] as Vector3).distance_to(shop_pos) > SHOP_SAFE)
+		_records = _records.filter(func(r): return _hub_dist(r["pos"]) > HUB_SAFE)
 	_ready_done = true
 	print("VidaDelCampus: %d hogueras, %d tazas, %d enemigos" % [bonfires.size(), _cups.size(), _records.size()])
 	# Partida guardada (Continuar en el menú principal)
@@ -202,21 +207,19 @@ func _make_loot() -> void:
 	add_child(b)
 
 
-## Tiendita del mercader (mundo/mercader.gd) en el patio de la Facultad de Ingeniería:
+## Tiendita del mercader (mundo/mercader.gd) en el Hub (Explanada de los Fundadores):
 ## puesto con toldo, mostrador, armas en exhibición, cajas y un letrero. Es zona segura
 ## (no aparecen enemigos a menos de SHOP_SAFE metros).
-const SHOP_SPOT := Vector3(-225.0, 0.0, 7.0)
+const SHOP_SPOT := Vector3(-14.0, 0.0, -207.0)
 const SHOP_SAFE := 16.0
+## Hub: santuario sin enemigos. Ninguno aparece dentro de HUB_SAFE metros del centro y
+## el que entre persiguiéndote se desvanece y vuelve a su puesto.
+const HUB_SAFE := 30.0
 var shop_pos := Vector3.INF
 
 
 func _make_merchant() -> void:
 	var c := SHOP_SPOT
-	if world and world.has_method("get_prefabs_of_kind"):
-		for f in world.get_prefabs_of_kind("FACULTAD"):
-			if String(f.get("title")).to_upper().contains("INGENIER"):
-				var fn := f as Node3D
-				c = fn.global_position + fn.global_basis * Vector3(7.0, 0, 5.0)
 	var p := _free_near(c, 6.0, 2.2)
 	if p == Vector3.INF:
 		p = c
@@ -226,8 +229,8 @@ func _make_merchant() -> void:
 	shop.name = "Tiendita"
 	shop.position = p
 	add_child(shop)
-	# El puesto mira hacia el centro del patio
-	var to := (c - Vector3(7.0, 0, 5.0)) - p
+	# El puesto mira hacia el árbol de los Fundadores (centro del Hub)
+	var to := WORLD.HUB - p
 	to.y = 0.0
 	if to.length() < 0.5:
 		to = Vector3(0, 0, 1)
@@ -335,6 +338,10 @@ func _sector(p: Vector3) -> String:
 	return "norte"
 
 
+func _hub_dist(p: Vector3) -> float:
+	return Vector2(p.x - WORLD.HUB.x, p.z - WORLD.HUB.z).length()
+
+
 func _in_lake(p: Vector3, margin: float) -> bool:
 	for lk in _lakes:
 		var n: Node3D = lk["node"]
@@ -405,6 +412,7 @@ func _make_bonfires() -> void:
 		[WORLD.COMP + Vector3(6, 0, 30), "Hoguera del Centro de Cómputo"],
 		[WORLD.LAB + Vector3(6, 0, 34), "Hoguera del Laboratorio"],
 		[WORLD.FINAL + Vector3(7, 0, 55), "Hoguera del Aula Magna"],
+		[WORLD.HUB + Vector3(0, 0, 10), "Hoguera de los Fundadores"],
 	]
 	if world and world.has_method("get_prefabs_of_kind"):
 		for f in world.get_prefabs_of_kind("FUENTE"):
@@ -534,6 +542,17 @@ func _make_enemy_records() -> void:
 		var p := _sample(c, float(z[1]), 2.2, _sector(c), [])
 		if p != Vector3.INF:
 			_add_record("mecha", p, float(z[1]), z[2])
+	# Guardianes del botín (escondites de CampusWorld): un enemigo pesado junto al cofre
+	if world and world.get("loot_sites") is Dictionary:
+		var sites: Dictionary = world.get("loot_sites")
+		for id in sites.keys():
+			var t := String(sites[id].get("guardia", ""))
+			if t == "":
+				continue
+			var gp: Vector3 = sites[id].get("guardia_pos", sites[id]["pos"])
+			var g := _free_near(gp, 7.0, _clearance(t))
+			if g != Vector3.INF:
+				_add_record(t, g, 4.0, "Guardián del botín")
 	# Dentro de los edificios de conexión
 	if world and world.has_method("get_connector_halls"):
 		for h in world.get_connector_halls():
@@ -716,6 +735,11 @@ func restore_state(d: Dictionary) -> void:
 	for id in d.get("armaduras", []):
 		if not armors_found.has(id):
 			armors_found.append(id)
+	for id in d.get("atajos", []):
+		if not shortcuts_open.has(id):
+			shortcuts_open.append(String(id))
+		if world and world.has_method("open_shortcut"):
+			world.open_shortcut(String(id), false)
 	for n in _armor_nodes:
 		if is_instance_valid(n) and armors_found.has(String(n.get_meta("armor_id"))):
 			n.queue_free()
@@ -865,7 +889,15 @@ func _physics_process(delta: float) -> void:
 		if not rec["alive"]:
 			continue
 		var d := pp.distance_to(rec["pos"])
-		if node == null and d < spawn_distance:
+		# Santuario: el enemigo que entra al Hub se desvanece y vuelve a su puesto
+		if node != null and _hub_dist((node as Node3D).global_position) < float(WORLD.HUB_WALL_R) + 1.0:
+			LFX.puff(self, (node as Node3D).global_position + Vector3(0, 1.0, 0), Color(2.4, 1.8, 0.8, 1), 30, 0.2, 3.0, -1.0)
+			node.queue_free()
+			rec["node"] = null
+			continue
+		# Con el jugador dentro del Hub no reaparecen los enemigos cercanos (no harían
+		# más que entrar y desvanecerse otra vez)
+		if node == null and d < spawn_distance and (d > 45.0 or _hub_dist(pp) > float(WORLD.HUB_WALL_R)):
 			_spawn(rec)
 		elif node != null and d > despawn_distance and (node as Node3D).global_position.distance_to(pp) > despawn_distance:
 			node.queue_free()
@@ -910,12 +942,53 @@ func _nearest_bonfire(max_d: float) -> Node:
 	return best
 
 
+# ======================================================================
+#  Atajos al Hub (rejas de un solo sentido de CampusWorld)
+# ======================================================================
+
+## El atajo cerrado más cercano (a menos de 3.4 m de la reja) o {}.
+func _nearest_shortcut() -> Dictionary:
+	if world == null or not (world.get("shortcuts") is Array):
+		return {}
+	var pp := player.global_position
+	for sc in world.get("shortcuts"):
+		if sc["open"]:
+			continue
+		var gp: Vector3 = sc["pos"]
+		if Vector2(pp.x - gp.x, pp.z - gp.z).length() < 3.4 and absf(pp.y - gp.y) < 2.5:
+			return sc
+	return {}
+
+
+func _shortcut_side_ok(sc: Dictionary) -> bool:
+	return (player.global_position - (sc["pos"] as Vector3)).dot(sc["side"]) > 0.0
+
+
+func _try_shortcut() -> void:
+	var sc := _nearest_shortcut()
+	if sc.is_empty():
+		return
+	if not _shortcut_side_ok(sc):
+		if hud and hud.has_method("toast"):
+			hud.toast("Está cerrada por el otro lado.", 2.5)
+		return
+	world.open_shortcut(String(sc["id"]))
+	if not shortcuts_open.has(sc["id"]):
+		shortcuts_open.append(sc["id"])
+	if hud and hud.has_method("toast"):
+		hud.toast("Atajo abierto. Se guardará al descansar en una hoguera.", 4.0)
+
+
 func _update_prompt() -> void:
 	var text := ""
 	if not _dead and not player.is_dead:
 		var b = _nearest_bonfire(2.8)
 		if b:
 			text = ("E  Descansar  ·  " if b.is_lit else "E  Encender  ·  ") + String(b.title)
+		else:
+			var sc := _nearest_shortcut()
+			if not sc.is_empty():
+				text = ("E  Abrir  ·  " + String(sc["title"])) if _shortcut_side_ok(sc) else "No se abre desde este lado"
 	if text != _prompt:
 		_prompt = text
 		if hud and hud.has_method("show_prompt"):
@@ -927,6 +1000,7 @@ func _on_interact() -> void:
 		return
 	var b = _nearest_bonfire(2.8)
 	if b == null:
+		_try_shortcut()
 		return
 	var first: bool = not b.is_lit
 	b.light()

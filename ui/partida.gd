@@ -21,6 +21,7 @@ const CLASSES := preload("res://jugador/player_classes.gd")
 const EQUIPO := preload("res://jugador/equipo.gd")
 const CARGA := preload("res://ui/pantalla_carga.gd")
 const NOTIF := preload("res://ui/notificaciones.gd")
+const REND := preload("res://ui/rendimiento.gd")
 
 ## Peleas de jefe: nodo -> id del jefe (el mismo que usa CampusWorld) y pieza de llave.
 const PELEAS := {
@@ -54,6 +55,7 @@ var botin: Array = []
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_PAUSABLE
+	REND.iniciar(get_tree())   # ajustes de rendimiento guardados ("modo patata")
 
 
 func _process(delta: float) -> void:
@@ -254,6 +256,7 @@ func guardar(vida: Node) -> void:
 		"hechizos": hechizos,
 		"arma": arma,
 		"botin": botin,
+		"atajos": vida.get("shortcuts_open") if vida.get("shortcuts_open") is Array else [],
 		"tiempo": tiempo,
 		"fecha": Time.get_datetime_string_from_system(false, true),
 	}

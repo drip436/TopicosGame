@@ -14,28 +14,31 @@ const EQ := preload("res://jugador/equipo.gd")
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const E := preload("res://ui/estilo.gd")
 
-## Lugar -> arma, "cofre" o "suelo", punto aproximado (x, z), créditos extra y pista.
+## Lugar -> arma, "cofre" o "suelo", punto de respaldo (x, z), créditos extra y pista.
+## El mundo (scripts/campus_world.gd, LOOT_HIDEOUTS) construye un escondite para cada lugar
+## y le dice a este script dónde quedó el cofre o el arma (world.loot_sites). El punto de
+## "pos" solo se usa si el mundo no pudo construir el escondite.
 const LUGARES := {
-	"cofre_avenida": {"arma": "sable_ethernet", "tipo": "cofre", "pos": Vector2(-33, 32), "creditos": 150,
-		"pista": "Avenida Universitaria, junto a la barricada poniente"},
-	"suelo_torre_agua": {"arma": "mazo_disco_duro", "tipo": "suelo", "pos": Vector2(125, -8), "creditos": 0,
-		"pista": "Al pie de la Torre de Agua"},
-	"suelo_residencias": {"arma": "lanza_antena", "tipo": "suelo", "pos": Vector2(-205, 60), "creditos": 0,
-		"pista": "Entre las Residencias Poniente"},
+	"cofre_caseta": {"arma": "sable_ethernet", "tipo": "cofre", "pos": Vector2(-27, 78), "creditos": 150,
+		"pista": "Detrás de la caseta de vigilancia, al sur de la avenida"},
+	"suelo_andamio_residencias": {"arma": "mazo_disco_duro", "tipo": "suelo", "pos": Vector2(-205, 60), "creditos": 0,
+		"pista": "En lo alto de un andamio junto a las Residencias Poniente"},
+	"suelo_jardin": {"arma": "lanza_antena", "tipo": "suelo", "pos": Vector2(-25, -113), "creditos": 0,
+		"pista": "En el andamio del Jardín, entre el Paso de los Fundadores y el Santuario"},
 	"cofre_derecho": {"arma": "estoque_compilador", "tipo": "cofre", "pos": Vector2(-219, -180), "creditos": 400,
-		"pista": "Patio de la Facultad de Derecho"},
+		"pista": "Archivo clausurado de Derecho: se entra por el boquete de atrás"},
 	"cofre_estadio": {"arma": "guadana_kernel", "tipo": "cofre", "pos": Vector2(-80, -150), "creditos": 400,
-		"pista": "En la cancha del Estadio Universitario (cuidado con el mecha)"},
-	"suelo_skatepark": {"arma": "espada_neon", "tipo": "suelo", "pos": Vector2(130, -134), "creditos": 0,
-		"pista": "Clavada en el Skatepark"},
-	"cofre_memorial": {"arma": "excalibyte", "tipo": "cofre", "pos": Vector2(-62, -385), "creditos": 900,
-		"pista": "En el Memorial, al fondo del sector norte"},
-	"cofre_laboratorio": {"arma": "martillo_singularidad", "tipo": "cofre", "pos": Vector2(215, -300), "creditos": 900,
-		"pista": "Patio del Laboratorio de Biogenética"},
-	"suelo_explanada": {"arma": "lanza_tesis", "tipo": "suelo", "pos": Vector2(0, -205), "creditos": 0,
-		"pista": "Explanada de los Fundadores"},
-	"cofre_torre": {"arma": "estoque_root", "tipo": "cofre", "pos": Vector2(148, -380), "creditos": 900,
-		"pista": "Estacionamiento de la Torre, en el extremo noreste"},
+		"pista": "Tras las barricadas junto al Estadio (lo cuida un mecha)"},
+	"suelo_andamio_torre": {"arma": "espada_neon", "tipo": "suelo", "pos": Vector2(125, -8), "creditos": 0,
+		"pista": "En lo alto del andamio de la Torre de Agua"},
+	"cofre_raiz": {"arma": "estoque_root", "tipo": "cofre", "pos": Vector2(276, -72), "creditos": 900,
+		"pista": "Cuarto raíz, cerca del Centro de Cómputo: se abre al vencer a ADA-7"},
+	"cofre_camara_fria": {"arma": "martillo_singularidad", "tipo": "cofre", "pos": Vector2(215, -300), "creditos": 900,
+		"pista": "Cámara fría del Patio del Laboratorio: boquete en el muro de atrás"},
+	"suelo_arquitectura": {"arma": "lanza_tesis", "tipo": "suelo", "pos": Vector2(111, -251), "creditos": 0,
+		"pista": "En lo alto del andamio de Arquitectura"},
+	"cofre_cripta": {"arma": "excalibyte", "tipo": "cofre", "pos": Vector2(-62, -385), "creditos": 900,
+		"pista": "Cripta del Memorial: se entra por el muro roto de atrás"},
 }
 const ALCANCE := 2.3
 
@@ -83,19 +86,26 @@ func _crear(id: String) -> void:
 	var col: Color = rz["color"]
 	var c := Vector3(d["pos"].x, 0, d["pos"].y)
 	var p := c
-	if vida and vida.has_method("_free_near"):
-		p = vida._free_near(c, 12.0, 0.9)
-		if p == Vector3.INF:
-			p = c
-	p = _fuera_de_fuentes(p)
-	p = _salir_de_cerco(p)
+	var yaw := float(hash(id) % 628) / 100.0
+	var sitio := _sitio_del_mundo(id)
+	if not sitio.is_empty():
+		# Escondite construido por el mundo: posición exacta (dentro de su estructura)
+		p = sitio["pos"]
+		yaw = deg_to_rad(float(sitio.get("yaw", 0.0)))
+	else:
+		if vida and vida.has_method("_free_near"):
+			p = vida._free_near(c, 12.0, 0.9)
+			if p == Vector3.INF:
+				p = c
+		p = _fuera_de_fuentes(p)
+		p = _salir_de_cerco(p)
 	p.y = maxf(p.y, 0.0)
 	var tomado := _ya_tomado(id)
 	var node: Node3D
 	if d["tipo"] == "cofre":
 		node = _cofre(col, int(rz["rank"]))
 		node.position = p
-		node.rotation.y = float(hash(id) % 628) / 100.0
+		node.rotation.y = yaw
 		add_child(node)
 		if tomado:
 			_dejar_abierto(node)
@@ -105,10 +115,20 @@ func _crear(id: String) -> void:
 			return
 		node = _arma_clavada(String(d["arma"]), col, int(rz["rank"]))
 		node.position = p
-		node.rotation.y = float(hash(id) % 628) / 100.0
+		node.rotation.y = yaw
 		add_child(node)
 	node.name = "Botin_" + id
 	_items[id] = {"node": node, "tipo": d["tipo"], "tomado": tomado, "color": col, "arma": d["arma"]}
+
+
+## Escondite que construyó CampusWorld para este lugar ({} si no hay).
+func _sitio_del_mundo(id: String) -> Dictionary:
+	var world = vida.get("world") if vida else null
+	if world == null and is_inside_tree() and get_tree().current_scene:
+		world = get_tree().current_scene.find_child("CampusWorld", true, false)
+	if world == null or not (world.get("loot_sites") is Dictionary):
+		return {}
+	return (world.get("loot_sites") as Dictionary).get(id, {})
 
 
 ## Respaldo por física: si el punto está rodeado por un muro bajo (el borde de una
@@ -195,7 +215,7 @@ func _physics_process(delta: float) -> void:
 			continue
 		var n: Node3D = it["node"]
 		var d := Vector2(n.global_position.x - pp.x, n.global_position.z - pp.z).length()
-		if d < md and absf(n.global_position.y - pp.y) < 2.0:
+		if d < md and absf(n.global_position.y - pp.y) < 1.4:
 			md = d
 			mejor = id
 		# Haz de luz que respira

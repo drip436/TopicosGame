@@ -84,6 +84,8 @@ var _mmc := {}
 var _units := {}
 var _paths: Array = []
 var _blocked: Array = []
+## Atajos al Hub: {id, title, pos, side, open, node}. Los usa mundo/world_life.gd.
+var shortcuts: Array = []
 ## Fuentes del campus: [centro (Vector3), radio]. Las usa mundo/botin.gd para no dejar
 ## cofres ni armas dentro del agua.
 var fountains: Array = []
@@ -208,6 +210,8 @@ func _build() -> void:
 	_paths.clear()
 	_blocked.clear()
 	_gate_pivots.clear()
+	shortcuts.clear()
+	fountains.clear()
 	_extra_zones.clear()
 	_tree_pts.clear()
 	_blocked_rects.clear()
@@ -233,6 +237,7 @@ func _build() -> void:
 	_make_lab()
 	_make_final_arena()
 	_make_explanade()
+	_make_hub_sanctuary()
 	_make_stadium()
 	_make_parking()
 	_make_garden()
@@ -244,6 +249,7 @@ func _build() -> void:
 	_make_signs()
 	_make_sector_walls()
 	_make_alamedas()
+	_make_density()
 	_make_nature()
 	_make_filler()
 	_make_wild_grass()
@@ -314,6 +320,8 @@ func register_boss_defeated(id: String) -> void:
 	_defeated[id] = true
 	if SEAL_FOR_BOSS.has(id):
 		unseal(SEAL_FOR_BOSS[id])
+	if id == "computo":
+		unseal("cuarto_raiz", false)   # bóveda del Estoque Root
 
 
 ## Se recogió una pieza de la llave (amuleto). Con las 4 se abre el Aula Magna.
@@ -406,10 +414,11 @@ func _on_first_boss_defeated(bf: Node) -> void:
 	_explore = true
 	_open_plaza_west()
 	_calm_puddles()
+	unseal("paso_fundadores", false)
 	_show_title(SEAL_TITLES["aulas_poniente"])
 	var hud = bf.get("hud")
 	if hud and hud.has_method("show_hint"):
-		hud.show_hint("La tormenta amaina. Se abrió una puerta al oeste de la plaza:\nel Edificio de Aulas Poniente lleva a la Biblioteca Central.", 10.0)
+		hud.show_hint("La tormenta amaina. Al oeste, el Edificio de Aulas Poniente lleva a la Biblioteca Central.\nAl norte, detrás de la Rectoría, el Paso de los Fundadores lleva al Santuario.", 10.0)
 
 
 ## Partida cargada con el primer jefe vencido: abre la plaza sin avisos.
@@ -417,6 +426,7 @@ func restore_first_boss() -> void:
 	_explore = true
 	_open_plaza_west()
 	_calm_puddles()
+	unseal("paso_fundadores", false)
 
 
 ## Para pruebas: abre la plaza, todos los sellos y el portón final.
@@ -441,7 +451,9 @@ func _open_plaza_west() -> void:
 		for c in bounds.get_children():
 			if c is CollisionShape3D:
 				var cp: Vector3 = (c as CollisionShape3D).position
-				if absf(wrapf(atan2(cp.x, cp.z) + PI * 0.5, -PI, PI)) < 0.08:
+				var ang := atan2(cp.x, cp.z)
+				# oeste (Aulas Poniente) y norte (hacia el Paso de los Fundadores)
+				if absf(wrapf(ang + PI * 0.5, -PI, PI)) < 0.08 or absf(wrapf(ang - PI, -PI, PI)) < 0.08:
 					(c as CollisionShape3D).set_deferred("disabled", true)
 
 
@@ -4322,14 +4334,39 @@ const SECTOR_WALLS := [
 	[Vector2(45, -213.8), Vector2(72, -213.8)],
 	[Vector2(128, -213.8), Vector2(300, -213.8)],
 	[Vector2(54, -213.8), Vector2(54, -420)],
+	# Cierre norte del Hub: el Sector Norte solo se alcanza por el Edificio de Posgrado
+	[Vector2(-42, -212), Vector2(-42, -232)],
+	[Vector2(-42, -232), Vector2(54, -232)],
 ]
+## Atajos de un solo sentido hacia el Hub: rejas en las barricadas que solo se abren desde
+## el lado lejano (al estilo Dark Souls) y quedan abiertas para siempre.
+## [id, título, punto (x, z) sobre el muro, lado desde el que se abre (x, z)]
+const SHORTCUTS := [
+	["tunel_estadio", "Reja del Túnel del Estadio", Vector2(-42, -150), Vector2(-1, 0)],
+	["porton_carga", "Portón de Carga del Estacionamiento Norte", Vector2(45, -150), Vector2(1, 0)],
+	["puerta_arquitectura", "Puerta de Servicio de Arquitectura", Vector2(54, -223), Vector2(1, 0)],
+	["porton_santuario", "Portón Norte del Santuario", Vector2(0, -232), Vector2(0, -1)],
+]
+const SHORTCUT_HALF := 2.2
+const SHORTCUT_TITLES := {
+	"tunel_estadio": "Atajo abierto: Túnel del Estadio",
+	"porton_carga": "Atajo abierto: Portón de Carga",
+	"puerta_arquitectura": "Atajo abierto: Puerta de Arquitectura",
+	"porton_santuario": "Atajo abierto: Portón Norte del Santuario",
+}
 ## Qué sello abre cada jefe.
 const SEAL_FOR_BOSS := {"profesor": "aulas_poniente", "biblioteca": "pasaje_central", "computo": "aulas_norte", "laboratorio": "posgrado"}
+## Tramo del Pasaje Central que cruza de la Plaza a la Explanada (Hub): x = 6.
+const PASS_SEG := 11
+## Centro del Hub (Explanada de los Fundadores) y radio de su muro bajo.
+const HUB := Vector3(0, 0, -200)
+const HUB_WALL_R := 27.0
 const SEAL_TITLES := {
 	"aulas_poniente": "Se abrió el Edificio de Aulas Poniente",
 	"pasaje_central": "Se abrió el Pasaje Central de Aulas",
 	"aulas_norte": "Se abrió el Edificio de Aulas Norte",
 	"posgrado": "Se abrió el Edificio de Posgrado",
+	"paso_fundadores": "Se abrió el Paso de los Fundadores",
 }
 const SEAL_SHADER := """
 shader_type spatial;
@@ -4389,10 +4426,17 @@ func _hall(id: String, title: String, o: Vector3, yaw: float, segs: int, floors:
 	var H := floors * FLOOR_H
 	var front: int = doors.get("front", -1)
 	var back: int = doors.get("back", -1)
+	# Tramo de paso: puerta en las dos fachadas y vestíbulo despejado (cruza el edificio)
+	var pass_s: int = doors.get("pass", -1)
+	if pass_s >= 0:
+		front = pass_s
+		back = pass_s
 	var kinds: Array = []
 	for s in segs:
 		var kind := "room"
-		if segs > 5 and s % 6 == 3 and s != front and s != back:
+		if s == pass_s:
+			kind = "pass"
+		elif segs > 5 and s % 6 == 3 and s != front and s != back:
 			kind = "lobby"
 		elif s > 0 and s < segs - 1 and s != front and s != back and s - 1 != front and rng.randf() < 0.2:
 			kind = "detour"
@@ -4438,19 +4482,21 @@ func _hall(id: String, title: String, o: Vector3, yaw: float, segs: int, floors:
 		match kind:
 			"lobby":
 				_lobby(zone, o, b, yaw, x0)
+			"pass":
+				_lobby(zone, o, b, yaw, x0, true)
 			"detour":
-				_classroom(o, b, yaw, x0, kinds[mini(s + 1, segs - 1)] == "lobby" or s == segs - 1, true)
+				_classroom(o, b, yaw, x0, kinds[mini(s + 1, segs - 1)] in ["lobby", "pass"] or s == segs - 1, true)
 				_mound(o + b * Vector3(cx, 0, 2.5), 3.2, 1.4)
 				_lbox(o, b, Vector3(cx, 1.6, 2.3), Vector3(4.0, 0.3, 3.0), m_concrete, false, Vector3(25, 0, 12))
 				_rebar(o + b * Vector3(cx + 1.0, 1.4, 2.0), 3)
 				_wc(Vector3(2.4, FLOOR_H, 3.0), Transform3D(b, o + b * Vector3(cx, FLOOR_H * 0.5, 2.5)))
 			_:
-				_classroom(o, b, yaw, x0, s == segs - 1 or kinds[mini(s + 1, segs - 1)] == "lobby", false)
+				_classroom(o, b, yaw, x0, s == segs - 1 or kinds[mini(s + 1, segs - 1)] in ["lobby", "pass"], false)
 		# Iluminación del pasillo y letreros de salida
 		if s % 3 == 1:
 			_lbox(o, b, Vector3(cx, FLOOR_H - 0.12, 2.5), Vector3(1.4, 0.05, 0.3), m_panel_light)
 			_omni(zone, o + b * Vector3(cx, FLOOR_H - 0.6, 2.5), Color(0.85, 0.92, 1.0), 1.3, 10.0, 0.04, 14.0)
-		if s % 4 == 2 and kind != "lobby":
+		if s % 4 == 2 and kind != "lobby" and kind != "pass":
 			_lbl(zone, "SALIDA  →", o + b * Vector3(cx, 2.4, 1.12), yaw, 30, Color(0.2, 1.0, 0.4), false, 0.006)
 	# Extremos del edificio, con o sin puerta
 	for e: float in [-1.0, 1.0]:
@@ -4497,14 +4543,23 @@ func _hall(id: String, title: String, o: Vector3, yaw: float, segs: int, floors:
 	var c1: Vector3 = corners[1]
 	var r := Rect2(Vector2(minf(c0.x, c1.x), minf(c0.z, c1.z)), Vector2(absf(c1.x - c0.x), absf(c1.z - c0.z)))
 	_connector_rects.append(r)
-	_hall_data.append({"id": id, "title": title, "origin": o, "basis": b, "length": L})
+	_hall_data.append({"id": id, "title": title, "origin": o, "basis": b, "length": L, "pass": pass_s})
 	_blocked_rects.append(r)
 	_end_zone()
 
 
 ## Vestíbulo: tramo abierto de lado a lado con recepción, bancas y avisos.
-func _lobby(zone: Node3D, o: Vector3, b: Basis, yaw: float, x0: float) -> void:
+func _lobby(zone: Node3D, o: Vector3, b: Basis, yaw: float, x0: float, open_pass := false) -> void:
 	var cx := x0 + 4.0
+	if open_pass:
+		# Paso despejado de fachada a fachada: sin mostrador ni vitrinas en medio
+		for k in 2:
+			_lbox(o, b, Vector3(x0 + 1.2, 0.25, -1.0 + k * 2.6), Vector3(1.8, 0.08, 0.5), m_wood, false, Vector3(0, 90, 0))
+		_cy(o + b * Vector3(x0 + 0.8, 0.35, -3.2), 0.3, 0.7, m_clay, Vector3.ZERO, 10, 0.8)
+		_wtree(o + b * Vector3(x0 + 0.8, 0.7, -3.2), 0.25)
+		_lbox(o, b, Vector3(cx, FLOOR_H - 0.12, -1.0), Vector3(1.4, 0.05, 0.3), m_panel_light)
+		_omni(zone, o + b * Vector3(cx + 2.0, FLOOR_H - 0.6, 0.0), Color(1.0, 0.85, 0.6), 1.4, 9.0, 0.03)
+		return
 	_lbox(o, b, Vector3(cx, 0.55, -2.6), Vector3(3.2, 1.1, 0.7), m_wood_dark, true)
 	_lbox(o, b, Vector3(cx, 1.12, -2.6), Vector3(3.4, 0.06, 0.9), m_metal_light)
 	_lbox(o, b, Vector3(x0 + 0.5, 1.0, -2.5), Vector3(0.8, 2.0, 0.9), m_red, true)
@@ -4597,11 +4652,90 @@ func _make_connectors() -> void:
 	# 1) Plaza → Sector Poniente (se abre al vencer al Catedrático)
 	_hall("aulas_poniente", "Edificio de Aulas Poniente", Vector3(-68, 0, 2.5), 180.0, 10, 2, {"start": true, "end": true}, [])
 	# 2) Poniente → Oriente, por detrás de la plaza
-	_hall("pasaje_central", "Pasaje Central de Aulas", Vector3(0, 0, -66), 0.0, 22, 2, {"start": true, "end": true}, ["pasaje_central", "start"])
+	_hall("pasaje_central", "Pasaje Central de Aulas", Vector3(0, 0, -66), 0.0, 22, 2, {"start": true, "end": true, "pass": PASS_SEG}, ["pasaje_central", "start"])
+	_make_founders_pass()
 	# 3) Oriente → Noreste (entrada por el frente, salida por un salón con el muro roto)
 	_hall("aulas_norte", "Edificio de Aulas Norte", Vector3(100, 0, -218), 0.0, 7, 2, {"front": 0, "back": 6}, ["aulas_norte", "front"])
 	# 4) Noreste → Norte (Aula Magna)
 	_hall("posgrado", "Edificio de Posgrado", Vector3(70, 0, -250), 180.0, 7, 3, {"start": true, "end": true}, ["posgrado", "start"])
+
+
+## Paso de los Fundadores: el vestíbulo central del Pasaje Central cruza de la Plaza a la
+## Explanada (Hub). Se abre al vencer al Catedrático. El pasillo del Pasaje queda cerrado a
+## los dos lados del paso hasta vencer al Bibliófilo, para que el paso no sea un atajo al
+## Sector Oriente.
+func _make_founders_pass() -> void:
+	var zone := _begin_zone("PasoFundadores")
+	var hall: Dictionary = {}
+	for h in _hall_data:
+		if h["id"] == "pasaje_central":
+			hall = h
+	if hall.is_empty():
+		_end_zone()
+		return
+	var o: Vector3 = hall["origin"]
+	var b: Basis = hall["basis"]
+	var L: float = hall["length"]
+	var x0 := -L * 0.5 + PASS_SEG * 8.0
+	# Sello en la puerta del lado de la Plaza
+	_seal("paso_fundadores", o + b * Vector3(x0 + 6.0, 0, 4.35), 0.0, 2.4)
+	# Sellos del pasillo a ambos lados del paso (los quita el Bibliófilo con "pasaje_central")
+	for lx: float in [x0 - 0.05, x0 + 8.05]:
+		_seal("pasaje_central", o + b * Vector3(lx, 0, 2.5), 90.0, 2.9)
+	# Letreros y luz en las dos fachadas
+	_lbl(zone, "PASO DE LOS FUNDADORES\n→ EXPLANADA", o + b * Vector3(x0 + 6.0, 3.35, 4.45), 0.0, 34, Color(0.95, 0.85, 0.6))
+	_lbl(zone, "PLAZA DE LA RECTORÍA →", o + b * Vector3(x0 + 6.0, 3.35, -4.45), 180.0, 30, Color(0.88, 0.82, 0.66))
+	_omni(zone, o + b * Vector3(x0 + 6.0, 3.0, 5.4), Color(1.0, 0.8, 0.5), 1.2, 8.0, 0.02)
+	_omni(zone, o + b * Vector3(x0 + 6.0, 3.0, -5.4), Color(1.0, 0.8, 0.5), 1.2, 8.0, 0.02)
+	_end_zone()
+
+
+## Explanada de los Fundadores como Hub (santuario): muro bajo con cuatro accesos,
+## gradas de ceremonia y el monumento partido. Todo con colisión (cobertura y miradores).
+func _make_hub_sanctuary() -> void:
+	var zone := _begin_zone("HubFundadores")
+	var c := HUB
+	# Muro bajo de piedra, con huecos al norte (Aula Magna), sur (Jardín / Paso), este y oeste (Paseo norte)
+	var gaps := [[PI, 9.0], [0.0, 6.0], [PI * 0.5, 6.5], [-PI * 0.5, 6.5]]   # [ángulo, medio ancho en m]
+	var n := 64
+	for i in n:
+		var a := TAU * (i + 0.5) / n
+		var p := c + Vector3(sin(a), 0, cos(a)) * HUB_WALL_R
+		var skip := false
+		for g in gaps:
+			var da := absf(wrapf(a - float(g[0]), -PI, PI))
+			if da * HUB_WALL_R < float(g[1]):
+				skip = true
+		if skip:
+			continue
+		var seg := TAU * HUB_WALL_R / n + 0.12
+		var h := 0.9 if i % 7 != 3 else 0.55   # tramos derruidos
+		_blk(p + Vector3(0, h * 0.5, 0), Vector3(seg, h, 0.6), m_stone_light, Vector3(0, rad_to_deg(a), 0), true)
+		if i % 5 == 0:
+			_chunk(p + Vector3(sin(a), 0, cos(a)) * 0.9, 0.2, 0.6)
+	# Pilares en los accesos
+	for g in gaps:
+		for sd: float in [-1.0, 1.0]:
+			var a: float = float(g[0]) + sd * (float(g[1]) + 0.6) / HUB_WALL_R
+			_blk(c + Vector3(sin(a), 0, cos(a)) * HUB_WALL_R + Vector3(0, 1.1, 0), Vector3(1.0, 2.2, 1.0), m_stone_light, Vector3(0, rad_to_deg(a), 0), true)
+	# Gradas de ceremonia (tres escalones) al noroeste y al noreste, mirando al árbol
+	for ang: float in [deg_to_rad(-135.0), deg_to_rad(135.0)]:
+		var dir := Vector3(sin(ang), 0, cos(ang))
+		var yaw := rad_to_deg(ang)
+		for row in 3:
+			var r := 18.0 + row * 1.2
+			var hh := 0.45 * (row + 1)
+			_blk(c + dir * r + Vector3(0, hh * 0.5, 0), Vector3(9.0 - row * 0.6, hh, 1.2), m_stone_light, Vector3(0, yaw, 0), true)
+	# Monumento partido: tres bloques escalonados (cobertura y mirador)
+	var mo := c + Vector3(-9, 0, 15)
+	_blk(mo + Vector3(0, 0.3, 0), Vector3(2.4, 0.6, 2.4), m_stone_light, Vector3(0, 12, 0), true)
+	_blk(mo + Vector3(1.6, 0.6, 1.3), Vector3(2.0, 1.2, 2.0), m_stone_light, Vector3(0, 30, 4), true)
+	_blk(mo + Vector3(-0.4, 0.9, 2.6), Vector3(1.6, 1.8, 1.6), m_stone_light, Vector3(6, -20, 0), true)
+	_rebar(mo + Vector3(1.6, 1.2, 1.3), 3)
+	for q in 8:
+		_chunk(mo + Vector3(rng.randf_range(-3, 3), 0, rng.randf_range(-3, 4)), 0.2, 0.7)
+	_lbl(zone, "SANTUARIO DE LOS FUNDADORES", c + Vector3(0, 3.0, HUB_WALL_R + 0.2), 0.0, 36, Color(0.95, 0.85, 0.6))
+	_end_zone()
 
 
 ## Reserva el terreno de los muros de sector (antes de colocar zonas y árboles).
@@ -4637,6 +4771,13 @@ func _make_sector_walls() -> void:
 					t1 = maxf(t1, t)
 			if t0 <= t1:
 				cuts.append([t0 + 0.3, t1 - 0.3])
+		# Huecos de los atajos (rejas)
+		for sc in SHORTCUTS:
+			var gp: Vector2 = sc[2]
+			var tg := (gp - a).dot(dir)
+			if tg > SHORTCUT_HALF and tg < l - SHORTCUT_HALF and gp.distance_to(a + dir * tg) < 0.2:
+				cuts.append([tg - SHORTCUT_HALF, tg + SHORTCUT_HALF])
+				_make_shortcut_gate(zone, sc, basis)
 		var spans: Array = [[0.0, l]]
 		for ct in cuts:
 			var next: Array = []
@@ -4687,6 +4828,1033 @@ func _make_sector_walls() -> void:
 				elif roll < 0.84:
 					_sandbag_wall(pos + side * 0.9, rad_to_deg(atan2(dir.x, dir.y)) + 90.0, 3.6)
 	_end_zone()
+
+
+## Reja de un atajo: pilares, dintel, barrotes (con colisión mientras está cerrada), un
+## volante del lado desde el que se abre y un candado del otro.
+func _make_shortcut_gate(zone: Node3D, sc: Array, basis: Basis) -> void:
+	var gp: Vector2 = sc[2]
+	var side2: Vector2 = sc[3]
+	var pos := Vector3(gp.x, 0, gp.y)
+	var side := Vector3(side2.x, 0, side2.y)
+	var holder := Node3D.new()
+	holder.name = "Atajo_" + String(sc[0])
+	holder.transform = Transform3D(basis, pos)
+	zone.add_child(holder)
+	# Pilares y dintel (fijos, con colisión)
+	for sd: float in [-1.0, 1.0]:
+		_blk(pos + basis * Vector3(0, 1.9, sd * (SHORTCUT_HALF + 0.35)), Vector3(0.9, 3.8, 0.7), m_concrete, basis.get_euler() * (180.0 / PI), true)
+	_blk(pos + basis * Vector3(0, 3.95, 0), Vector3(1.0, 0.5, SHORTCUT_HALF * 2.0 + 1.6), m_concrete, basis.get_euler() * (180.0 / PI))
+	_wc(Vector3(0.8, 5.0, SHORTCUT_HALF * 2.0), Transform3D(basis, pos + Vector3(0, 6.5, 0)))   # nadie salta por arriba
+	# Barrotes (nodo propio para poder animarlos)
+	var reja := Node3D.new()
+	reja.name = "Reja"
+	holder.add_child(reja)
+	var bars := 9
+	for i in bars:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.09, 3.6, 0.09)
+		bm.material = m_metal
+		mi.mesh = bm
+		mi.position = Vector3(0, 1.8, lerpf(-SHORTCUT_HALF + 0.2, SHORTCUT_HALF - 0.2, float(i) / (bars - 1)))
+		reja.add_child(mi)
+	for y: float in [0.5, 1.9, 3.3]:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.07, 0.1, SHORTCUT_HALF * 2.0)
+		bm.material = m_metal
+		mi.mesh = bm
+		mi.position = Vector3(0, y, 0)
+		reja.add_child(mi)
+	var body := StaticBody3D.new()
+	body.name = "Body"
+	var cs := CollisionShape3D.new()
+	var bx := BoxShape3D.new()
+	bx.size = Vector3(0.8, 4.0, SHORTCUT_HALF * 2.0)
+	cs.shape = bx
+	cs.position = Vector3(0, 2.0, 0)
+	body.add_child(cs)
+	holder.add_child(body)
+	# Volante (lado que abre) y candado (lado cerrado)
+	var lside := basis.inverse() * side          # ±X local
+	var wheel := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.2
+	tm.outer_radius = 0.28
+	tm.material = m_hazard_y
+	wheel.mesh = tm
+	wheel.name = "Volante"
+	wheel.position = lside * 0.6 + Vector3(0, 1.25, SHORTCUT_HALF + 0.35)
+	wheel.rotation.z = PI * 0.5
+	holder.add_child(wheel)
+	var lock := MeshInstance3D.new()
+	var lm := BoxMesh.new()
+	lm.size = Vector3(0.12, 0.3, 0.25)
+	lm.material = m_gold
+	lock.mesh = lm
+	lock.name = "Candado"
+	lock.position = lside * -0.12 + Vector3(0, 1.3, 0)
+	reja.add_child(lock)
+	var lamp := _omni(holder, lside * 1.2 + Vector3(0, 3.2, 0), Color(1.0, 0.75, 0.3), 1.3, 7.0)
+	lamp.name = "Luz"
+	for face: float in [0.0, PI]:
+		var t := Label3D.new()
+		t.text = String(sc[1]).to_upper()
+		t.font_size = 30
+		t.pixel_size = 0.008
+		t.modulate = Color(0.95, 0.85, 0.6)
+		t.position = Vector3(0.52 * (1.0 if face == 0.0 else -1.0), 3.95, 0)
+		t.rotation.y = PI * 0.5 + face
+		holder.add_child(t)
+	shortcuts.append({"id": String(sc[0]), "title": String(sc[1]), "pos": pos, "side": side, "open": false, "node": holder})
+
+
+## Abre un atajo (lo llama VidaDelCampus al girar el volante o al cargar la partida).
+func open_shortcut(id: String, animate := true) -> void:
+	for sc in shortcuts:
+		if sc["id"] != id or sc["open"]:
+			continue
+		sc["open"] = true
+		var holder: Node3D = sc["node"]
+		if not is_instance_valid(holder):
+			continue
+		var body := holder.get_node_or_null("Body")
+		if body:
+			body.queue_free()
+		var reja: Node3D = holder.get_node("Reja")
+		var luz := holder.get_node_or_null("Luz") as OmniLight3D
+		if luz:
+			luz.light_color = Color(0.45, 1.0, 0.55)
+		if animate and is_inside_tree():
+			var tw := create_tween().set_parallel(true)
+			tw.tween_property(reja, "position:y", -3.75, 2.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+			var wheel := holder.get_node_or_null("Volante") as Node3D
+			if wheel:
+				tw.tween_property(wheel, "rotation:x", TAU * 2.0, 2.2)
+			if SHORTCUT_TITLES.has(id):
+				_show_title(SHORTCUT_TITLES[id])
+		else:
+			reja.position.y = -3.75
+
+
+# ================================================================ densidad y escondites
+# Rediseño Souls-like: cero pasillos vacíos. Utilería temática con colisión en los bordes
+# de las calzadas, conjuntos (andamios, campamentos, barricadas) en los claros entre zonas
+# y un escondite construido para cada arma del botín. Todo usa cajas de colisión simples.
+
+## Escondites del botín construidos aquí: id de lugar (mundo/botin.gd) ->
+## {"pos": Vector3, "yaw": float, "guardia": tipo de enemigo o "", "guardia_pos": Vector3}.
+var loot_sites := {}
+var _dens_spots: Array = []     # puntos ya ocupados por utilería nueva (x, z, radio)
+
+const DENS_ARENAS := [
+	[Vector2(-220, -85), Vector2(38, 36)], [Vector2(225, -85), Vector2(36, 36)],
+	[Vector2(170, -280), Vector2(40, 42)], [Vector2(0, -325), Vector2(46, 60)],
+]
+
+
+## Tema de la utilería según el sector (el del jefe que lo domina).
+func _theme_at(p: Vector2) -> String:
+	if p.x < -42.0 and p.y > -212.0:
+		return "humanidades"
+	if p.x > 45.0 and p.y > -213.8:
+		return "red"
+	if p.x > 54.0 and p.y <= -213.8:
+		return "cuarentena"
+	if p.x >= -42.0 and p.x <= 54.0 and p.y > -232.0:
+		return "base"
+	return "ceremonia"
+
+
+## ¿Se puede poner utilería de radio `r` en `p`? Respeta la zona de inicio y la arena del
+## primer jefe, el Hub, las arenas, las hogueras, los atajos, los edificios de conexión,
+## las fuentes, los muros de sector y todo lo ya reservado (prefabs y zonas).
+func _dens_ok(p: Vector2, r: float, check_blocked := true) -> bool:
+	if absf(p.x) < 46.0 + r and p.y > -62.0:
+		return false                                   # plaza, arena del Catedrático y avenida de inicio
+	if p.y > AVENUE_Z - 12.0 and p.y < AVENUE_Z + 12.0:
+		return false                                   # carril del autobús
+	if p.distance_to(Vector2(HUB.x, HUB.z)) < HUB_WALL_R + 3.0 + r:
+		return false
+	if absf(p.x) > 292.0 or p.y < -422.0 or p.y > 88.0:
+		return false
+	for a in DENS_ARENAS:
+		var c: Vector2 = a[0]
+		var h: Vector2 = a[1]
+		if absf(p.x - c.x) < h.x + r and absf(p.y - c.y) < h.y + r:
+			return false
+	for sc in SHORTCUTS:
+		if p.distance_to(sc[2]) < 9.0 + r:
+			return false
+	for cr in _connector_rects:
+		if (cr as Rect2).grow(7.0 + r).has_point(p):
+			return false
+	for f in fountains:
+		var fc: Vector3 = f[0]
+		if p.distance_to(Vector2(fc.x, fc.z)) < float(f[1]) + 9.0 + r:
+			return false
+	for s in _dens_spots:
+		if p.distance_to(Vector2(s.x, s.y)) < float(s.z) + r + 1.5:
+			return false
+	if _near_tree(p, r + 0.8):
+		return false
+	if check_blocked:
+		for b in _blocked:
+			if p.distance_to(b[0]) < float(b[1]) + r:
+				return false
+	for br in _blocked_rects:
+		if (br as Rect2).grow(r + 0.5).has_point(p):
+			return false
+	return true
+
+
+func _dens_mark(p: Vector2, r: float) -> void:
+	_dens_spots.append(Vector3(p.x, p.y, r))
+	_reserve(p, r + 0.6)
+
+
+func _make_density() -> void:
+	_dens_spots.clear()
+	loot_sites.clear()
+	var zone := _begin_zone("Densidad")
+	var saved := rng.state
+	rng.seed = seed_value * 977 + 41
+	_make_loot_hideouts(zone)
+	_dens_paths(zone)
+	_dens_clusters(zone)
+	rng.state = saved
+	_end_zone()
+	print("CampusWorld: %d piezas de utilería nueva, %d escondites de botín" % [_dens_spots.size(), loot_sites.size()])
+
+
+# ---------------------------------------------------------------- bordes de calzada
+
+func _dens_paths(zone: Node3D) -> void:
+	var n := _paths.size()
+	for pi in n:
+		var a: Vector2 = _paths[pi][0]
+		var e: Vector2 = _paths[pi][1]
+		var w: float = _paths[pi][2]
+		var l := a.distance_to(e)
+		if l < 24.0 or w < 3.5:
+			continue
+		var dir := (e - a) / l
+		var nor := Vector2(-dir.y, dir.x)
+		var yaw := rad_to_deg(atan2(dir.x, dir.y))
+		var t := rng.randf_range(8.0, 14.0)
+		var side := 1.0 if rng.randf() < 0.5 else -1.0
+		while t < l - 8.0:
+			var centre := w >= 8.0 and rng.randf() < 0.22
+			var off := 0.0 if centre else side * (w * 0.5 - 0.35)
+			var p := a + dir * t + nor * off
+			var ok := _dens_ok(p, 1.8, false)
+			if ok:
+				# No sobre otra calzada (cruces) ni dentro de una zona construida
+				for pj in n:
+					if pj == pi:
+						continue
+					var q := Geometry2D.get_closest_point_to_segment(p, _paths[pj][0], _paths[pj][1])
+					if p.distance_to(q) < float(_paths[pj][2]) * 0.5 + 1.2:
+						ok = false
+						break
+			if ok:
+				for b in _blocked:
+					if p.distance_to(b[0]) < float(b[1]) * 0.6:
+						ok = false
+						break
+			if ok:
+				var pos := Vector3(p.x, 0, p.y)
+				if centre:
+					_prop_centre(zone, pos, yaw, _theme_at(p))
+				else:
+					_prop_edge(zone, pos, yaw, _theme_at(p), -side)
+				_dens_spots.append(Vector3(p.x, p.y, 1.8))
+				_reserve(p, 2.2)
+			side = -side
+			t += rng.randf_range(7.5, 12.0)
+
+
+## Pieza grande en medio de una calzada ancha (deja paso por los dos lados).
+func _prop_centre(zone: Node3D, pos: Vector3, yaw: float, theme: String) -> void:
+	match theme:
+		"humanidades":
+			_p_column(pos, yaw + rng.randf_range(-25, 25))
+		"red":
+			if rng.randf() < 0.5:
+				_p_spool(pos, yaw + 90.0, true)
+			else:
+				_p_antenna(pos, yaw + rng.randf_range(-30, 30))
+		"cuarentena":
+			_p_fence_panel(pos, yaw + 90.0 + rng.randf_range(-15, 15), 3.4)
+			_p_drums(pos + Vector3(rng.randf_range(-0.6, 0.6), 0, rng.randf_range(-0.6, 0.6)) + Basis(Vector3.UP, deg_to_rad(yaw)) * Vector3(0, 0, 1.4), 2)
+		"ceremonia":
+			_p_log(pos, yaw + 90.0 + rng.randf_range(-20, 20), 4.2)
+		_:
+			_car(zone, pos, yaw + 90.0 + rng.randf_range(-12, 12), 0.0, Color(0.75, 0.75, 0.72), rng.randf() < 0.4)
+
+
+## Pieza en el borde de una calzada. `inward` = hacia qué lado queda el paso (±1).
+func _prop_edge(zone: Node3D, pos: Vector3, yaw: float, theme: String, _inward: float) -> void:
+	var r := rng.randf()
+	match theme:
+		"humanidades":
+			if r < 0.28:
+				_bookshelf(pos, yaw + 90.0, 2.4, rng.randf_range(1.9, 2.6), rng.randf_range(-6, 6))
+				_book_pile(pos + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)), 10)
+			elif r < 0.5:
+				_p_desks(pos, yaw, 3)
+			elif r < 0.68:
+				_p_book_cart(pos, yaw + rng.randf_range(-30, 30))
+			elif r < 0.84:
+				_p_cabinet(pos, yaw + 90.0)
+			else:
+				_p_lectern(pos, yaw + 90.0)
+				_book_pile(pos, 8)
+		"red":
+			if r < 0.3:
+				_p_racks(pos, yaw, 1 + rng.randi() % 2)
+			elif r < 0.5:
+				_p_spool(pos, yaw + rng.randf_range(-20, 20), rng.randf() < 0.4)
+			elif r < 0.68:
+				_p_transformer(zone, pos, yaw + 90.0)
+			elif r < 0.84:
+				_p_floor_tiles(pos, yaw)
+			else:
+				_p_vending(pos, yaw + 90.0, rng.randf() < 0.4)
+		"cuarentena":
+			if r < 0.3:
+				_p_drums(pos, 3)
+			elif r < 0.52:
+				_p_fence_panel(pos, yaw + rng.randf_range(-12, 12), 3.2)
+			elif r < 0.7:
+				_p_stretcher(pos, yaw + rng.randf_range(-40, 40))
+			elif r < 0.86:
+				_sandbag_wall(pos, yaw + 90.0, 3.0)
+			else:
+				_p_incubator(zone, pos, yaw + 90.0)
+		"ceremonia":
+			if r < 0.34:
+				_p_chairs(pos, yaw + 90.0, 4)
+			elif r < 0.54:
+				_p_log(pos, yaw + rng.randf_range(-25, 25), 3.4)
+			elif r < 0.72:
+				_p_pedestal(pos, yaw)
+			elif r < 0.88:
+				_p_toga_rack(pos, yaw + 90.0)
+			else:
+				_p_planter(pos, yaw)
+		_:
+			if r < 0.25:
+				_p_vending(pos, yaw + 90.0, rng.randf() < 0.35)
+			elif r < 0.5:
+				_p_desks(pos, yaw, 2)
+			elif r < 0.75:
+				_p_planter(pos, yaw)
+			else:
+				_p_column(pos, yaw + rng.randf_range(-15, 15))
+
+
+# ---------------------------------------------------------------- utilería (toda con colisión)
+
+func _yb(yaw: float) -> Basis:
+	return Basis(Vector3.UP, deg_to_rad(yaw))
+
+
+## Máquina expendedora destruida (de pie o tirada).
+func _p_vending(pos: Vector3, yaw: float, fallen: bool) -> void:
+	var b := _yb(yaw)
+	if fallen:
+		_lbox(pos, b, Vector3(0, 0.42, 0), Vector3(1.0, 0.84, 1.9), m_metal, true)
+		_lbox(pos, b, Vector3(0, 0.85, 0.1), Vector3(0.8, 0.02, 1.3), m_glass)
+		for q in 5:
+			_mm_add(_uc(m_red if q % 2 == 0 else m_blue, 8), Transform3D(_rb(Vector3(90, rng.randf() * 360.0, 0)) * Basis.from_scale(Vector3(0.07, 0.12, 0.07)), pos + b * Vector3(rng.randf_range(-1.3, 1.3), 0.04, rng.randf_range(1.0, 2.0))))
+	else:
+		var lean := rng.randf_range(-5, 5)
+		_lbox(pos, b, Vector3(0, 0.95, 0), Vector3(1.0, 1.9, 0.84), m_metal, true, Vector3(0, 0, lean))
+		_lbox(pos, b, Vector3(-0.12, 1.15, 0.43), Vector3(0.62, 1.1, 0.02), m_screen if rng.randf() < 0.3 else m_glass, false, Vector3(0, 0, lean))
+		_lbox(pos, b, Vector3(0.36, 1.1, 0.43), Vector3(0.16, 0.5, 0.03), m_hazard_k, false, Vector3(0, 0, lean))
+		_lbox(pos, b, Vector3(0, 0.3, 0.43), Vector3(0.7, 0.22, 0.03), m_hazard_k, false, Vector3(0, 0, lean))
+
+
+## Barricada de pupitres apilados.
+func _p_desks(pos: Vector3, yaw: float, n: int) -> void:
+	var b := _yb(yaw)
+	for k in n:
+		var z := (k - (n - 1) * 0.5) * 1.05
+		for level in 2:
+			if level == 1 and rng.randf() < 0.35:
+				continue
+			var o := Vector3(rng.randf_range(-0.12, 0.12), level * 0.78, z + rng.randf_range(-0.08, 0.08))
+			var rot := Vector3(rng.randf_range(-6, 6) + (180.0 if level == 1 and rng.randf() < 0.5 else 0.0), rng.randf_range(-18, 18), rng.randf_range(-6, 6))
+			_lbox(pos, b, o + Vector3(0, 0.72, 0), Vector3(0.7, 0.05, 0.95), m_desk, false, rot)
+			for lx: float in [-0.3, 0.3]:
+				for lz: float in [-0.4, 0.4]:
+					_lbox(pos, b, o + Vector3(lx, 0.36, lz), Vector3(0.04, 0.72, 0.04), m_iron, false, rot)
+			_lbox(pos, b, o + Vector3(-0.42, 0.45, 0), Vector3(0.05, 0.5, 0.8), m_wood, false, rot)
+	_wc(Vector3(0.9, 1.5, n * 1.05 + 0.1), Transform3D(b, pos + Vector3(0, 0.75, 0)))
+
+
+## Columna derruida: tocón en pie y dos tambores tirados.
+func _p_column(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_cy(pos + b * Vector3(0, 0.55, -1.6), 0.5, 1.1, m_stone_light, Vector3.ZERO, 12, 1.0, true)
+	_lbox(pos, b, Vector3(0, 0.12, -1.6), Vector3(1.3, 0.24, 1.3), m_stone_light)
+	_rebar(pos + b * Vector3(0, 1.1, -1.6), 3)
+	for k in 2:
+		var c := Vector3(rng.randf_range(-0.2, 0.2), 0.5, 0.1 + k * 1.75)
+		_mm_add(_uc(m_stone_light, 12), Transform3D(b * _rb(Vector3(90, 0, rng.randf_range(-12, 12))) * Basis.from_scale(Vector3(1.0, 1.6, 1.0)), pos + b * c))
+		_wc(Vector3(1.0, 1.0, 1.6), Transform3D(b, pos + b * c))
+	for q in 5:
+		_chunk(pos + b * Vector3(rng.randf_range(-1.2, 1.2), 0, rng.randf_range(-2.0, 2.6)), 0.2, 0.6)
+
+
+## Jardinera elevada con vegetación descontrolada.
+func _p_planter(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(pos, b, Vector3(0, 0.35, 0), Vector3(1.3, 0.7, 3.0), m_concrete, true)
+	_lbox(pos, b, Vector3(0, 0.72, 0), Vector3(1.1, 0.06, 2.8), m_hedge)
+	for k in 3:
+		var p := pos + b * Vector3(rng.randf_range(-0.3, 0.3), 0.7, -1.0 + k * 1.0)
+		if rng.randf() < 0.6:
+			_wtree(p, rng.randf_range(0.3, 0.55), Vector3(rng.randf_range(-12, 12), 0, rng.randf_range(-12, 12)))
+		else:
+			_sp(p + Vector3(0, 0.35, 0), Vector3(1.0, 0.8, 1.0), m_hedge, Vector3(0, rng.randf() * 360.0, 0), 8)
+
+
+## Carrito de libros volcado.
+func _p_book_cart(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(pos, b, Vector3(0, 0.3, 0), Vector3(0.6, 0.6, 1.5), m_wood_dark, true, Vector3(0, 0, 90))
+	for sz: float in [-0.6, 0.6]:
+		_mm_add(_uc(m_tire, 8), Transform3D(b * _rb(Vector3(0, 0, 0)) * Basis.from_scale(Vector3(0.16, 0.05, 0.16)), pos + b * Vector3(0.33, 0.5, sz)))
+	_book_pile(pos + b * Vector3(-0.9, 0, 0), 14)
+
+
+## Archivero de catálogo (fichas tiradas).
+func _p_cabinet(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(pos, b, Vector3(0, 0.75, 0), Vector3(1.6, 1.5, 0.6), m_wood_dark, true)
+	for row in 4:
+		for col in 4:
+			var out := 0.25 if rng.randf() < 0.2 else 0.0
+			_lbox(pos, b, Vector3(-0.57 + col * 0.38, 0.22 + row * 0.35, 0.3 + out * 0.5), Vector3(0.32, 0.28, 0.04 + out), m_wood)
+			_lbox(pos, b, Vector3(-0.57 + col * 0.38, 0.22 + row * 0.35, 0.33 + out), Vector3(0.1, 0.05, 0.02), m_gold)
+	for q in 9:
+		_mm_add(_ub(m_paper), Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(0.13, 0.008, 0.08)), pos + b * Vector3(rng.randf_range(-1.1, 1.1), 0.02, rng.randf_range(0.5, 1.8))))
+
+
+## Atril de lectura.
+func _p_lectern(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_cy(pos + Vector3(0, 0.55, 0), 0.09, 1.1, m_wood_dark, Vector3.ZERO, 8, 1.0, true)
+	_cy(pos + Vector3(0, 0.04, 0), 0.32, 0.08, m_wood_dark, Vector3.ZERO, 10)
+	_lbox(pos, b, Vector3(0, 1.18, 0), Vector3(0.7, 0.05, 0.5), m_wood_dark, false, Vector3(-25, 0, 0))
+	_lbox(pos, b, Vector3(0, 1.23, 0.02), Vector3(0.5, 0.04, 0.36), m_paper, false, Vector3(-25, 0, 0))
+	_wc(Vector3(0.7, 1.3, 0.6), Transform3D(b, pos + Vector3(0, 0.65, 0)))
+
+
+## Racks de servidor tirados o en pie (siempre visibles y con colisión).
+func _p_racks(pos: Vector3, yaw: float, n: int) -> void:
+	var b := _yb(yaw)
+	for k in n:
+		var z := (k - (n - 1) * 0.5) * 1.5
+		if rng.randf() < 0.45:
+			_lbox(pos, b, Vector3(0, 0.42, z), Vector3(2.2, 0.84, 1.1), m_rack, true, Vector3(0, rng.randf_range(-14, 14), 0))
+			_lbox(pos, b, Vector3(0, 0.85, z), Vector3(1.9, 0.02, 0.8), m_screen if rng.randf() < 0.25 else m_metal)
+		else:
+			_lbox(pos, b, Vector3(0, 1.1, z), Vector3(0.84, 2.2, 1.1), m_rack, true, Vector3(0, 0, rng.randf_range(-7, 7)))
+			for u in 6:
+				_lbox(pos, b, Vector3(0.43, 0.35 + u * 0.3, z), Vector3(0.02, 0.05, 0.8), m_cyan if rng.randf() < 0.3 else m_metal_light)
+
+
+## Bobina de cable (de pie como carrete o tirada).
+func _p_spool(pos: Vector3, yaw: float, lying: bool) -> void:
+	var b := _yb(yaw)
+	if lying:
+		for y: float in [0.05, 0.85]:
+			_cy(pos + Vector3(0, y, 0), 0.85, 0.1, m_wood, Vector3.ZERO, 14)
+		_cy(pos + Vector3(0, 0.45, 0), 0.45, 0.8, m_rack, Vector3.ZERO, 12)
+		_wc(Vector3(1.5, 0.9, 1.5), Transform3D(b, pos + Vector3(0, 0.45, 0)))
+	else:
+		for x: float in [-0.45, 0.45]:
+			_mm_add(_uc(m_wood, 14), Transform3D(b * _rb(Vector3(0, 0, 90)) * Basis.from_scale(Vector3(1.7, 0.1, 1.7)), pos + b * Vector3(x, 0.85, 0)))
+		_mm_add(_uc(m_rack, 12), Transform3D(b * _rb(Vector3(0, 0, 90)) * Basis.from_scale(Vector3(0.9, 0.8, 0.9)), pos + b * Vector3(0, 0.85, 0)))
+		_wc(Vector3(1.0, 1.7, 1.6), Transform3D(b, pos + Vector3(0, 0.85, 0)))
+	# cable suelto
+	var prev := pos + b * Vector3(0.6, 0.05, 0)
+	for q in 5:
+		var nxt := prev + b * Vector3(rng.randf_range(0.3, 0.8), 0, rng.randf_range(-0.7, 0.7))
+		_rod(prev, nxt, 0.035, m_rack, 5)
+		prev = nxt
+
+
+## Transformador con chispas.
+func _p_transformer(zone: Node3D, pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(pos, b, Vector3(0, 0.1, 0), Vector3(1.9, 0.2, 1.5), m_concrete)
+	_lbox(pos, b, Vector3(0, 0.95, 0), Vector3(1.5, 1.5, 1.1), m_metal, true)
+	for k in 5:
+		_lbox(pos, b, Vector3(-0.6 + k * 0.3, 0.95, 0.58), Vector3(0.05, 1.2, 0.08), m_metal_light)
+	for sx: float in [-0.45, 0.0, 0.45]:
+		_cy(pos + b * Vector3(sx, 1.95, 0), 0.07, 0.5, m_clay, Vector3.ZERO, 8)
+	_lbox(pos, b, Vector3(0, 1.0, -0.57), Vector3(0.5, 0.5, 0.02), m_hazard_y)
+	if rng.randf() < 0.5:
+		_sparks(zone, pos + b * Vector3(0.3, 2.1, 0))
+
+
+## Losas de piso técnico apiladas y tiradas.
+func _p_floor_tiles(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	var n := 4 + rng.randi() % 4
+	for k in n:
+		_lbox(pos, b, Vector3(rng.randf_range(-0.05, 0.05), 0.04 + k * 0.07, rng.randf_range(-0.05, 0.05)), Vector3(0.6, 0.06, 0.6), m_metal_light, false, Vector3(0, rng.randf_range(-12, 12), 0))
+	_wc(Vector3(0.65, n * 0.07 + 0.05, 0.65), Transform3D(b, pos + Vector3(0, n * 0.035, 0)))
+	for q in 3:
+		_lbox(pos, b, Vector3(rng.randf_range(-0.4, 0.4), 0.3, 0.9 + q * 0.5), Vector3(0.6, 0.05, 0.6), m_metal_light, false, Vector3(rng.randf_range(50, 75), rng.randf_range(-30, 30), 0))
+	for q in 4:
+		_cy(pos + b * Vector3(rng.randf_range(-0.8, 0.8), 0.15, rng.randf_range(-1.4, -0.6)), 0.03, 0.3, m_metal, Vector3.ZERO, 6)
+
+
+## Antena caída (mástil con parábola).
+func _p_antenna(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_mm_add(_uc(m_metal_light, 8), Transform3D(b * _rb(Vector3(86, 0, 0)) * Basis.from_scale(Vector3(0.16, 5.0, 0.16)), pos + b * Vector3(0, 0.3, 0)))
+	_wc(Vector3(0.5, 0.6, 5.0), Transform3D(b, pos + Vector3(0, 0.3, 0)))
+	_mm_add(_uc(m_metal_light, 14, 0.15), Transform3D(b * _rb(Vector3(70, 0, 0)) * Basis.from_scale(Vector3(1.6, 0.45, 1.6)), pos + b * Vector3(0, 0.7, 2.5)))
+	_wc(Vector3(1.6, 1.3, 0.8), Transform3D(b, pos + b * Vector3(0, 0.65, 2.5)))
+	for q in 3:
+		_rod(pos + b * Vector3(0, 0.3, -2.0 + q), pos + b * Vector3(rng.randf_range(-1.5, 1.5), 0.02, -2.0 + q + rng.randf_range(-0.5, 0.5)), 0.02, m_rack, 4)
+
+
+## Tambos tóxicos (cilindros propios: no dependen de modelos).
+func _p_drums(pos: Vector3, n: int) -> void:
+	for k in n:
+		var p := pos + Vector3(rng.randf_range(-0.9, 0.9), 0, rng.randf_range(-0.9, 0.9))
+		var mat: Material = m_hazard_y if rng.randf() < 0.6 else m_blue
+		if rng.randf() < 0.25:
+			var yaw := rng.randf() * 360.0
+			_cy(p + Vector3(0, 0.3, 0), 0.3, 0.9, mat, Vector3(90, yaw, 0), 10)
+			_wc(Vector3(0.6, 0.6, 0.9), Transform3D(_yb(yaw), p + Vector3(0, 0.3, 0)))
+			_puddle(p + _yb(yaw) * Vector3(0, 0, 1.0), rng.randf_range(0.5, 0.9), m_spill)
+		else:
+			_cy(p + Vector3(0, 0.45, 0), 0.3, 0.9, mat, Vector3.ZERO, 10, 1.0, true)
+			_cy(p + Vector3(0, 0.6, 0), 0.31, 0.12, m_hazard_k, Vector3.ZERO, 10)
+
+
+## Panel de cerca de cuarentena con cinta de riesgo.
+func _p_fence_panel(pos: Vector3, yaw: float, length: float) -> void:
+	var b := _yb(yaw)
+	var lean := rng.randf_range(-10, 10)
+	for sz: float in [-0.5, 0.5]:
+		_lbox(pos, b, Vector3(0, 1.1, sz * length), Vector3(0.07, 2.2, 0.07), m_iron, false, Vector3(0, 0, lean))
+		_lbox(pos, b, Vector3(0, 0.08, sz * length), Vector3(0.7, 0.16, 0.4), m_concrete)
+	_mm_add(_ub(m_chain), Transform3D(b * _rb(Vector3(0, 90, 0)) * _rb(Vector3(lean, 0, 0)) * Basis.from_scale(Vector3(length, 2.0, 0.01)), pos + Vector3(0, 1.1, 0)))
+	_lbox(pos, b, Vector3(0.04, 1.3, 0), Vector3(0.02, 0.12, length), m_hazard_y, false, Vector3(0, 0, lean))
+	_lbox(pos, b, Vector3(0.05, 1.5, 0), Vector3(0.02, 0.4, 0.5), m_hazard_y, false, Vector3(0, 0, lean))
+	_wc(Vector3(0.3, 2.2, length), Transform3D(b, pos + Vector3(0, 1.1, 0)))
+
+
+## Camilla (a veces volcada).
+func _p_stretcher(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	var tipped := rng.randf() < 0.3
+	var rot := Vector3(0, 0, 80 if tipped else 0)
+	var h := 0.45 if tipped else 0.75
+	_lbox(pos, b, Vector3(0, h, 0), Vector3(0.7, 0.08, 1.9), m_white_lab, false, rot)
+	_lbox(pos, b, Vector3(0, h + 0.06, -0.7), Vector3(0.5, 0.08, 0.4), m_canvas, false, rot)
+	if not tipped:
+		for sx: float in [-0.3, 0.3]:
+			for sz: float in [-0.8, 0.8]:
+				_lbox(pos, b, Vector3(sx, 0.36, sz), Vector3(0.04, 0.72, 0.04), m_metal_light)
+		_lbox(pos, b, Vector3(0.38, 1.3, -0.8), Vector3(0.03, 1.2, 0.03), m_metal_light)
+	_wc(Vector3(0.8, 0.9, 1.9), Transform3D(b, pos + Vector3(0, 0.45, 0)))
+
+
+## Incubadora rota con líquido.
+func _p_incubator(zone: Node3D, pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(pos, b, Vector3(0, 0.45, 0), Vector3(1.3, 0.9, 0.8), m_white_lab, true)
+	_lbox(pos, b, Vector3(0, 1.2, 0), Vector3(1.2, 0.6, 0.7), m_glass_clear)
+	_lbox(pos, b, Vector3(0, 0.95, 0), Vector3(1.1, 0.08, 0.6), m_spill)
+	_lbox(pos, b, Vector3(0.45, 0.55, 0.41), Vector3(0.25, 0.18, 0.02), m_screen)
+	_puddle(pos + b * Vector3(0.3, 0, 1.0), 0.8, m_spill)
+	_omni(zone, pos + Vector3(0, 1.3, 0), Color(0.4, 1.0, 0.5), 0.7, 4.0)
+
+
+## Fila de sillas plegables de la ceremonia.
+func _p_chairs(pos: Vector3, yaw: float, n: int) -> void:
+	var b := _yb(yaw)
+	for k in n:
+		var x := (k - (n - 1) * 0.5) * 0.62
+		var fallen := rng.randf() < 0.3
+		var rot := Vector3(-85 if fallen else 0, rng.randf_range(-12, 12), 0)
+		var y := 0.22 if fallen else 0.0
+		_lbox(pos, b, Vector3(x, y + 0.45, 0), Vector3(0.44, 0.04, 0.42), m_wood, false, rot)
+		_lbox(pos, b, Vector3(x, y + 0.75, -0.2) if not fallen else Vector3(x, 0.08, 0.35), Vector3(0.44, 0.34, 0.04), m_wood, false, rot)
+		if not fallen:
+			for lx: float in [-0.2, 0.2]:
+				_lbox(pos, b, Vector3(x + lx, 0.22, 0), Vector3(0.03, 0.46, 0.4), m_iron)
+	_wc(Vector3(n * 0.62 + 0.1, 0.95, 0.6), Transform3D(b, pos + Vector3(0, 0.47, 0)))
+
+
+## Tronco caído (sirve de cobertura baja).
+func _p_log(pos: Vector3, yaw: float, length: float) -> void:
+	var b := _yb(yaw)
+	_mm_add(_uc(m_wood, 10, 0.75), Transform3D(b * _rb(Vector3(90, 0, 0)) * Basis.from_scale(Vector3(0.9, length, 0.9)), pos + Vector3(0, 0.42, 0)))
+	_wc(Vector3(0.85, 0.85, length), Transform3D(b, pos + Vector3(0, 0.42, 0)))
+	for q in 4:
+		var z := rng.randf_range(-length * 0.4, length * 0.45)
+		var br := b * _rb(Vector3(rng.randf_range(20, 70), rng.randf_range(0, 360), 0))
+		var bl := rng.randf_range(0.8, 1.8)
+		_mm_add(_uc(m_wood, 5, 0.3), Transform3D(br * Basis.from_scale(Vector3(0.14, bl, 0.14)), pos + b * Vector3(0, 0.6, z) + (br * Vector3.UP) * bl * 0.5))
+	_cy(pos + b * Vector3(0, 0.35, -length * 0.5 - 0.9), 0.5, 0.7, m_wood, Vector3.ZERO, 10, 0.85, true)
+
+
+## Pedestal con escultura rota.
+func _p_pedestal(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(pos, b, Vector3(0, 0.5, 0), Vector3(1.3, 1.0, 1.3), m_stone, true)
+	_lbox(pos, b, Vector3(0, 1.05, 0), Vector3(1.5, 0.12, 1.5), m_stone_light)
+	if rng.randf() < 0.55:
+		_mm_add(_uc(m_stone_light, 10, 0.6), Transform3D(b * Basis.from_scale(Vector3(0.8, 1.3, 0.7)), pos + Vector3(0, 1.75, 0)))
+		_rebar(pos + Vector3(0, 2.4, 0), 2)
+	else:
+		_rebar(pos + Vector3(0, 1.1, 0), 3)
+	_sp(pos + b * Vector3(1.2, 0.3, 0.6), Vector3(0.6, 0.6, 0.6), m_stone_light, Vector3.ZERO, 8)
+	_lbox(pos, b, Vector3(0, 0.55, 0.66), Vector3(0.7, 0.3, 0.02), m_gold)
+
+
+## Perchero de togas de graduación.
+func _p_toga_rack(pos: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	for sx: float in [-0.9, 0.9]:
+		_lbox(pos, b, Vector3(sx, 0.85, 0), Vector3(0.05, 1.7, 0.05), m_iron)
+		_lbox(pos, b, Vector3(sx, 0.03, 0), Vector3(0.05, 0.06, 0.6), m_iron)
+	_lbox(pos, b, Vector3(0, 1.68, 0), Vector3(1.85, 0.04, 0.04), m_iron)
+	for k in 5:
+		if rng.randf() < 0.25:
+			continue
+		var x := -0.7 + k * 0.35
+		_lbox(pos, b, Vector3(x, 1.05, 0), Vector3(0.3, 1.15, 0.12), m_hazard_k, false, Vector3(0, rng.randf_range(-15, 15), rng.randf_range(-4, 4)))
+		_lbox(pos, b, Vector3(x, 1.5, 0.07), Vector3(0.1, 0.25, 0.02), m_gold)
+	_wc(Vector3(1.9, 1.7, 0.5), Transform3D(b, pos + Vector3(0, 0.85, 0)))
+
+
+# ---------------------------------------------------------------- conjuntos en los claros
+
+## Lugar libre de `size` cerca de `anchor`, dentro del sector de `theme` ("" = cualquiera).
+func _dens_site(anchor: Vector2, r0: float, r1: float, size: Vector2, theme: String) -> Vector3:
+	var half := maxf(size.x, size.y) * 0.5
+	var r := r0
+	var turn := rng.randf() * TAU
+	while r <= r1:
+		for k in 10:
+			var a := turn + TAU * k / 10.0
+			var p := anchor + Vector2(cos(a), sin(a)) * r
+			if theme != "" and _theme_at(p) != theme:
+				continue
+			if not _dens_ok(p, half) or not _site_ok(p, size):
+				continue
+			return Vector3(p.x, 0, p.y)
+		r += 7.0
+		turn += 0.6
+	return Vector3.INF
+
+
+func _dens_clusters(zone: Node3D) -> void:
+	var sets := [
+		# [ancla (x, z), tema, conjunto]
+		[Vector2(-163, 8), "humanidades", "andamio"], [Vector2(-133, -47), "humanidades", "laberinto"],
+		[Vector2(-240, -132), "humanidades", "laberinto"], [Vector2(-155, -160), "humanidades", "andamio"],
+		[Vector2(-262, -80), "humanidades", "pupitres"], [Vector2(-118, -98), "humanidades", "pupitres"],
+		[Vector2(178, -13), "red", "servidores"], [Vector2(128, -62), "red", "servidores"],
+		[Vector2(130, -134), "red", "andamio"], [Vector2(172, -180), "red", "servidores"],
+		[Vector2(276, -72), "red", "pupitres"], [Vector2(222, -18), "red", "andamio"],
+		[Vector2(205, -236), "cuarentena", "campamento"], [Vector2(240, -324), "cuarentena", "campamento"],
+		[Vector2(148, -380), "cuarentena", "andamio"], [Vector2(78, -352), "cuarentena", "campamento"],
+		[Vector2(266, -392), "cuarentena", "pupitres"],
+		[Vector2(-74, -350), "ceremonia", "ceremonia"], [Vector2(-148, -404), "ceremonia", "ceremonia"],
+		[Vector2(-222, -238), "ceremonia", "andamio"], [Vector2(-130, -280), "ceremonia", "ceremonia"],
+		[Vector2(-30, -262), "ceremonia", "pupitres"],
+	]
+	for s in sets:
+		var kind: String = s[2]
+		var size := Vector2(12, 12)
+		var site := _dens_site(s[0], 26.0, 62.0, size, s[1])
+		if site == Vector3.INF:
+			continue
+		var p2 := Vector2(site.x, site.z)
+		_reserve_rect(p2, size)
+		_dens_spots.append(Vector3(p2.x, p2.y, 6.5))
+		var yaw := rng.randf_range(0.0, 360.0)
+		match kind:
+			"andamio":
+				_set_scaffold(zone, site, yaw, s[1])
+			"laberinto":
+				_set_book_maze(zone, site, yaw)
+			"pupitres":
+				_set_desk_fort(zone, site, yaw, s[1])
+			"servidores":
+				_set_server_dump(zone, site, yaw)
+			"campamento":
+				_set_quarantine_camp(zone, site, yaw)
+			"ceremonia":
+				_set_ceremony(zone, site, yaw)
+
+
+## Andamio con dos rampas y plataforma alta (mirador). Devuelve el centro de la plataforma.
+## Sin barandal en dos lados: se puede caer. Las rampas tienen 19° (se suben caminando).
+##   Rampa 1: del suelo al descanso (y = 1.25), por el frente.
+##   Rampa 2: del descanso a la plataforma (y = 2.5), de regreso.
+func _set_scaffold(zone: Node3D, o: Vector3, yaw: float, theme: String) -> Vector3:
+	var b := _yb(yaw)
+	var plank := m_wood
+	var ang := rad_to_deg(atan2(1.25, 3.6))
+	var ramp_l := sqrt(3.6 * 3.6 + 1.25 * 1.25) + 0.1
+	_lbox(o, b, Vector3(0.4, 0.57, -1.6), Vector3(ramp_l, 0.12, 1.2), plank, true, Vector3(0, 0, ang))
+	_lbox(o, b, Vector3(3.1, 1.19, -1.6), Vector3(1.9, 0.12, 1.3), plank, true)        # descanso
+	_lbox(o, b, Vector3(3.45, 1.19, 0.05), Vector3(1.2, 0.12, 2.1), plank, true)
+	_lbox(o, b, Vector3(1.05, 1.82, 0.5), Vector3(ramp_l, 0.12, 1.2), plank, true, Vector3(0, 0, -ang))
+	var pc := Vector3(-2.5, 2.44, 1.3)                                                   # plataforma 3.4 × 3.4
+	_lbox(o, b, pc, Vector3(3.4, 0.12, 3.4), plank, true)
+	# Postes
+	for pp: Vector3 in [Vector3(-4.2, 0, -0.4), Vector3(-4.2, 0, 3.0), Vector3(-0.8, 0, 3.0), Vector3(-0.8, 0, -0.4)]:
+		_lbox(o, b, pp + Vector3(0, 1.8, 0), Vector3(0.1, 3.6, 0.1), m_iron, true)
+	for pp: Vector3 in [Vector3(4.05, 0, -2.25), Vector3(4.05, 0, 1.1), Vector3(2.2, 0, -2.25), Vector3(2.85, 0, 1.1)]:
+		_lbox(o, b, pp + Vector3(0, 0.56, 0), Vector3(0.1, 1.12, 0.1), m_iron, true)
+	for y: float in [0.9, 1.9]:
+		_lbox(o, b, Vector3(-2.5, y, 3.0), Vector3(3.4, 0.06, 0.06), m_iron, false, Vector3(0, 0, 14 if y < 1.0 else -14))
+		_lbox(o, b, Vector3(-4.2, y, 1.3), Vector3(0.06, 0.06, 3.4), m_iron, false, Vector3(14 if y < 1.0 else -14, 0, 0))
+	# Barandal solo al fondo y a un lado de la plataforma
+	_lbox(o, b, Vector3(-2.5, 3.0, 3.0), Vector3(3.4, 1.0, 0.08), m_iron, true)
+	_lbox(o, b, Vector3(-4.2, 3.0, 1.3), Vector3(0.08, 1.0, 3.4), m_iron, true)
+	# Lona y botes al pie
+	_lbox(o, b, Vector3(-2.5, 3.62, 1.3), Vector3(3.7, 0.04, 3.7), m_canvas if theme != "cuarentena" else m_hazard_y, false, Vector3(5, 0, 0))
+	for q in 3:
+		_cy(o + b * Vector3(rng.randf_range(1.0, 2.4), 0.22, rng.randf_range(2.0, 3.2)), 0.16, 0.44, m_metal_light if q % 2 == 0 else m_red, Vector3.ZERO, 8, 0.85, true)
+	return o + b * (pc + Vector3(0, 0.06, 0.3))
+
+
+## Laberinto de estantes de biblioteca al aire libre.
+func _set_book_maze(zone: Node3D, o: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	var walls := [[Vector3(-3.5, 0, -3.0), 0.0], [Vector3(0.6, 0, -3.0), 0.0], [Vector3(-1.4, 0, 0.0), 0.0], [Vector3(3.0, 0, 0.2), 0.0],
+		[Vector3(-4.6, 0, 1.6), 90.0], [Vector3(1.0, 0, 3.2), 0.0], [Vector3(-2.6, 0, 3.4), 0.0], [Vector3(4.6, 0, -1.6), 90.0]]
+	for wl in walls:
+		var lp: Vector3 = wl[0]
+		_bookshelf(o + b * lp, yaw + float(wl[1]), 2.6, rng.randf_range(2.0, 2.7), rng.randf_range(-5, 5))
+	for q in 4:
+		_book_pile(o + b * Vector3(rng.randf_range(-4, 4), 0, rng.randf_range(-4, 4)), 12)
+	_p_lectern(o + b * Vector3(0.8, 0, 1.4), yaw + 180.0)
+	_floating_papers(zone, o + Vector3(0, 1.6, 0), Vector3(5, 1.4, 5))
+	_omni(zone, o + Vector3(0, 2.2, 0), Color(1.0, 0.7, 0.35), 0.9, 9.0, 0.03)
+
+
+## Fuerte de pupitres y sacos: cobertura en U.
+func _set_desk_fort(zone: Node3D, o: Vector3, yaw: float, theme: String) -> void:
+	var b := _yb(yaw)
+	_p_desks(o + b * Vector3(-3.4, 0, 0), yaw, 4)
+	_p_desks(o + b * Vector3(3.4, 0, 0.6), yaw, 3)
+	_p_desks(o + b * Vector3(0, 0, -3.4), yaw + 90.0, 4)
+	_sandbag_wall(o + b * Vector3(-1.6, 0, 3.6), yaw, 3.0)
+	if theme == "red":
+		_p_racks(o + b * Vector3(2.0, 0, 3.4), yaw + 90.0, 1)
+	elif theme == "cuarentena":
+		_p_drums(o + b * Vector3(2.2, 0, 3.2), 3)
+	else:
+		_p_vending(o + b * Vector3(2.2, 0, 3.4), yaw + 180.0, true)
+	_lbox(o, b, Vector3(0, 0.02, 0), Vector3(2.2, 0.03, 1.4), m_canvas, false, Vector3(0, 25, 0))
+	for q in 5:
+		_chunk(o + b * Vector3(rng.randf_range(-2.5, 2.5), 0, rng.randf_range(-2.5, 2.5)), 0.15, 0.4)
+
+
+## Cementerio de servidores: filas de racks, bobinas y un transformador.
+func _set_server_dump(zone: Node3D, o: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	for row in 3:
+		_p_racks(o + b * Vector3(-3.6 + row * 3.2, 0, -1.6), yaw, 3)
+	_p_spool(o + b * Vector3(-3.4, 0, 3.4), yaw + 30.0, true)
+	_p_spool(o + b * Vector3(-0.6, 0, 3.8), yaw + 80.0, false)
+	_p_transformer(zone, o + b * Vector3(3.4, 0, 3.2), yaw + 180.0)
+	_p_floor_tiles(o + b * Vector3(1.2, 0, 1.6), yaw)
+	# Charola de cable colgando entre dos postes
+	for sx: float in [-5.2, 5.2]:
+		_lbox(o, b, Vector3(sx, 1.9, -3.6), Vector3(0.12, 3.8, 0.12), m_metal, true)
+	_lbox(o, b, Vector3(0, 3.6, -3.6), Vector3(10.4, 0.08, 0.5), m_metal_light, false, Vector3(0, 0, 3))
+	for q in 5:
+		var x := rng.randf_range(-4.5, 4.5)
+		_rod(o + b * Vector3(x, 3.55, -3.6), o + b * Vector3(x + rng.randf_range(-0.4, 0.4), rng.randf_range(1.2, 2.6), -3.6 + rng.randf_range(-0.3, 0.3)), 0.03, m_rack, 4)
+	_omni(zone, o + Vector3(0, 1.6, 0), Color(0.3, 0.9, 1.0), 0.8, 8.0, 0.2, 6.0)
+
+
+## Campamento de cuarentena: dos carpas rígidas, cerca, tambos y camillas.
+func _set_quarantine_camp(zone: Node3D, o: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	for k in 2:
+		var tc := Vector3(-2.8 + k * 5.6, 0, -1.6)
+		# Carpa: estructura con dos muros laterales y fondo (se entra por el frente)
+		for sx: float in [-1.5, 1.5]:
+			_lbox(o, b, tc + Vector3(sx, 1.1, 0), Vector3(0.08, 2.2, 3.4), m_white_lab, true)
+			_lbox(o, b, tc + Vector3(sx * 0.5, 2.55, 0), Vector3(1.7, 0.06, 3.5), m_white_lab, false, Vector3(0, 0, -sx * 20.0))
+		_lbox(o, b, tc + Vector3(0, 1.1, -1.7), Vector3(3.0, 2.2, 0.08), m_white_lab, true)
+		_lbox(o, b, tc + Vector3(0, 1.6, 1.72), Vector3(1.2, 0.5, 0.03), m_hazard_y)
+		if k == 0:
+			_p_stretcher(o + b * (tc + Vector3(0, 0, -0.3)), yaw)
+		else:
+			_p_incubator(zone, o + b * (tc + Vector3(0, 0, -0.9)), yaw)
+	_p_fence_panel(o + b * Vector3(-5.2, 0, 2.0), yaw, 3.4)
+	_p_fence_panel(o + b * Vector3(5.2, 0, 2.2), yaw, 3.4)
+	_p_fence_panel(o + b * Vector3(-2.6, 0, 4.6), yaw + 90.0, 3.4)
+	_p_drums(o + b * Vector3(2.6, 0, 3.8), 4)
+	_puddle(o + b * Vector3(0, 0, 2.0), 1.4, m_spill)
+	# Regadera de emergencia
+	_lbox(o, b, Vector3(0, 1.2, 4.4), Vector3(0.07, 2.4, 0.07), m_hazard_y, true)
+	_lbox(o, b, Vector3(0, 2.4, 4.0), Vector3(0.07, 0.07, 0.8), m_hazard_y)
+	_cy(o + b * Vector3(0, 2.3, 3.6), 0.2, 0.08, m_hazard_y, Vector3.ZERO, 10)
+	_omni(zone, o + Vector3(0, 2.0, 1.0), Color(0.45, 1.0, 0.4), 0.9, 9.0, 0.05)
+
+
+## Ceremonia interrumpida: filas de sillas frente a un estrado con atril.
+func _set_ceremony(zone: Node3D, o: Vector3, yaw: float) -> void:
+	var b := _yb(yaw)
+	_lbox(o, b, Vector3(0, 0.2, -4.2), Vector3(7.0, 0.4, 2.4), m_wood_dark, true)
+	_lbox(o, b, Vector3(0, 0.1, -2.8), Vector3(2.0, 0.2, 0.5), m_wood_dark, true)
+	_p_lectern(o + b * Vector3(0, 0.4, -4.0), yaw + 180.0)
+	_p_toga_rack(o + b * Vector3(-2.4, 0.4, -4.6), yaw)
+	for row in 3:
+		for sx: float in [-2.2, 2.2]:
+			_p_chairs(o + b * Vector3(sx + rng.randf_range(-0.2, 0.2), 0, -0.6 + row * 1.7), yaw + rng.randf_range(-6, 6), 5)
+	for sx: float in [-4.6, 4.6]:
+		_lbox(o, b, Vector3(sx, 1.7, -4.2), Vector3(0.1, 3.4, 0.1), m_iron, true)
+	_lbox(o, b, Vector3(0, 3.2, -4.2), Vector3(9.2, 0.7, 0.04), m_canvas, false, Vector3(0, 0, -4))
+	_lbl(zone, "GENERACIÓN  ∞", o + b * Vector3(0, 3.2, -4.16), yaw, 40, Color(0.9, 0.82, 0.6))
+	_p_pedestal(o + b * Vector3(4.6, 0, 3.6), yaw)
+
+
+# ---------------------------------------------------------------- escondites del botín
+
+## [id de lugar, estilo, ancla (x, z), radio mínimo y máximo de búsqueda, tema, guardia]
+const LOOT_HIDEOUTS := [
+	["cofre_caseta", "caseta", Vector2(0, 0), 0.0, 0.0, "", ""],
+	["suelo_jardin", "andamio", Vector2(0, 0), 0.0, 0.0, "", ""],
+	["suelo_andamio_residencias", "andamio", Vector2(-205, 60), 14.0, 44.0, "humanidades", ""],
+	["cofre_derecho", "ruina", Vector2(-219, -180), 18.0, 50.0, "humanidades", "robot_hacha"],
+	["cofre_estadio", "guardado", Vector2(-80, -150), 40.0, 66.0, "humanidades", "mecha"],
+	["suelo_andamio_torre", "andamio", Vector2(125, -8), 24.0, 52.0, "red", ""],
+	["cofre_raiz", "contenedor", Vector2(225, -85), 44.0, 74.0, "red", "androide_script"],
+	["cofre_camara_fria", "ruina", Vector2(215, -300), 12.0, 44.0, "cuarentena", "mutante_grande"],
+	["suelo_arquitectura", "andamio", Vector2(111, -251), 20.0, 50.0, "cuarentena", ""],
+	["cofre_cripta", "cripta", Vector2(-62, -385), 12.0, 44.0, "ceremonia", "mecha"],
+]
+## Candidatos fijos de los dos escondites de la zona central (hecha a mano).
+const LOOT_FIXED := {
+	"cofre_caseta": [Vector2(-27, 78), Vector2(27, 80), Vector2(-31, 70), Vector2(31, 72)],   # lejos del carril del autobús y de las cámaras de la intro
+	"suelo_jardin": [Vector2(-25, -113), Vector2(27, -115), Vector2(-29, -170), Vector2(31, -168)],
+}
+
+
+func _make_loot_hideouts(zone: Node3D) -> void:
+	for h in LOOT_HIDEOUTS:
+		var id: String = h[0]
+		var style: String = h[1]
+		var site := Vector3.INF
+		var size := Vector2(13, 13)
+		if LOOT_FIXED.has(id):
+			for c: Vector2 in LOOT_FIXED[id]:
+				var free := true
+				for bb in _blocked_rects:
+					if (bb as Rect2).grow(6.5).has_point(c):
+						free = false
+				if free:
+					site = Vector3(c.x, 0, c.y)
+					break
+		else:
+			site = _dens_site(h[2], float(h[3]), float(h[4]), size, h[5])
+		if site == Vector3.INF:
+			push_warning("CampusWorld: no hubo lugar para el escondite '%s' (el botín usará su punto de respaldo)." % id)
+			continue
+		var p2 := Vector2(site.x, site.z)
+		_reserve_rect(p2, size)
+		_dens_spots.append(Vector3(p2.x, p2.y, 7.0))
+		# El frente (+z local) mira hacia el ancla / el centro del campus
+		var look: Vector2 = (h[2] as Vector2) - p2 if not LOOT_FIXED.has(id) else Vector2(0, -60) - p2
+		var yaw := rad_to_deg(atan2(look.x, look.y))
+		var info := {}
+		match style:
+			"caseta":
+				info = _hide_booth(zone, site, yaw)
+			"andamio":
+				var top := _set_scaffold(zone, site, yaw, _theme_at(p2))
+				info = {"pos": top, "yaw": yaw}
+			"ruina":
+				info = _hide_ruin(zone, site, yaw, _theme_at(p2))
+			"guardado":
+				info = _hide_ring(zone, site, yaw)
+			"contenedor":
+				info = _hide_vault(zone, site, yaw)
+			"cripta":
+				info = _hide_crypt(zone, site, yaw)
+		if info.is_empty():
+			continue
+		info["guardia"] = String(h[6])
+		if not info.has("guardia_pos"):
+			info["guardia_pos"] = site + _yb(yaw) * Vector3(0, 0, 8.5)
+		loot_sites[id] = info
+
+
+## Caseta de vigilancia de la entrada: el cofre queda detrás, tapado por la caseta y una
+## barda rota (se rodea por un lado).
+func _hide_booth(zone: Node3D, o: Vector3, yaw: float) -> Dictionary:
+	var b := _yb(yaw)
+	# Caseta 2.8 × 2.8 con puerta al costado
+	_lbox(o, b, Vector3(0, 1.3, 1.4), Vector3(2.8, 2.6, 0.2), m_plaster, true)
+	_lbox(o, b, Vector3(0, 1.3, -1.4), Vector3(2.8, 2.6, 0.2), m_plaster, true)
+	_lbox(o, b, Vector3(-1.4, 1.3, 0), Vector3(0.2, 2.6, 2.8), m_plaster, true)
+	_lbox(o, b, Vector3(1.4, 1.3, -0.9), Vector3(0.2, 2.6, 1.0), m_plaster, true)
+	_lbox(o, b, Vector3(0, 2.68, 0), Vector3(3.4, 0.16, 3.4), m_concrete)
+	_lbox(o, b, Vector3(0, 1.5, 1.52), Vector3(1.6, 0.9, 0.04), m_glass)
+	_lbox(o, b, Vector3(-0.6, 0.45, 0.6), Vector3(1.2, 0.9, 0.7), m_desk, true)
+	_lbl(zone, "VIGILANCIA", o + b * Vector3(0, 2.3, 1.56), yaw, 30, Color(0.85, 0.85, 0.8))
+	# Pluma de acceso rota
+	_lbox(o, b, Vector3(2.2, 0.55, 2.0), Vector3(0.3, 1.1, 0.3), m_hazard_y, true)
+	_lbox(o, b, Vector3(3.9, 0.7, 2.3), Vector3(3.4, 0.1, 0.1), m_hazard_y, false, Vector3(0, 8, -14))
+	# Barda detrás (en U): el rincón del cofre
+	_lbox(o, b, Vector3(-2.9, 1.0, -2.6), Vector3(0.3, 2.0, 5.4), m_concrete, true)
+	_lbox(o, b, Vector3(0.3, 1.0, -5.3), Vector3(6.7, 2.0, 0.3), m_concrete, true)
+	_lbox(o, b, Vector3(3.5, 0.7, -4.2), Vector3(0.3, 1.4, 2.2), m_concrete, true, Vector3(0, 0, 6))
+	for q in 6:
+		_chunk(o + b * Vector3(rng.randf_range(2.6, 4.4), 0, rng.randf_range(-3.0, -1.2)), 0.2, 0.6)
+	_rebar(o + b * Vector3(3.5, 1.4, -3.2), 2)
+	_p_drums(o + b * Vector3(1.6, 0, -4.2), 2)
+	return {"pos": o + b * Vector3(-1.2, 0, -3.6), "yaw": yaw + 180.0}
+
+
+## Edificio en ruinas con el frente tapiado: se entra por un boquete en la pared de atrás.
+## El cofre queda en el rincón que no se ve desde el boquete.
+func _hide_ruin(zone: Node3D, o: Vector3, yaw: float, theme: String) -> Dictionary:
+	var b := _yb(yaw)
+	var wall: Material = m_brick
+	var glow := Color(1.0, 0.7, 0.35)
+	if theme == "cuarentena":
+		wall = m_white_lab
+		glow = Color(0.5, 0.9, 1.0)
+	var W := 8.0
+	var D := 6.4
+	var H := 3.2
+	# Frente tapiado (+z), costados y fondo con boquete (a la derecha, 1.8 m)
+	_lbox(o, b, Vector3(0, H * 0.5, D * 0.5), Vector3(W, H, 0.4), wall, true)
+	for sx: float in [-1.0, 1.0]:
+		_lbox(o, b, Vector3(sx * W * 0.5, H * 0.5, 0), Vector3(0.4, H, D), wall, true)
+	_lbox(o, b, Vector3(-1.1, H * 0.5, -D * 0.5), Vector3(W - 2.2, H, 0.4), wall, true)
+	_lbox(o, b, Vector3(W * 0.5 - 0.25, H * 0.5, -D * 0.5), Vector3(0.5, H, 0.4), wall, true)
+	_lbox(o, b, Vector3(W * 0.5 - 1.4, H - 0.35, -D * 0.5), Vector3(1.8, 0.7, 0.4), wall)
+	# Tablas sobre la puerta y ventana del frente
+	_lbox(o, b, Vector3(0, 1.1, D * 0.5 + 0.22), Vector3(1.4, 2.2, 0.06), m_wood_dark)
+	for k in 3:
+		_lbox(o, b, Vector3(0, 0.5 + k * 0.7, D * 0.5 + 0.27), Vector3(1.9, 0.18, 0.05), m_wood, false, Vector3(0, 0, rng.randf_range(-12, 12)))
+	# Techo a medias y muro interior que esconde el rincón del cofre
+	_lbox(o, b, Vector3(-1.6, H + 0.1, 0.6), Vector3(W - 3.0, 0.2, D - 1.0), m_concrete, false, Vector3(3, 0, 0))
+	_lbox(o, b, Vector3(0.4, H * 0.5, -0.8), Vector3(0.3, H, 2.8), wall, true)
+	_rebar(o + b * Vector3(2.2, H, -1.0), 3)
+	for q in 8:
+		_chunk(o + b * Vector3(rng.randf_range(1.6, 3.6), 0, rng.randf_range(-4.4, -2.4)), 0.2, 0.7)
+	# Interior según el tema
+	if theme == "cuarentena":
+		_p_incubator(zone, o + b * Vector3(2.8, 0, 2.4), yaw + 180.0)
+		_lbox(o, b, Vector3(-3.4, 1.0, -1.0), Vector3(0.6, 2.0, 2.6), m_metal_light, true)   # refrigeradores
+		_puddle(o + b * Vector3(-1.4, 0, -1.2), 1.0, m_spill)
+		_lbl(zone, "CÁMARA FRÍA", o + b * Vector3(0, 2.6, D * 0.5 + 0.24), yaw, 34, Color(0.6, 0.95, 1.0))
+	else:
+		_bookshelf(o + b * Vector3(2.2, 0, 2.6), yaw + 180.0, 2.6, 2.4, 3.0)
+		_book_pile(o + b * Vector3(1.6, 0, 0.6), 16)
+		_p_cabinet(o + b * Vector3(-2.2, 0, -2.6), yaw)
+		_lbl(zone, "ARCHIVO  —  CLAUSURADO", o + b * Vector3(0, 2.6, D * 0.5 + 0.24), yaw, 30, Color(0.9, 0.8, 0.6))
+	_omni(zone, o + b * Vector3(-1.8, 1.6, 1.4), glow, 0.9, 6.0, 0.05)
+	return {"pos": o + b * Vector3(-2.0, 0, 1.9), "yaw": yaw + 180.0, "guardia_pos": o + b * Vector3(3.0, 0, -8.0)}
+
+
+## Cofre a la vista dentro de un anillo de barricadas, con su guardián adentro.
+func _hide_ring(zone: Node3D, o: Vector3, yaw: float) -> Dictionary:
+	var n := 10
+	for i in n:
+		if i == 2 or i == 7:
+			continue                      # dos entradas
+		var a := deg_to_rad(yaw) + TAU * i / n
+		var p := o + Vector3(sin(a), 0, cos(a)) * 5.6
+		var ydeg := rad_to_deg(a)
+		if i % 3 == 0:
+			_sandbag_wall(p, ydeg, 3.2)
+		else:
+			_blk(p + Vector3(0, 0.45, 0), Vector3(3.2, 0.9, 0.6), m_concrete, Vector3(0, ydeg, 0), true)
+			if i % 2 == 0:
+				_lbox(p, _yb(ydeg), Vector3(0, 1.0, 0), Vector3(3.0, 0.2, 0.04), m_hazard_y)
+	# Tarima del cofre y marcador viejo del estadio
+	_cy(o + Vector3(0, 0.06, 0), 1.5, 0.12, m_concrete, Vector3.ZERO, 12)
+	var b := _yb(yaw)
+	for sx: float in [-2.2, 2.2]:
+		_lbox(o, b, Vector3(sx, 2.0, -6.6), Vector3(0.16, 4.0, 0.16), m_iron, true)
+	_lbox(o, b, Vector3(0, 3.4, -6.6), Vector3(5.0, 1.4, 0.2), m_rack, false, Vector3(0, 0, -5))
+	_lbl(zone, "LOCAL 0  —  VISITA ∞", o + b * Vector3(0, 3.4, -6.48), yaw, 40, Color(1.0, 0.5, 0.2))
+	_omni(zone, o + Vector3(0, 2.0, 0), Color(0.7, 0.4, 1.0), 0.8, 7.0)
+	return {"pos": o + Vector3(0, 0.12, 0), "yaw": yaw, "guardia_pos": o + b * Vector3(0, 0, 3.0)}
+
+
+## "Cuarto raíz": bóveda de servidores sellada. El sello se disipa al vencer a ADA-7.
+func _hide_vault(zone: Node3D, o: Vector3, yaw: float) -> Dictionary:
+	var b := _yb(yaw)
+	var W := 4.4
+	var D := 8.0
+	var H := 3.0
+	for sx: float in [-1.0, 1.0]:
+		_lbox(o, b, Vector3(sx * W * 0.5, H * 0.5, 0), Vector3(0.3, H, D), m_metal, true)
+		_lbox(o, b, Vector3(sx * (W * 0.5 - 0.7), H * 0.5, D * 0.5), Vector3(1.1, H, 0.3), m_metal, true)
+	_lbox(o, b, Vector3(0, H * 0.5, -D * 0.5), Vector3(W, H, 0.3), m_metal, true)
+	_lbox(o, b, Vector3(0, H - 0.25, D * 0.5), Vector3(2.2, 0.5, 0.3), m_metal)
+	_lbox(o, b, Vector3(0, H + 0.1, 0), Vector3(W + 0.4, 0.2, D + 0.4), m_rack)
+	# Racks a los lados (pasillo central de 1.6 m) y franjas de luz
+	for k in 4:
+		for sx: float in [-1.0, 1.0]:
+			_lbox(o, b, Vector3(sx * 1.45, 1.1, -2.9 + k * 1.5), Vector3(0.8, 2.2, 1.1), m_rack, true)
+			_lbox(o, b, Vector3(sx * 1.03, 1.1, -2.9 + k * 1.5), Vector3(0.02, 1.8, 0.06), m_cyan)
+	_lbox(o, b, Vector3(0, 0.01, 0), Vector3(1.5, 0.02, D - 0.6), m_metal_light)
+	_lbl(zone, "CUARTO RAÍZ\n/root", o + b * Vector3(0, H + 0.6, D * 0.5 + 0.2), yaw, 40, Color(0.3, 0.95, 1.0))
+	_omni(zone, o + b * Vector3(0, 2.2, -1.0), Color(0.25, 0.9, 1.0), 1.0, 7.0, 0.1, 5.0)
+	_seal("cuarto_raiz", o + b * Vector3(0, 0, D * 0.5), yaw, 2.0)
+	_p_spool(o + b * Vector3(3.6, 0, 3.6), yaw + 40.0, true)
+	_p_transformer(zone, o + b * Vector3(-3.8, 0, 2.6), yaw + 90.0)
+	return {"pos": o + b * Vector3(0, 0, -3.1), "yaw": yaw, "guardia_pos": o + b * Vector3(0, 0, 8.0)}
+
+
+## Cripta del Memorial: mausoleo con reja al frente; se entra por el muro roto de atrás.
+func _hide_crypt(zone: Node3D, o: Vector3, yaw: float) -> Dictionary:
+	var b := _yb(yaw)
+	var W := 6.4
+	var D := 7.6
+	var H := 3.6
+	for sx: float in [-1.0, 1.0]:
+		_lbox(o, b, Vector3(sx * W * 0.5, H * 0.5, 0), Vector3(0.5, H, D), m_stone, true)
+		_cy(o + b * Vector3(sx * 2.0, H * 0.5, D * 0.5 + 0.9), 0.32, H, m_stone_light, Vector3.ZERO, 12, 0.85, true)
+		_lbox(o, b, Vector3(sx * (W * 0.5 - 0.9), H * 0.5, D * 0.5), Vector3(1.4, H, 0.5), m_stone, true)
+	# Reja del frente (no se pasa) y frontón
+	for k in 7:
+		_lbox(o, b, Vector3(-1.2 + k * 0.4, 1.5, D * 0.5), Vector3(0.07, 3.0, 0.07), m_iron)
+	_wc(Vector3(3.0, 3.2, 0.3), Transform3D(b, o + b * Vector3(0, 1.6, D * 0.5)))
+	_lbox(o, b, Vector3(0, H + 0.3, D * 0.5 + 0.5), Vector3(W + 1.2, 0.6, 2.0), m_stone_light)
+	_lbox(o, b, Vector3(0, H + 0.15, -0.6), Vector3(W + 0.6, 0.3, D - 0.6), m_stone)
+	_lbl(zone, "IN MEMORIAM", o + b * Vector3(0, H + 0.3, D * 0.5 + 1.52), yaw, 44, Color(0.9, 0.8, 0.55))
+	# Fondo con boquete a la izquierda
+	_lbox(o, b, Vector3(1.2, H * 0.5, -D * 0.5), Vector3(W - 2.4, H, 0.5), m_stone, true)
+	_lbox(o, b, Vector3(-W * 0.5 + 0.2, H * 0.5, -D * 0.5), Vector3(0.4, H, 0.5), m_stone, true)
+	_lbox(o, b, Vector3(-W * 0.5 + 1.3, H - 0.4, -D * 0.5), Vector3(1.9, 0.8, 0.5), m_stone)
+	for q in 8:
+		_chunk(o + b * Vector3(rng.randf_range(-3.2, -1.2), 0, rng.randf_range(-5.6, -3.6)), 0.2, 0.8)
+	# Sarcófago (tapa el cofre desde la reja) y cofre detrás
+	_lbox(o, b, Vector3(0.4, 0.5, 1.0), Vector3(2.6, 1.0, 1.2), m_stone_light, true)
+	_lbox(o, b, Vector3(0.4, 1.06, 1.0), Vector3(2.8, 0.14, 1.4), m_stone, false, Vector3(0, 6, 0))
+	_lbox(o, b, Vector3(0.4, 1.16, 1.0), Vector3(0.5, 0.06, 0.9), m_gold)
+	_omni(zone, o + b * Vector3(0, 2.2, 0), Color(1.0, 0.85, 0.4), 1.0, 7.0, 0.04)
+	return {"pos": o + b * Vector3(1.2, 0, -1.6), "yaw": yaw, "guardia_pos": o + b * Vector3(0, 0, 9.0)}
 
 
 func _inside_structure(p: Vector2) -> bool:
