@@ -10,7 +10,7 @@ signal lightning_struck(direction: Vector2)
 	set(v):
 		rain_amount = v
 		if rain:
-			rain.amount = v
+			rain.amount = _scaled_amount(v)
 @export var splash_amount: int = 1200
 @export var environment_path: NodePath
 @export var sun_path: NodePath
@@ -35,6 +35,7 @@ signal lightning_struck(direction: Vector2)
 var rain: GPUParticles3D
 var splashes: GPUParticles3D
 var droplets: GPUParticles3D
+var _particle_scale := 1.0
 
 var _rng := RandomNumberGenerator.new()
 var _next := 4.0
@@ -49,6 +50,20 @@ var _amb_base := 0.7
 var _storm_tween: Tween
 var _cover_t := 0.0
 var _covered := false
+
+
+func _scaled_amount(base: int) -> int:
+	return maxi(1, roundi(base * _particle_scale))
+
+
+func set_particle_scale(scale_factor: float) -> void:
+	_particle_scale = scale_factor
+	if rain:
+		rain.amount = _scaled_amount(rain_amount)
+	if splashes:
+		splashes.amount = _scaled_amount(splash_amount)
+	if droplets:
+		droplets.amount = _scaled_amount(splash_amount / 2)
 
 
 func _ready() -> void:
@@ -230,7 +245,7 @@ func _soft_tex(colors: PackedColorArray, offsets: PackedFloat32Array, radial: bo
 func _make_rain() -> void:
 	rain = GPUParticles3D.new()
 	rain.name = "Rain"
-	rain.amount = rain_amount
+	rain.amount = _scaled_amount(rain_amount)
 	rain.lifetime = 1.4
 	rain.preprocess = 1.4
 	rain.local_coords = false
@@ -269,7 +284,7 @@ func _make_splashes() -> void:
 	# Anillos de impacto sobre el suelo
 	splashes = GPUParticles3D.new()
 	splashes.name = "RainSplashes"
-	splashes.amount = splash_amount
+	splashes.amount = _scaled_amount(splash_amount)
 	splashes.lifetime = 0.35
 	splashes.local_coords = false
 	splashes.position = Vector3(0, 0.04, 0)
@@ -314,7 +329,7 @@ func _make_splashes() -> void:
 	# Pequeñas gotas que rebotan
 	droplets = GPUParticles3D.new()
 	droplets.name = "RainDroplets"
-	droplets.amount = splash_amount / 2
+	droplets.amount = _scaled_amount(splash_amount / 2)
 	droplets.lifetime = 0.3
 	droplets.local_coords = false
 	droplets.position = Vector3(0, 0.04, 0)

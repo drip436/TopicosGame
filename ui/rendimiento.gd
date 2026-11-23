@@ -13,6 +13,7 @@ extends Node
 ## "alta" no toca nada: deja el juego tal como está hecho.
 
 const E := preload("res://ui/estilo.gd")
+const Clima := preload("res://scripts/weather.gd")
 const SCRIPT_PROPIO := "res://ui/rendimiento.gd"
 const RUTA := "user://rendimiento.cfg"
 const ORDEN := ["patata", "baja", "media", "alta"]
@@ -42,7 +43,6 @@ const NIVELES := {
 }
 
 var nivel := "alta"
-var _t := 0.0
 
 
 # ------------------------------------------------------------------ API
@@ -142,24 +142,11 @@ func cambiar(id: String) -> void:
 	_aplicar_todo()
 
 
-func _process(delta: float) -> void:
-	# El entorno y la cámara pueden cambiar (jefes, cinemática): se repasan cada 2 s
-	_t += delta
-	if _t > 2.0:
-		_t = 0.0
-		_ventana()
-		for n in get_tree().root.find_children("*", "WorldEnvironment", true, false):
-			_nodo(n)
-		var cam := get_viewport().get_camera_3d()
-		if cam:
-			_nodo(cam)
-
-
 func _on_nodo(n: Node) -> void:
 	if nivel == "alta":
 		return
 	# Solo lo que este script sabe ajustar (el campus crea miles de nodos al armarse)
-	if n is Light3D or n is GPUParticles3D or n is WorldEnvironment or n is Camera3D or n is MultiMeshInstance3D or String(n.name) == "VidaDelCampus":
+	if n is Clima or n is Light3D or n is GPUParticles3D or n is WorldEnvironment or n is Camera3D or n is MultiMeshInstance3D or String(n.name) == "VidaDelCampus":
 		_nodo.call_deferred(n)
 
 
@@ -248,7 +235,9 @@ func _nodo(n: Node) -> void:
 			d = minf(d, float(o["distance_fade_begin"]))
 		l.distance_fade_begin = d
 		l.distance_fade_length = 8.0
-	elif n is GPUParticles3D:
+	elif n is Clima:
+		n.set_particle_scale(1.0 if alta else float(c["part"]))
+	elif n is GPUParticles3D and not (n.get_parent() is Clima):
 		if alta:
 			_restaurar(n)
 			return

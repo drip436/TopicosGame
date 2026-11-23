@@ -45,6 +45,23 @@ func _ready() -> void:
 	capa.add_child(_fps)
 	get_tree().node_added.connect(_on_node_added)
 	aplicar()
+	_ajustar_ventana_inicial()
+
+
+func _ajustar_ventana_inicial() -> void:
+	var ventana := get_window()
+	if ventana.mode != Window.MODE_WINDOWED or DisplayServer.get_name() == "headless":
+		return
+	var area := DisplayServer.screen_get_usable_rect(ventana.current_screen)
+	var marco := ventana.get_size_with_decorations() - ventana.size
+	var disponible := area.size - marco
+	if disponible.x <= 0 or disponible.y <= 0:
+		return
+	var escala := minf(float(disponible.x) / ventana.size.x, float(disponible.y) / ventana.size.y)
+	if escala < 1.0:
+		var borde_superior := ventana.position - ventana.get_position_with_decorations()
+		ventana.size = Vector2i(Vector2(ventana.size) * escala)
+		ventana.position = area.position + (disponible - ventana.size) / 2 + borde_superior
 
 
 func _process(_delta: float) -> void:
