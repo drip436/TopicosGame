@@ -170,6 +170,7 @@ func _notification(what: int) -> void:
 
 
 func _enter_tree() -> void:
+	add_to_group("estructuras_campus")
 	if _ready_done:
 		_changed()
 

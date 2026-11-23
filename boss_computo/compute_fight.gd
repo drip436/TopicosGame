@@ -15,6 +15,7 @@ signal phase_changed(phase: int)
 signal boss_defeated
 signal player_died
 
+const PRESENTACION := preload("res://scripts/presentacion_jefe.gd")
 const BOSS_SCENE: PackedScene = preload("BossAdmin.tscn")
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const HUD := preload("res://boss_profesor/boss_hud.gd")
@@ -134,6 +135,9 @@ func _start() -> void:
 	if hud.has_method("set_boss_part"):
 		hud.set_boss_part("PIERNA IZQUIERDA  ·  punto débil", 1.0)
 	hud.show_hint("Su punto débil es la PIERNA ROBÓTICA IZQUIERDA: golpéala desde su costado izquierdo.\nEn el resto del cuerpo el daño es mínimo · No te quedes detrás de ella ni pegado a la pierna", 10.0)
+	var toma := PRESENTACION.new()
+	boss.add_child(toma)
+	toma.iniciar(boss, player, _center, boss_name, 3.1, 4.5)
 	boss.begin_intro()
 
 

@@ -1119,6 +1119,7 @@ func _soft_tex(colors: PackedColorArray, offsets: PackedFloat32Array) -> Gradien
 
 func _fire(parent: Node3D, pos: Vector3, size: float) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.position = pos
 	p.amount = int(48 * size)
 	p.lifetime = 0.9
@@ -1176,6 +1177,7 @@ func _fire(parent: Node3D, pos: Vector3, size: float) -> void:
 
 func _smoke(parent: Node3D, pos: Vector3, size: float) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.position = pos
 	p.amount = int(36 * size) + 10
 	p.lifetime = 12.0

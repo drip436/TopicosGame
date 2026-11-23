@@ -79,11 +79,17 @@ const ZONES := [
 @export var open_world_on_start: bool = false
 
 var w_body: StaticBody3D
+var _collision_cells := {}
 var w_zone: Node3D
 var _mmc := {}
 var _units := {}
 var _paths: Array = []
 var _blocked: Array = []
+const PLACEMENT_CELL := 24.0
+const PLACEMENT_MARGIN := 5.0
+var _circle_cells := {}
+var _rect_cells := {}
+var _path_cells := {}
 ## Atajos al Hub: {id, title, pos, side, open, node}. Los usa mundo/world_life.gd.
 var shortcuts: Array = []
 ## Fuentes del campus: [centro (Vector3), radio]. Las usa mundo/botin.gd para no dejar
@@ -207,6 +213,7 @@ func _build() -> void:
 	_mm.clear()
 	_mmc.clear()
 	_units.clear()
+	_collision_cells.clear()
 	_paths.clear()
 	_blocked.clear()
 	_gate_pivots.clear()
@@ -250,9 +257,14 @@ func _build() -> void:
 	_make_sector_walls()
 	_make_alamedas()
 	_make_density()
+	_index_placement_areas()
 	_make_nature()
 	_make_filler()
 	_make_wild_grass()
+	_circle_cells.clear()
+	_rect_cells.clear()
+	_path_cells.clear()
+	_collision_cells.clear()
 	_make_world_fx()
 	_make_markers()
 	# Todas las luces se desvanecen a distancia (rendimiento).
@@ -754,7 +766,16 @@ func _wc(size: Vector3, xf: Transform3D) -> void:
 	s.size = (size * xf.basis.get_scale()).abs()
 	cs.shape = s
 	cs.transform = Transform3D(xf.basis.orthonormalized(), xf.origin)
-	w_body.add_child(cs)
+	if _prefab_local:
+		w_body.add_child(cs)
+	else:
+		# Jolt solo reconstruye el compuesto del sector al añadir una caja.
+		var cell := Vector2i(floori(xf.origin.x / MM_CELL), floori(xf.origin.z / MM_CELL))
+		if not _collision_cells.has(cell):
+			var body := StaticBody3D.new()
+			w_body.add_child(body)
+			_collision_cells[cell] = body
+		_collision_cells[cell].add_child(cs)
 
 
 func _mmc_add(mesh: Mesh, xf: Transform3D, c: Color) -> void:
@@ -823,18 +844,50 @@ func _reserve(c: Vector2, r: float) -> void:
 	_blocked.append([c, r])
 
 
+## Se construye cuando todas las zonas ya están reservadas, antes de distribuir vegetación.
+func _index_placement_areas() -> void:
+	for circle in _blocked:
+		var bounds := Rect2(Vector2(circle[0]), Vector2.ZERO).grow(float(circle[1]))
+		_index_area(_circle_cells, bounds, circle)
+	for rect: Rect2 in _blocked_rects:
+		_index_area(_rect_cells, rect, rect)
+	for path in _paths:
+		var bounds := Rect2(Vector2(path[0]), Vector2.ZERO).expand(path[1]).grow(float(path[2]) * 0.5)
+		_index_area(_path_cells, bounds, path)
+
+
+func _index_area(cells: Dictionary, bounds: Rect2, item: Variant) -> void:
+	var padded := bounds.grow(PLACEMENT_MARGIN)
+	var first := Vector2i((padded.position / PLACEMENT_CELL).floor())
+	var last := Vector2i((padded.end / PLACEMENT_CELL).floor())
+	for x in range(first.x, last.x + 1):
+		for y in range(first.y, last.y + 1):
+			var key := Vector2i(x, y)
+			if not cells.has(key):
+				cells[key] = []
+			cells[key].append(item)
+
+
 func _is_free(p: Vector2, margin: float) -> bool:
 	if absf(p.y - AVENUE_Z) < 8.0 + margin:
 		return false
 	if p.length() < 100.0:
 		return false
-	for b in _blocked:
+	var circles := _blocked
+	var rects := _blocked_rects
+	var paths := _paths
+	if not _circle_cells.is_empty() and margin <= PLACEMENT_MARGIN:
+		var cell := Vector2i((p / PLACEMENT_CELL).floor())
+		circles = _circle_cells.get(cell, [])
+		rects = _rect_cells.get(cell, [])
+		paths = _path_cells.get(cell, [])
+	for b in circles:
 		if p.distance_to(b[0]) < float(b[1]) + margin:
 			return false
-	for r in _blocked_rects:
+	for r in rects:
 		if (r as Rect2).grow(margin).has_point(p):
 			return false
-	for s in _paths:
+	for s in paths:
 		var a: Vector2 = s[0]
 		var e: Vector2 = s[1]
 		var q := Geometry2D.get_closest_point_to_segment(p, a, e)
@@ -1383,6 +1436,7 @@ func _book_pile(c: Vector3, n: int) -> void:
 
 func _floating_papers(parent: Node3D, pos: Vector3, extents: Vector3) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.name = "FloatingPapers"
 	p.position = pos
 	p.amount = 90
@@ -1666,6 +1720,7 @@ func _rack(pos: Vector3, yaw: float) -> void:
 
 func _sparks(parent: Node3D, pos: Vector3) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.position = pos
 	p.amount = 28
 	p.lifetime = 1.8
@@ -1989,6 +2044,7 @@ func _spart(holder: Node3D, mesh: Mesh, p: Vector3, size: Vector3, rot := Vector
 
 func _bubbles(parent: Node3D, pos: Vector3, r: float, h: float) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.position = pos
 	p.amount = 16
 	p.lifetime = h / 0.9
@@ -3084,6 +3140,7 @@ func _reeds(parent: Node3D, center: Vector3, pts: Array) -> void:
 ## Neblina baja que se arrastra sobre el agua.
 func _lake_mist(parent: Node3D, c: Vector3, A: float, B: float) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.name = "Neblina"
 	p.position = c + Vector3(0, 0.7, 0)
 	p.amount = int(clampf(A * B / 50.0, 16.0, 70.0))
@@ -3165,6 +3222,7 @@ func _fountain(zone: Node3D, c: Vector3, r: float, jets: bool) -> void:
 
 func _water_jet(parent: Node3D, pos: Vector3, ring_r: float) -> void:
 	var p := GPUParticles3D.new()
+	p.add_to_group("particulas_decorativas_campus")
 	p.position = pos
 	p.amount = 140 if ring_r <= 0.0 else 220
 	p.lifetime = 1.1 if ring_r <= 0.0 else 0.75

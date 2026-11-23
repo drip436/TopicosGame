@@ -13,6 +13,7 @@ var _seed := 0.0
 
 
 func _ready() -> void:
+	add_to_group("luces_parpadeantes")
 	_seed = randf() * 100.0
 	light_energy = base_energy
 

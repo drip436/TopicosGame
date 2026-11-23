@@ -22,6 +22,7 @@ signal game_finished(good_ending: bool)
 signal advance
 signal chosen(option: int)
 
+const PRESENTACION := preload("res://scripts/presentacion_jefe.gd")
 const BOSS_SCENE: PackedScene = preload("BossRector.tscn")
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const HUD := preload("res://boss_profesor/boss_hud.gd")
@@ -288,6 +289,9 @@ func _start_fight() -> void:
 	hud.show_boss(boss_name)
 	hud.set_boss_health(boss.health, boss.max_health)
 	hud.show_hint("Pelea con mucha destreza: esquiva tus golpes y contraataca. Si te alejas, te dispara con su revólver.", 8.0)
+	var toma := PRESENTACION.new()
+	boss.add_child(toma)
+	toma.iniciar(boss, player, _center, boss_name, 1.5, 1.5)
 	boss.begin_fight()
 
 

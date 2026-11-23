@@ -35,6 +35,7 @@ signal player_died
 @export var clear_weather_on_victory: bool = true
 @export_range(0.0, 0.3) var rain_after_victory: float = 0.03
 
+const PRESENTACION := preload("res://scripts/presentacion_jefe.gd")
 const BOSS_SCENE: PackedScene = preload("BossProfesor.tscn")
 const HUD := preload("boss_hud.gd")
 const PLAYER := preload("test_player.gd")
@@ -159,6 +160,9 @@ func start_fight() -> void:
 	_close_entrance()
 	_close_fog_gate()
 	_show_hud()
+	var toma := PRESENTACION.new()
+	boss.add_child(toma)
+	toma.iniciar(boss, player, arena_center, boss_name, 3.0, 3.0)
 	boss.begin_intro(landing_point)
 
 

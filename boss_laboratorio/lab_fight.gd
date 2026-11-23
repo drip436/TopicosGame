@@ -15,6 +15,7 @@ signal phase_changed(phase: int)
 signal boss_defeated
 signal player_died
 
+const PRESENTACION := preload("res://scripts/presentacion_jefe.gd")
 const BOSS_SCENE: PackedScene = preload("BossDoctor.tscn")
 const LFX := preload("res://boss_bibliotecario/library_fx.gd")
 const HUD := preload("res://boss_profesor/boss_hud.gd")
@@ -133,6 +134,9 @@ func _start() -> void:
 	hud.show_boss(boss_name)
 	hud.set_boss_health(boss.health, boss.max_health)
 	hud.show_hint("Es escurridizo: se esconde detrás de sus mutantes y huye si te acercas.\nInterrúmpelo cuando experimente (se cura) · Los frascos y charcos llenan la barra de VENENO", 10.0)
+	var toma := PRESENTACION.new()
+	boss.add_child(toma)
+	toma.iniciar(boss, player, _center, boss_name, 2.2, 3.7)
 	boss.begin_intro()
 
 
